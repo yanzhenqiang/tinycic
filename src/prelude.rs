@@ -232,6 +232,7 @@ pub fn init_prelude(env: &mut Environment) {
     // 从 .x 文件加载结构体类型（动态注册）
     let _ = load_structure_from_file(env, "lib/rat.x");
     let _ = load_structure_from_file(env, "lib/cauchy.x");
+    let _ = load_structure_from_file(env, "lib/real.x");
 
     // 额外注册 Rat 基本常量（这些可以在 .x 文件中定义，但当前 parser 不支持 def）
     // Rat.zero = Rat.mk (Int.ofNat 0) 0
@@ -254,6 +255,14 @@ pub fn init_prelude(env: &mut Environment) {
         Term::const_("zero"),
     );
     env.add_constant("Rat.one", Term::const_("Rat"), Some(rat_one));
+
+    // 额外注册 Real 基本常量（parser 暂不支持 def）
+    // Real.zero = Real.mk (CauchySeq.mk (λ _ => Rat.zero))
+    let real_zero = Term::app(
+        Term::const_("Real.mk"),
+        Term::app(Term::const_("CauchySeq.mk"), Term::const_("Rat.zero")),
+    );
+    env.add_constant("Real.zero", Term::const_("Real"), Some(real_zero));
 }
 
 #[cfg(test)]
@@ -737,6 +746,40 @@ mod tests {
 
         let result = env.lookup_constant(&"CauchySeq.seq".to_string());
         assert!(result.is_ok(), "CauchySeq.seq projection should be registered");
+    }
+
+    // =========================================================================
+    // Real 实数验证
+    // =========================================================================
+
+    /// 验证 Real 类型已注册
+    #[test]
+    fn test_real_type_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Real".to_string());
+        assert!(result.is_ok(), "Real type should be registered");
+    }
+
+    /// 验证 Real.rep 投影函数
+    #[test]
+    fn test_real_rep_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Real.rep".to_string());
+        assert!(result.is_ok(), "Real.rep projection should be registered");
+    }
+
+    /// 验证 Real.zero 常量
+    #[test]
+    fn test_real_zero_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Real.zero".to_string());
+        assert!(result.is_ok(), "Real.zero should be registered");
     }
 
     // =========================================================================

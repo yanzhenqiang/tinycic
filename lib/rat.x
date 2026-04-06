@@ -50,6 +50,10 @@ def mk (n : Int) (d : PosInt) : Rat :=
 // 单位元
 def one : Rat := Rat.mk (Int.ofNat (Nat.succ Nat.zero)) PosInt.one
 
+// 从整数构造
+def ofInt (z : Int) : Rat :=
+  Rat.mk z PosInt.one
+
 // 负数
  def neg (r : Rat) : Rat :=
   Rat.mk (Int.neg r.num) r.den

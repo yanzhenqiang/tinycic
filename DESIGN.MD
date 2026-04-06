@@ -127,10 +127,21 @@ env.add_inductive() / env.add_constant()
 - `lib/rat.x` - 添加 `abs` 绝对值函数
 - 86 个测试全部通过（含 2 个 Cauchy 序列测试）
 
-### 2.4 实数构造
-- [ ] `Real` - 作为 CauchySeq / 等价关系 的商
-- [ ] 实数运算（从有理数运算提升）
-- [ ] 序关系和完备性
+### 2.4 实数构造 ✅ 已完成
+- [x] `Real` - 作为 CauchySeq / 等价关系 的商（动态加载 lib/real.x）
+  - 代表元 `rep : CauchySeq`
+  - 投影函数 `Real.rep : Real → CauchySeq`
+- [x] 实数运算（从有理数运算提升）
+  - `ofRat/ofNat/ofInt`: 从有理数/自然数/整数构造实数
+  - `add/mul/neg/sub`: 加、乘、负、减
+  - `zero/one`: 零元、单位元
+- [x] 序关系 `lt`（用 ε-N 定义）
+- [ ] 完备性定理（有上界集合有最小上界）
+
+**新增文件:**
+- `lib/real.x` - Real structure 定义及运算
+- `lib/rat.x` - 添加 `ofInt` 和 `abs`
+- 89 个测试全部通过（含 3 个 Real 测试）
 
 ## 后续目标
 - [ ] 代码提取 (Extraction) 到 C

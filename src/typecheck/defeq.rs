@@ -301,7 +301,7 @@ impl DefEqChecker {
     }
 
     /// 推断项的类型（简化实现）
-    fn infer_type(&self, term: &Rc<Term>) -> Option<Rc<Term>> {
+    pub fn infer_type(&self, term: &Rc<Term>) -> Option<Rc<Term>> {
         use crate::typecheck::TypeInference;
         use crate::typecheck::Context;
 

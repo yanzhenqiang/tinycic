@@ -17,8 +17,10 @@ struct IntroBinding {
 /// State for tracking calc blocks
 #[derive(Debug, Clone)]
 struct CalcState {
-    /// The expressions in the calc chain
-    steps: Vec<Rc<Term>>,
+    /// The left-hand side expressions in the calc chain
+    lhs_exprs: Vec<Rc<Term>>,
+    /// The right-hand side expressions in the calc chain
+    rhs_exprs: Vec<Rc<Term>>,
     /// The rewrite theorems used for each step
     rewrites: Vec<Vec<Rc<Term>>>,
 }
@@ -26,13 +28,15 @@ struct CalcState {
 impl CalcState {
     fn new() -> Self {
         Self {
-            steps: Vec::new(),
+            lhs_exprs: Vec::new(),
+            rhs_exprs: Vec::new(),
             rewrites: Vec::new(),
         }
     }
 
-    fn add_step(&mut self, expr: Rc<Term>, rw_terms: Vec<Rc<Term>>) {
-        self.steps.push(expr);
+    fn add_step(&mut self, lhs: Rc<Term>, rhs: Rc<Term>, rw_terms: Vec<Rc<Term>>) {
+        self.lhs_exprs.push(lhs);
+        self.rhs_exprs.push(rhs);
         self.rewrites.push(rw_terms);
     }
 }
@@ -95,7 +99,7 @@ impl<'env> ProofTermGenerator<'env> {
         // Try to build a proper proof term
         let mut proof = if let Some(ref calc_state) = self.calc_state {
             // We have a calc block, build proof from it
-            if calc_state.steps.len() >= 2 {
+            if !calc_state.lhs_exprs.is_empty() {
                 self.build_calc_proof(calc_state)
             } else {
                 Term::app(Term::const_("sorry"), final_goal.clone())
@@ -171,21 +175,19 @@ impl<'env> ProofTermGenerator<'env> {
                 self.ctx.push(LocalDecl::with_value(name.clone(), ty.clone(), proof.clone()));
                 Ok(())
             }
-            ParsedTactic::Calc(_steps) => {
-                // Start a new calc block
-                self.calc_state = Some(CalcState::new());
+            ParsedTactic::Calc(steps) => {
+                // Start a new calc block with the parsed steps
+                let mut calc_state = CalcState::new();
+                for step in steps {
+                    calc_state.add_step(step.lhs.clone(), step.rhs.clone(), step.rewrites.clone());
+                }
+                self.calc_state = Some(calc_state);
                 Ok(())
             }
             ParsedTactic::Rw(terms) => {
                 // Store rewrite terms for next calc step or have
                 if !terms.is_empty() {
                     self.pending_rewrite = Some(terms.clone());
-                    // If we're in a calc block, add this rewrite to the current step
-                    if let Some(ref mut calc) = self.calc_state {
-                        // Add a placeholder step with this rewrite
-                        // In a full implementation, we'd track the actual expressions
-                        calc.add_step(Term::const_("_"), terms.clone());
-                    }
                 }
                 Ok(())
             }
@@ -230,20 +232,16 @@ impl<'env> ProofTermGenerator<'env> {
 
     /// Build proof term from calc state
     fn build_calc_proof(&self, calc_state: &CalcState) -> Rc<Term> {
-        if calc_state.steps.len() < 2 {
-            // Not enough steps for a calc proof
+        if calc_state.lhs_exprs.is_empty() {
+            // No steps for a calc proof
             return Term::const_("sorry");
         }
 
-        // Build transitivity chain: step0 = step1 = step2 = ...
+        // Build transitivity chain: lhs0 = rhs0, rhs0 = rhs1, rhs1 = rhs2, ...
         // For each step, we need the equality proof
         let mut combined_proof = None;
 
         for (i, rewrites) in calc_state.rewrites.iter().enumerate() {
-            if i >= calc_state.steps.len() - 1 {
-                break;
-            }
-
             let eq_proof = self.build_equality_proof(rewrites);
 
             combined_proof = match combined_proof {

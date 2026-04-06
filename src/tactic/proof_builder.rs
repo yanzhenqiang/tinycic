@@ -101,21 +101,124 @@ impl Default for ProofBuilder {
 }
 
 /// Parse tactic script into ParsedTactic list
+/// Handles multi-line calc blocks
 pub fn parse_tactic_script(script: &str) -> Vec<ParsedTactic> {
     let mut tactics = Vec::new();
+    let lines: Vec<&str> = script.lines().collect();
+    let mut i = 0;
 
-    for line in script.lines() {
-        let line = line.trim();
+    while i < lines.len() {
+        let line = lines[i].trim();
         if line.is_empty() || line.starts_with("--") || line.starts_with("//") {
+            i += 1;
             continue;
         }
 
-        if let Some(tactic) = parse_tactic_line(line) {
-            tactics.push(tactic);
+        // Check if this is a calc block
+        if line == "calc" {
+            // Parse calc block
+            let mut calc_steps = Vec::new();
+            i += 1;
+
+            // Collect calc steps until we hit a non-calc line
+            while i < lines.len() {
+                let step_line = lines[i].trim();
+                if step_line.is_empty() || step_line.starts_with("--") || step_line.starts_with("//") {
+                    i += 1;
+                    continue;
+                }
+
+                // Check if this is a calc step or the end of calc block
+                if let Some(step) = parse_calc_step(step_line) {
+                    calc_steps.push(step);
+                    i += 1;
+                } else if is_tactic_line(step_line) {
+                    // This is a new tactic, not part of calc
+                    break;
+                } else {
+                    // Unknown line, skip it
+                    i += 1;
+                }
+            }
+
+            tactics.push(ParsedTactic::Calc(calc_steps));
+        } else {
+            // Regular tactic line
+            if let Some(tactic) = parse_tactic_line(line) {
+                tactics.push(tactic);
+            }
+            i += 1;
         }
     }
 
     tactics
+}
+
+/// Check if a line is a tactic (not a calc step)
+fn is_tactic_line(line: &str) -> bool {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.is_empty() {
+        return false;
+    }
+
+    matches!(parts[0],
+        "intro" | "use" | "exact" | "apply" | "have" | "obtain" | "sorry" | "calc" | "rw"
+    )
+}
+
+/// Parse a calc step line: "lhs = rhs := by rw [theorems]"
+/// or "_ = rhs := by rw [theorems]" (where _ refers to previous lhs)
+fn parse_calc_step(line: &str) -> Option<CalcStep> {
+    // Check if line contains "=" and ":="
+    if !line.contains('=') || !line.contains(":=") {
+        return None;
+    }
+
+    // Split by ":=" to separate expression from proof
+    let parts: Vec<&str> = line.splitn(2, ":=").collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let expr_part = parts[0].trim();
+    let proof_part = parts[1].trim();
+
+    // Parse lhs = rhs
+    let expr_parts: Vec<&str> = expr_part.splitn(2, '=').collect();
+    if expr_parts.len() != 2 {
+        return None;
+    }
+
+    let lhs_str = expr_parts[0].trim();
+    let rhs_str = expr_parts[1].trim();
+
+    // Parse lhs and rhs as terms
+    let lhs = if lhs_str == "_" {
+        // Placeholder for previous lhs
+        Term::const_("_")
+    } else {
+        parse_simple_term(lhs_str)
+    };
+    let rhs = parse_simple_term(rhs_str);
+
+    // Parse rw [...] from proof_part
+    let rewrites = if proof_part.contains("rw") {
+        // Extract [...] content
+        if let Some(start) = proof_part.find('[') {
+            if let Some(end) = proof_part.find(']') {
+                let inner = &proof_part[start+1..end];
+                parse_rewrite_terms(inner)
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
+    } else {
+        vec![]
+    };
+
+    Some(CalcStep { lhs, rhs, rewrites })
 }
 
 fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
@@ -269,5 +372,46 @@ mod tests {
 
         // Context should have ε and hε
         assert_eq!(builder.context.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_calc_block() {
+        let script = r#"
+            calc
+              a = b := by rw [thm1]
+              _ = c := by rw [thm2]
+              _ = d := by rw [thm3]
+        "#;
+        let tactics = parse_tactic_script(script);
+        assert_eq!(tactics.len(), 1);
+        match &tactics[0] {
+            ParsedTactic::Calc(steps) => {
+                assert_eq!(steps.len(), 3, "Should have 3 calc steps");
+                // Check first step
+                assert!(matches!(steps[0].lhs.as_ref(), Term::Const(name) if name == "a"));
+                assert!(matches!(steps[0].rhs.as_ref(), Term::Const(name) if name == "b"));
+                assert_eq!(steps[0].rewrites.len(), 1);
+                // Check second step (with underscore lhs)
+                assert!(matches!(steps[1].lhs.as_ref(), Term::Const(name) if name == "_"));
+                assert!(matches!(steps[1].rhs.as_ref(), Term::Const(name) if name == "c"));
+            }
+            _ => panic!("Expected Calc with steps, got {:?}", tactics[0]),
+        }
+    }
+
+    #[test]
+    fn test_parse_calc_with_intro() {
+        // Test calc block followed by other tactics
+        let script = r#"
+            intro x
+            calc
+              a = b := by rw [thm1]
+            exact proof
+        "#;
+        let tactics = parse_tactic_script(script);
+        assert_eq!(tactics.len(), 3);
+        assert!(matches!(tactics[0], ParsedTactic::Intro(_)));
+        assert!(matches!(tactics[1], ParsedTactic::Calc(_)));
+        assert!(matches!(tactics[2], ParsedTactic::Exact(_)));
     }
 }

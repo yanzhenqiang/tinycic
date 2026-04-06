@@ -215,23 +215,24 @@ env.add_inductive() / env.add_constant()
    - 问题：`collect_tactic_line` 只处理了 `Ident` token，忽略了 `Intro`/`Use`/`Exact` 等特殊 token
    - 修复后：`intro r1 r2` 正确生成 `λr1:Real, λr2:Real, sorry ...` 的证明项
 
-2. **ProofTermGenerator 增强**
-   - 添加错误回退：当 tactic 应用失败时返回 `sorry` 而不是 panic
-   - 添加 `CalcState` 和 `pending_rewrite` 跟踪 calc/rw 状态
-   - 实现 `build_equality_proof` 和 `build_calc_proof`
-   - calc 块中现在会跟踪 rw 定理（通过 `calc.add_step`）
+2. **Lexer 增强**
+   - 添加 `Token::Equal` 用于识别 `=` 符号（calc 块的等号）
+   - 支持解析 `expr1 = expr2` 结构
 
-3. **测试验证**
-   - 添加 `test_real_proof_generation` 测试验证 lambda 生成
+3. **CalcStep 结构**
+   - 添加 `CalcStep { lhs, rhs, rewrites }` 结构体
+   - 更新 `ParsedTactic::Calc(Vec<CalcStep>)` 以携带 calc 步骤信息
+   - 准备支持 calc 块表达式的跟踪
+
+4. **测试验证**
    - 110 个测试全部通过
 
 **当前挑战:**
-- calc 块的表达式解析（`expr1 = expr2 := by rw [...]`）尚未实现
-- Parser 目前只收集 tactic 行，不解析 calc 内部的等式表达式
-- 需要扩展 parser 来捕获 calc 步骤中的左右表达式
+- Parser 目前只收集 tactic 名称，不解析 calc 行中的 `expr = expr := by rw [...]` 结构
+- 需要将 calc 行解析为 `CalcStep` 对象（lhs, rhs, rewrites）
 
 **下一步工作:**
-1. **扩展 Parser**：解析 calc 块的 `expr = expr := by rw [...]` 结构
+1. **扩展 tactic 解析器**：解析 calc 行的 `lhs = rhs := by rw [...]` 为 `CalcStep`
 2. **实现表达式跟踪**：在 `CalcState` 中记录每步的左右表达式
 3. **构建完整证明**：将 calc 步骤转换为 `Eq.trans` 链
 4. **验证 Real 定理**：测试 `Real.add_comm` 等定理的完整证明生成

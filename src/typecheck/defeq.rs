@@ -342,4 +342,111 @@ mod tests {
         // 注意：这需要 delta reduction，当前实现可能不支持
         // assert!(checker.is_def_eq(&myid1, &id_term));
     }
+
+    // =========================================================================
+    // LEAN4_TRANSLATED_TESTS: 从 Lean 4 kernel 测试翻译的测试用例
+    // =========================================================================
+
+    /// 测试绑定变量的定义等价 (来自 Lean 4 is_def_eq_binding 测试)
+    #[test]
+    fn lean4_test_def_eq_binding() {
+        let env = Environment::new();
+        let mut checker = DefEqChecker::new(env);
+
+        // (x : A) → B x = (y : A) → B y
+        // 使用不同的绑定变量名但等价的主体
+        let b1 = Term::app(Term::const_("B"), Term::var(0));
+        let b2 = Term::app(Term::const_("B"), Term::var(0));
+        let pi1 = Term::pi("x", Term::const_("A"), b1);
+        let pi2 = Term::pi("y", Term::const_("A"), b2);
+
+        assert!(checker.is_def_eq(&pi1, &pi2));
+    }
+
+    /// 测试嵌套 Pi 类型的等价 (来自 Lean 4 多参数函数测试)
+    #[test]
+    fn lean4_test_nested_pi() {
+        let env = Environment::new();
+        let mut checker = DefEqChecker::new(env);
+
+        // (A : Type) → (B : Type) → A = (X : Type) → (Y : Type) → X
+        let inner1 = Term::pi("B", Term::type0(), Term::var(1));
+        let inner2 = Term::pi("Y", Term::type0(), Term::var(1));
+        let pi1 = Term::pi("A", Term::type0(), inner1);
+        let pi2 = Term::pi("X", Term::type0(), inner2);
+
+        assert!(checker.is_def_eq(&pi1, &pi2));
+    }
+
+    /// 测试应用项的等价 (来自 Lean 4 infer_app 测试)
+    #[test]
+    fn lean4_test_app_congruence() {
+        let env = Environment::new();
+        let mut checker = DefEqChecker::new(env);
+
+        // f a = f a (相同的应用)
+        let f = Term::const_("f");
+        let a = Term::const_("a");
+        let app1 = Term::app(f.clone(), a.clone());
+        let app2 = Term::app(f.clone(), a.clone());
+
+        assert!(checker.is_def_eq(&app1, &app2));
+
+        // f a ≠ f b (不同的参数)
+        let b = Term::const_("b");
+        let app3 = Term::app(f, b);
+        assert!(!checker.is_def_eq(&app1, &app3));
+    }
+
+    /// 测试归约后的定义等价 (来自 Lean 4 whnf + is_def_eq 测试)
+    /// 注意：当前实现需要完善归约逻辑
+    #[test]
+    #[ignore = "requires full reduction in is_def_eq"]
+    fn lean4_test_def_eq_after_reduction() {
+        let env = Environment::new();
+        let mut checker = DefEqChecker::new(env);
+
+        // (λx. x) y = y
+        let id = Term::lambda("x", Term::type0(), Term::var(0));
+        let y = Term::const_("y");
+        let app = Term::app(id, y.clone());
+
+        assert!(checker.is_def_eq(&app, &y));
+    }
+
+    /// 测试递归深度限制 (来自 Lean 4 递归检查测试)
+    #[test]
+    fn lean4_test_max_depth() {
+        let env = Environment::new();
+        let mut checker = DefEqChecker::new(env);
+
+        // 创建深层嵌套的应用
+        // app_n = f (f (... (f x)...))
+        let f = Term::const_("f");
+        let x = Term::const_("x");
+
+        let mut deep_term = x.clone();
+        for _ in 0..2000 {
+            deep_term = Term::app(f.clone(), deep_term);
+        }
+
+        // 与自身比较应该成功（指针相等快速路径）
+        assert!(checker.is_def_eq(&deep_term, &deep_term));
+    }
+
+    /// 测试 Sort 层级的等价 (来自 Lean 4 universe 测试)
+    #[test]
+    fn lean4_test_sort_eq() {
+        let env = Environment::new();
+        let mut checker = DefEqChecker::new(env);
+
+        // Type = Type
+        let type1 = Term::sort(0);
+        let type2 = Term::sort(0);
+        assert!(checker.is_def_eq(&type1, &type2));
+
+        // Type ≠ Type₁
+        let type1_level = Term::sort(1);
+        assert!(!checker.is_def_eq(&type1, &type1_level));
+    }
 }

@@ -341,4 +341,70 @@ mod tests {
         // 验证缓存命中（缓存中至少应该有 1 个条目）
         assert!(reducer.cache.len() >= 1, "Cache should have entries");
     }
+
+    // =========================================================================
+    // LEAN4_TRANSLATED_TESTS: 从 Lean 4 kernel 测试翻译的测试用例
+    // =========================================================================
+
+    /// 测试多参数 beta 归约 (来自 Lean 4 type_checker 多参数应用测试)
+    #[test]
+    fn lean4_test_multi_arg_beta() {
+        // (λf x. f x) (λy. y) z → z
+        // 对应 Lean 4 的 multi-argument beta reduction 测试
+        let f_var = Term::var(1);  // f
+        let x_var = Term::var(0);  // x
+        let inner = Term::lambda("x", Term::type0(), Term::app(f_var, x_var));
+        let outer = Term::lambda("f", Term::type0(), inner);
+
+        let id = Term::lambda("y", Term::type0(), Term::var(0));
+        let z = Term::const_("z");
+
+        // 两次应用
+        let app = Term::app(Term::app(outer, id), z.clone());
+
+        let result = whnf(&app);
+        assert!(matches!(result, Whnf::Term(t) if t == z));
+    }
+
+    /// 测试 let 绑定链 (来自 Lean 4 zeta 归约测试)
+    #[test]
+    fn lean4_test_let_chain() {
+        // let x := a in let y := x in y → a
+        let a = Term::const_("a");
+        let inner_let = Term::let_("y", Term::type0(), Term::var(0), Term::var(0));
+        let outer_let = Term::let_("x", Term::type0(), a.clone(), inner_let);
+
+        let result = whnf(&outer_let);
+        assert!(matches!(result, Whnf::Term(t) if t == a));
+    }
+
+    /// 测试已经是 WHNF 的项不发生变化
+    #[test]
+    fn lean4_test_whnf_idempotent() {
+        // 变量、常量、Pi、Lambda 已经是 WHNF
+        let var = Term::var(0);
+        let konst = Term::const_("C");
+        let pi = Term::pi("x", Term::type0(), Term::var(0));
+        let lam = Term::lambda("x", Term::type0(), Term::var(0));
+
+        assert!(matches!(whnf(&var), Whnf::Term(t) if t == var));
+        assert!(matches!(whnf(&konst), Whnf::Term(t) if t == konst));
+        assert!(matches!(whnf(&pi), Whnf::Term(t) if t == pi));
+        assert!(matches!(whnf(&lam), Whnf::Term(t) if t == lam));
+    }
+
+    /// 测试归约步数限制
+    #[test]
+    fn lean4_test_max_steps() {
+        // (λx. x x) (λx. x x) - 应该触发步数限制
+        let omega_body = Term::app(Term::var(0), Term::var(0));
+        let omega = Term::lambda("x", Term::type0(), omega_body);
+        let app = Term::app(omega.clone(), omega.clone());
+
+        let reducer = Reducer::new(10); // 很小的步数限制
+        let result = reducer.whnf_no_cache(&app);
+
+        // 应该因为步数限制而返回 Stuck
+        assert!(matches!(result, Whnf::Stuck(_)));
+    }
 }

@@ -15,6 +15,7 @@ pub mod tactics;
 pub mod proofgen;
 pub mod parser;
 pub mod proof_builder;
+pub mod proof_term_gen;
 
 /// 证明目标
 #[derive(Debug, Clone)]

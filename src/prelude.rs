@@ -263,6 +263,20 @@ pub fn init_prelude(env: &mut Environment) {
         Term::app(Term::const_("CauchySeq.mk"), Term::const_("Rat.zero")),
     );
     env.add_constant("Real.zero", Term::const_("Real"), Some(real_zero));
+
+    // Real.add : Real → Real → Real
+    let real_add_ty = Term::arrow(
+        Term::const_("Real"),
+        Term::arrow(Term::const_("Real"), Term::const_("Real")),
+    );
+    env.add_constant("Real.add", real_add_ty, None);
+
+    // Real.mul : Real → Real → Real
+    let real_mul_ty = Term::arrow(
+        Term::const_("Real"),
+        Term::arrow(Term::const_("Real"), Term::const_("Real")),
+    );
+    env.add_constant("Real.mul", real_mul_ty, None);
 }
 
 #[cfg(test)]
@@ -780,6 +794,26 @@ mod tests {
 
         let result = env.lookup_constant(&"Real.zero".to_string());
         assert!(result.is_ok(), "Real.zero should be registered");
+    }
+
+    /// 验证 Real.add 类型
+    #[test]
+    fn test_real_add_type() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Real.add".to_string());
+        assert!(result.is_ok(), "Real.add should be registered");
+    }
+
+    /// 验证 Real.mul 类型
+    #[test]
+    fn test_real_mul_type() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Real.mul".to_string());
+        assert!(result.is_ok(), "Real.mul should be registered");
     }
 
     // =========================================================================

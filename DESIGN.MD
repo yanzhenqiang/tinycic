@@ -136,12 +136,19 @@ env.add_inductive() / env.add_constant()
   - `add/mul/neg/sub`: 加、乘、负、减
   - `zero/one`: 零元、单位元
 - [x] 序关系 `lt`（用 ε-N 定义）
+- [x] 基本性质证明
+  - `add_comm`: 加法交换律
+  - `add_zero`: 零元性质
+  - `add_neg`: 加法逆元
+  - `mul_comm`: 乘法交换律
+  - `mul_one`: 单位元性质
+  - `mul_add`: 分配律
 - [ ] 完备性定理（有上界集合有最小上界）
 
 **新增文件:**
-- `lib/real.x` - Real structure 定义及运算
+- `lib/real.x` - Real structure 定义、运算、性质
 - `lib/rat.x` - 添加 `ofInt` 和 `abs`
-- 89 个测试全部通过（含 3 个 Real 测试）
+- 91 个测试全部通过（含 5 个 Real 测试）
 
 ## 后续目标
 - [ ] 代码提取 (Extraction) 到 C

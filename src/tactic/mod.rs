@@ -13,6 +13,7 @@ use std::rc::Rc;
 
 pub mod tactics;
 pub mod proofgen;
+pub mod parser;
 
 /// 证明目标
 #[derive(Debug, Clone)]

@@ -637,9 +637,9 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Parse tactic block until we hit a keyword that ends it
-        // (namespace, end, theorem, lemma, def, structure, inductive, or EOF)
-        let mut had_content = false;
+        // Collect tactic script as string
+        let mut script_lines = Vec::new();
+
         loop {
             match &self.current {
                 Token::Eof |
@@ -652,45 +652,137 @@ impl<'a> Parser<'a> {
                 Token::Inductive => {
                     break;
                 }
-                // Skip tactic keywords and their arguments
+                // Collect tactic lines
                 Token::Ident(s) => {
-                    had_content = true;
                     let tactic = s.clone();
                     match tactic.as_str() {
                         "intro" | "use" | "exact" | "apply" | "rw" | "calc" |
-                        "have" | "obtain" | "by" => {
+                        "have" | "obtain" => {
+                            // Collect this line as part of script
+                            let line = self.collect_tactic_line();
+                            script_lines.push(line);
+                        }
+                        "by" => {
                             self.advance();
-                            // Check if this is 'exact sorry' - if so, we have our proof
-                            if tactic == "exact" {
-                                if let Token::Ident(arg) = &self.current {
-                                    if arg == "sorry" {
-                                        return Ok(Term::const_("sorry"));
-                                    }
-                                }
-                            }
-                            // Skip arguments until newline or end of tactic
-                            self.skip_tactic_args();
                         }
                         _ => {
                             self.advance();
                         }
                     }
                 }
-                // Skip symbols
-                Token::LParen | Token::LBrace | Token::LBracket => {
-                    had_content = true;
-                    self.skip_balanced();
-                }
+                // Skip symbols and other tokens
                 _ => {
-                    had_content = true;
                     self.advance();
                 }
             }
         }
 
         // For now, return sorry as the proof
-        // A full implementation would build a proof term from the tactics
+        // A full implementation would parse the script and generate proof term
+        // let script = script_lines.join("\n");
+        // let tactics = crate::tactic::parser::parse_tactics(&script);
+        // ... generate proof from tactics
+
         Ok(Term::const_("sorry"))
+    }
+
+    /// Collect a tactic line as string
+    fn collect_tactic_line(&mut self) -> String {
+        let mut parts = Vec::new();
+
+        // Collect until end of line or block-ending token
+        loop {
+            match &self.current {
+                Token::Eof |
+                Token::Namespace |
+                Token::End |
+                Token::Theorem |
+                Token::Lemma |
+                Token::Def |
+                Token::Structure |
+                Token::Inductive => break,
+                Token::Ident(s) if s == "intro" || s == "use" || s == "exact" ||
+                                   s == "apply" || s == "rw" || s == "calc" ||
+                                   s == "have" || s == "obtain" => {
+                    if !parts.is_empty() {
+                        break; // New tactic starts
+                    }
+                    parts.push(s.clone());
+                    self.advance();
+                }
+                Token::Ident(s) => {
+                    parts.push(s.clone());
+                    self.advance();
+                }
+                Token::LParen | Token::LBrace | Token::LBracket => {
+                    // Include balanced brackets
+                    let bracket_content = self.collect_balanced();
+                    parts.push(bracket_content);
+                }
+                _ => {
+                    if let Token::Ident(s) = &self.current {
+                        parts.push(s.clone());
+                    }
+                    self.advance();
+                }
+            }
+        }
+
+        parts.join(" ")
+    }
+
+    /// Collect balanced brackets as string
+    fn collect_balanced(&mut self) -> String {
+        let open = match &self.current {
+            Token::LParen => "(",
+            Token::LBrace => "{",
+            Token::LBracket => "[",
+            _ => return String::new(),
+        };
+
+        let close = match open {
+            "(" => ")",
+            "{" => "}",
+            "[" => "]",
+            _ => return String::new(),
+        };
+
+        let mut result = vec![open.to_string()];
+        self.advance();
+
+        let mut depth = 1;
+        while depth > 0 {
+            match &self.current {
+                Token::Eof => break,
+                Token::LParen => {
+                    result.push("(".to_string());
+                    depth += 1;
+                    self.advance();
+                }
+                Token::RParen => {
+                    result.push(")".to_string());
+                    depth -= 1;
+                    if depth > 0 {
+                        self.advance();
+                    }
+                }
+                Token::Ident(s) => {
+                    result.push(s.clone());
+                    self.advance();
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+
+        // Add closing bracket
+        if depth == 0 {
+            result.push(close.to_string());
+            self.advance();
+        }
+
+        result.join(" ")
     }
 
     /// Skip arguments of a tactic until we reach the end of the tactic

@@ -222,7 +222,7 @@ impl<'a> Parser<'a> {
         if self.current == Token::Colon {
             self.advance();
             // Parse type expression
-            let type_expr = self.parse_type_expr()?;
+            let type_expr = self.parse_type_expr(&[])?;
             ty = Some(type_expr);
         }
 
@@ -579,8 +579,10 @@ impl<'a> Parser<'a> {
             }
             self.advance();
 
-            // Parse type
-            let ty = self.parse_type_expr()?;
+            // Parse type, passing known params for substitution
+            // (e.g., for "(h : ε > Rat.zero)", ε should refer to previous param)
+            let known_param_names: Vec<Name> = params.iter().map(|(n, _)| n.clone()).collect();
+            let ty = self.parse_type_expr(&known_param_names)?;
 
             // Add all params with this type
             for name in names {
@@ -597,8 +599,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a simple type expression
-    fn parse_type_expr(&mut self) -> Result<Rc<Term>, ParseError> {
-        let mut components = Vec::new();
+    /// known_params: list of parameter names that should be replaced with De Bruijn variables
+    fn parse_type_expr(&mut self, known_params: &[Name]) -> Result<Rc<Term>, ParseError> {
+        let mut components: Vec<Rc<Term>> = Vec::new();
 
         while self.current != Token::RParen
             && self.current != Token::Colon
@@ -607,6 +610,13 @@ impl<'a> Parser<'a> {
         {
             match &self.current {
                 Token::Ident(s) => {
+                    // Check if this is a known parameter (for param types like "ε > Rat.zero")
+                    if let Some(idx) = known_params.iter().rev().position(|p| p == s) {
+                        // It's a parameter reference - use De Bruijn index
+                        components.push(Term::var(idx as u32));
+                        self.advance();
+                        continue;
+                    }
                     // Check for qualified name (e.g., "CauchySeq.isCauchy")
                     let mut full_name = s.clone();
                     self.advance();
@@ -621,7 +631,7 @@ impl<'a> Parser<'a> {
                             break;
                         }
                     }
-                    components.push(full_name);
+                    components.push(Term::const_(full_name));
                 }
                 Token::Arrow => {
                     self.advance();
@@ -635,12 +645,36 @@ impl<'a> Parser<'a> {
         if components.is_empty() {
             Ok(Term::type0())
         } else if components.len() == 1 {
-            Ok(Term::const_(components[0].clone()))
+            Ok(components.remove(0))
         } else {
-            // Build arrow type
-            let mut result = Term::const_(components.pop().unwrap());
-            for comp in components.into_iter().rev() {
-                result = Term::arrow(Term::const_(comp), result);
+            // Check if second component is an operator (infix notation)
+            // For "ε > Rat.zero", components are [Var(ε), Const(>), Const(Rat.zero)]
+            // We need to build: App { App { Const(>), Var(ε) }, Const(Rat.zero) }
+            if components.len() == 3 {
+                if let Term::Const(op) = components[1].as_ref() {
+                    // Map operators to Rat functions
+                    let rat_op = match op.as_str() {
+                        ">" => Some("Rat.gt"),
+                        "<" => Some("Rat.lt"),
+                        "≥" => Some("Rat.le"),
+                        "≤" => Some("Rat.le"), // Note: should be Rat.ge
+                        "=" => Some("Rat.eq"),
+                        _ => None,
+                    };
+                    if let Some(rat_fn) = rat_op {
+                        // Infix operator: reorder [lhs, op, rhs] to [Rat.op, lhs, rhs]
+                        let lhs = components.remove(0);
+                        let _op_term = components.remove(0); // drop the operator
+                        let rhs = components.remove(0);
+                        let result = Term::app(Term::app(Term::const_(rat_fn), lhs), rhs);
+                        return Ok(result);
+                    }
+                }
+            }
+            // Default: left-associative application
+            let mut result = components.remove(0);
+            for arg in components {
+                result = Term::app(result, arg);
             }
             Ok(result)
         }

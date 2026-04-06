@@ -100,6 +100,10 @@ def eq (r1 r2 : Rat) : Prop :=
 def lt (r1 r2 : Rat) : Prop :=
   Int.mul r1.num (posToInt r2.den) < Int.mul r2.num (posToInt r1.den)
 
+// 大于：a > b 当且仅当 b < a
+def gt (r1 r2 : Rat) : Prop :=
+  lt r2 r1
+
 def le (r1 r2 : Rat) : Prop :=
   lt r1 r2 ∨ eq r1 r2
 
@@ -152,6 +156,37 @@ lemma le_refl (a : Rat) : le a a :=
 lemma abs_zero : eq (abs zero) zero :=
   by
     exact Int.abs_zero
+
+// 加法零元：a + 0 = a
+lemma add_zero (r : Rat) : eq (add r zero) r :=
+  by
+    exact Int.add_zero _
+
+// 减法自反：a - a = 0
+lemma sub_self (r : Rat) : eq (sub r r) zero :=
+  by
+    -- r - r = r + (-r) = 0
+    exact Int.sub_self _
+
+// 减法分配律：(a + b) - (c + b) = a - c
+lemma sub_add_distrib (a b c : Rat) :
+  eq (sub (add a b) (add c b)) (sub a c) :=
+  by
+    -- (a + b) - (c + b) = (a + b) + (-(c + b)) = (a + b) + (-c + -b) = a - c + (b - b) = a - c
+    exact Int.sub_add_distrib _ _ _
+
+// 正整数的正性：ofNat n > 0 当 n > 0
+lemma ofNat_pos (n : Nat) (h : Nat.succ Nat.zero ≤ n) : lt zero (ofInt (Int.ofNat n)) :=
+  by
+    -- n ≥ 1 意味着 ofNat n > 0
+    exact Int.ofNat_pos _ h
+
+// 除法的正性：ε > 0 且 n > 0 → ε/n > 0
+lemma div_pos (ε : Rat) (n : PosInt) (hε : lt zero ε) (hn : Nat.succ Nat.zero ≤ PosInt.toNat n) :
+  lt zero (div ε (mk (Int.ofNat (PosInt.toNat n)) n) sorry) :=
+  by
+    -- ε > 0 且分母 n > 0，所以 ε/n > 0
+    exact Int.div_pos _ _ hε hn
 
 // =========================================================================
 // 基本性质

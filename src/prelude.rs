@@ -338,6 +338,11 @@ pub fn init_prelude(env: &mut Environment) {
     let _ = load_def_from_file(env, "lib/cauchy.x", "CauchySeq");
     let _ = load_def_from_file(env, "lib/real.x", "Real");
 
+    // 注册 sorry 作为不完整证明的占位符（必须在 theorem 加载之前）
+    // sorry : {A : Type} → A
+    let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
+    env.add_constant("sorry", sorry_ty, None);
+
     // 从 .x 文件加载 theorem 定义（动态注册并验证证明）
     let _ = load_theorem_from_file(env, "lib/real.x", "Real");
 
@@ -363,11 +368,6 @@ pub fn init_prelude(env: &mut Environment) {
         Term::const_("zero"),
     );
     env.add_constant("Rat.one", Term::const_("Rat"), Some(rat_one));
-
-    // 注册 sorry 作为不完整证明的占位符
-    // sorry : {A : Type} → A
-    let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
-    env.add_constant("sorry", sorry_ty, None);
 
     // 手动注册 Real 基本运算（parser 暂不支持复杂 def 表达式）
     // TODO: 完善 parser 后迁移到 .x 文件

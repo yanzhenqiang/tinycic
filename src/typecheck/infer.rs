@@ -347,11 +347,14 @@ impl<'env> TypeInference<'env> {
 
     /// 提取宇宙层级
     fn extract_level(&self, term: &Rc<Term>) -> TcResult<Level> {
-        match self.whnf(term).as_ref() {
+        let whnf_term = self.whnf(term);
+        match whnf_term.as_ref() {
             Term::Sort(lvl) => Ok(Level(lvl.0)),
+            // Prop 是 Sort(0) 的别名
+            Term::Const(name) if name == "Prop" => Ok(Level(0)),
             _ => Err(TypeError::UniverseMismatch {
                 expected: Level(0),
-                found: Level(0),
+                found: Level(999), // 表示不是 Sort 类型
             }),
         }
     }

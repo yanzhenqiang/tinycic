@@ -201,6 +201,11 @@ pub fn load_theorem_from_file(env: &mut Environment, path: &str, namespace: &str
                     let namespaced_decl = TheoremDecl::new(full_name_clone, decl.statement)
                         .with_proof(decl.proof.unwrap_or_else(|| Term::const_("sorry")));
 
+                    // Debug: print statement for Real.add_assoc
+                    if full_name == "Real.add_assoc" {
+                        eprintln!("DEBUG statement for {}: {:?}", full_name, namespaced_decl.statement);
+                    }
+
                     // 使用 TheoremProcessor 处理并验证
                     let processor = TheoremProcessor::new();
                     match processor.register(env, &namespaced_decl) {

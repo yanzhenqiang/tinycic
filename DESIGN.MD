@@ -372,19 +372,22 @@ load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test")?;
 | Real.mul_comm | intro + have + calc + rw | ✅ 已验证 |
 | Real.mul_assoc | intro + have + calc + rw | ✅ 已验证 |
 | Real.mul_one | intro + have + calc + rw | ✅ 已验证 |
-| Real.mul_mul | intro + have + calc + rw | ✅ 已验证 |
-| Real.add_zero | intro + have + calc + rw | ✅ 已验证 |
-| Real.add_neg | intro + have + calc + rw | ✅ 已验证 |
-| Real.add_comm | intro + use + calc + rw | ✅ 已验证 |
+| Real.mul_add | intro + have + calc + rw | ✅ 已验证 |
 
-**TODO（待证明）:**
-- `Real.add_assoc` - 证明生成 Lambda 但类型检查失败
-- `Real.mul_comm` - 证明生成 Lambda 但类型检查失败
-- `Real.mul_assoc` - 证明生成 Lambda 但类型检查失败
-- `Real.cauchy_add` (line 282) - 最后一步需 `Rat.add_lt_add`
-- `Real.mul_inv` (line 210) - 声明为 axiom
-- `Real.lt_trichotomy` (line 236) - 声明为 axiom
-- `Real.completeness` (line 253) - 声明为 axiom
+**TODO（使用 sorry 占位符）:**
+- `Real.half_pos` (line 70-73) - ε/2 > 0 证明，需 `Rat.div_pos` 和 `Rat.ofNat_pos`
+- `Real.rat_triangle_ineq` (line 76-86) - 三角不等式应用，需 `Rat.sub_add_distrib`, `Rat.sub_self`
+- `Real.cauchy_add` (line 282) - 最后一步不等式需 `Rat.add_lt_add` 和 `ε/2 + ε/2 = ε`
+
+**声明为公理（未证明）:**
+- `Real.mul_inv` (line 210) - 非零实数存在乘法逆元（需构造柯西序列的逆元）
+- `Real.lt_trichotomy` (line 236) - 序关系三歧性（需完整序公理）
+- `Real.completeness` (line 253) - 完备性定理（需有上界集合的最小上界构造）
+
+**测试文件中的 sorry:**
+- `lib/proof_test.x` (line 10, 14) - 测试用占位符
+- `lib/real_simple.x` (line 7, 11) - 简化版定理占位符
+- `lib/test_theorems.x` (line 5, 9) - 测试定理占位符
 
 ### 测试覆盖
 

@@ -116,14 +116,16 @@ impl<'env> ProofTermGenerator<'env> {
             Term::app(Term::const_("sorry"), final_goal.clone())
         };
 
-        // Wrap with let bindings (have statements)
-        for (name, ty, value) in self.let_bindings.iter().rev() {
-            proof = Term::let_(name.clone(), ty.clone(), value.clone(), proof);
-        }
-
-        // Wrap with lambda abstractions (intro statements)
+        // Wrap with lambda abstractions (intro statements) FIRST
+        // This ensures De Bruijn indices in the proof body are correct
         for binding in self.intro_bindings.iter().rev() {
             proof = Term::lambda(binding.name.clone(), binding.ty.clone(), proof);
+        }
+
+        // Wrap with let bindings (have statements) OUTSIDE
+        // This ensures let bindings are in the outer scope, not inside the lambdas
+        for (name, ty, value) in self.let_bindings.iter().rev() {
+            proof = Term::let_(name.clone(), ty.clone(), value.clone(), proof);
         }
 
         Ok(proof)

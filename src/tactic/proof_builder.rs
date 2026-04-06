@@ -263,9 +263,11 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
         }
         "have" => {
             // have h : type := proof (simplified)
+            // Use a placeholder type that will be inferred from context
             if parts.len() > 1 {
                 let name = parts[1].trim_end_matches(':').to_string();
-                Some(ParsedTactic::Have(name, Term::type0(), Term::const_("sorry")))
+                // Use a "_" placeholder that will be filled in during type checking
+                Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("sorry")))
             } else {
                 None
             }

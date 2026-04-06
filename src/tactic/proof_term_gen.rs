@@ -322,4 +322,38 @@ mod tests {
         // Should be λn : Nat, let h : Nat := sorry in sorry
         println!("Generated proof with have: {:?}", proof_term);
     }
+
+    #[test]
+    fn test_generate_with_calc_and_rw() {
+        // Test a calc block with rw
+        // Goal: (a : Nat) → (b : Nat) → Eq Nat (add a b) (add b a)
+        let goal = Term::pi("a", Term::const_("Nat"),
+            Term::pi("b", Term::const_("Nat"),
+                Term::app(Term::app(Term::const_("Eq"), Term::const_("Nat")),
+                    Term::app(Term::app(Term::const_("add"), Term::var(1)), Term::var(0)))));
+
+        let mut generator = ProofTermGenerator::new_without_env(goal);
+
+        // intro a b; calc; rw [add_comm]
+        let script = r#"
+            intro a b
+            calc
+            rw [add_comm]
+        "#;
+        let tactics = parse_tactic_script(script);
+        let proof = generator.generate(&tactics);
+
+        assert!(proof.is_ok());
+        let proof_term = proof.unwrap();
+        // Should contain Eq.symm or similar, not just sorry
+        println!("Generated calc/rw proof: {:?}", proof_term);
+
+        // Verify it's a lambda (from intro)
+        match proof_term.as_ref() {
+            Term::Lambda { .. } => {
+                // Good, has lambda from intro
+            }
+            _ => panic!("Expected Lambda from intro, got {:?}", proof_term),
+        }
+    }
 }

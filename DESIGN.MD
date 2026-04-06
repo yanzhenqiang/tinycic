@@ -217,6 +217,12 @@ env.add_inductive() / env.add_constant()
 - [ ] lib/real_simple.x (line 7, 11) - 简化版定理占位符
 - [ ] lib/test_theorems.x (line 5, 9) - 测试定理占位符
 
+**TODO - Parser 改进:**
+- [ ] 希腊字母参数绑定 - `ε > Rat.zero` 中的 `ε` 未被替换为 De Bruijn 索引
+  - 原因：`parse_complex_type` 将 `ε > Rat.zero` 解析为 Pi 类型而非 App
+  - 需要：区分类型表达式（使用 `->`/`→`）和值表达式（使用 `>`/`<` 操作符）
+- [ ] 操作符优先级 - 需要实现完整的操作符解析（`>`, `<`, `=`, `+`, `-`, `*`, `/`）
+
 **TODO - 代码架构改进:**
 - [ ] 加载 def 时 Rust 和 .x 没有完全分离 - `load_def_from_file` 仍依赖手动调用，应将 def 加载也改为纯 .x 文件驱动
 

@@ -943,6 +943,7 @@ impl<'a> Parser<'a> {
                trimmed.starts_with("theorem ") ||
                trimmed.starts_with("lemma ") ||
                trimmed.starts_with("def ") ||
+               trimmed.starts_with("axiom ") ||
                trimmed.starts_with("structure ") ||
                trimmed.starts_with("inductive ") {
                 break;
@@ -982,7 +983,7 @@ impl<'a> Parser<'a> {
                 Token::Inductive => break,
                 Token::Ident(s) if s == "intro" || s == "use" || s == "exact" ||
                                     s == "apply" || s == "rw" || s == "calc" ||
-                                    s == "have" || s == "obtain" => break,
+                                    s == "have" || s == "obtain" || s == "axiom" => break,
                 Token::LParen | Token::LBrace | Token::LBracket => {
                     self.skip_balanced();
                 }
@@ -1159,7 +1160,7 @@ impl<'a> Parser<'a> {
                     // Check if this is a keyword that ends the term
                     if s == "def" || s == "theorem" || s == "lemma" ||
                        s == "structure" || s == "inductive" || s == "namespace" ||
-                       s == "end" || s == "where" || s == "by" {
+                       s == "end" || s == "where" || s == "by" || s == "axiom" {
                         break;
                     }
                     let arg = Term::const_(s.clone());

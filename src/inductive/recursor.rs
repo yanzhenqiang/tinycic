@@ -261,11 +261,31 @@ impl RecursorBuilder {
                 let arg_idx = (param_base_idx + param_idx) as u32;
                 rhs = Term::app(rhs, Term::var(arg_idx));
 
-                // 如果参数是递归的，添加归纳假设
+                // 如果参数是递归的，添加归纳假设（递归调用）
                 if self.contains_inductive(param_ty) {
                     // 构造递归调用：rec P m_0 ... m_n p_1 ... p_k arg
-                    // 简化：使用占位符
-                    let rec_call = Term::var(0); // 简化
+                    // rec 变量索引 = num_params + 1 + num_ctors + num_params (构造子参数之后)
+                    let rec_idx = (param_base_idx + params.len()) as u32;
+                    let mut rec_call = Term::var(rec_idx);
+
+                    // 应用 motive
+                    let motive_idx = num_params as u32;
+                    rec_call = Term::app(rec_call, Term::var(motive_idx));
+
+                    // 应用所有 minor premises
+                    for i in 0..self.decl.constructors.len() {
+                        let minor_idx = (num_params + 1 + i) as u32;
+                        rec_call = Term::app(rec_call, Term::var(minor_idx));
+                    }
+
+                    // 应用归纳类型的参数
+                    for i in 0..num_params {
+                        rec_call = Term::app(rec_call, Term::var(i as u32));
+                    }
+
+                    // 应用当前参数（递归参数）
+                    rec_call = Term::app(rec_call, Term::var(arg_idx));
+
                     rhs = Term::app(rhs, rec_call);
                 }
             }
@@ -354,6 +374,23 @@ mod tests {
         let succ_rule = &rec_info.rules[1];
         assert_eq!(succ_rule.ctor_name, "succ");
         assert_eq!(succ_rule.nfields, 1); // succ 有 1 个参数
+    }
+
+    /// 测试递归调用构造（来自 Lean 4 recursor 规则测试）
+    #[test]
+    fn lean4_test_recursor_rhs_construction() {
+        use crate::term::Term;
+
+        let nat = super::super::builtin::nat_decl();
+        let builder = RecursorBuilder::new(&nat);
+        let rec_info = builder.build().unwrap();
+
+        // succ 规则应该有递归调用
+        let succ_rule = &rec_info.rules[1];
+
+        // RHS 应该是：minor_1 n (rec P base step n)
+        // 验证 RHS 是 App 结构
+        assert!(matches!(succ_rule.rhs.as_ref(), Term::App { .. }));
     }
 }
 

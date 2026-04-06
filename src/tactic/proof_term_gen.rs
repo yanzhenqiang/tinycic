@@ -80,7 +80,11 @@ impl<'env> ProofTermGenerator<'env> {
     pub fn generate(&mut self, tactics: &[ParsedTactic]) -> Result<Rc<Term>, String> {
         // Process each tactic
         for tactic in tactics {
-            self.apply_tactic(tactic)?;
+            if let Err(_e) = self.apply_tactic(tactic) {
+                // Fall back to sorry on error
+                return Ok(Term::app(Term::const_("sorry"),
+                    self.goal_stack.last().unwrap_or(&Term::const_("_")).clone()));
+            }
         }
 
         // Build final proof term

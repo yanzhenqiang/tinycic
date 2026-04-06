@@ -627,7 +627,7 @@ impl<'a> Parser<'a> {
     fn parse_proof(&mut self, goal_type: Option<Rc<Term>>) -> Result<Rc<Term>, ParseError> {
         // Expect 'by' keyword
         match &self.current {
-            Token::Ident(s) if s == "by" => {
+            Token::By => {
                 self.advance();
             }
             _ => {
@@ -651,12 +651,15 @@ impl<'a> Parser<'a> {
                 Token::Inductive => {
                     break;
                 }
-                // Collect tactic lines
+                // Collect tactic lines - handle special tokens
+                Token::Intro | Token::Use | Token::Exact => {
+                    let line = self.collect_tactic_line();
+                    script_lines.push(line);
+                }
                 Token::Ident(s) => {
                     let tactic = s.clone();
                     match tactic.as_str() {
-                        "intro" | "use" | "exact" | "apply" | "rw" | "calc" |
-                        "have" | "obtain" => {
+                        "apply" | "rw" | "calc" | "have" | "obtain" | "sorry" => {
                             // Collect this line as part of script
                             let line = self.collect_tactic_line();
                             script_lines.push(line);
@@ -693,8 +696,12 @@ impl<'a> Parser<'a> {
             // Use ProofTermGenerator to generate actual proof term
             if let Some(goal) = goal_type {
                 let mut generator = crate::tactic::proof_term_gen::ProofTermGenerator::new_without_env(goal);
+                for (i, t) in tactics.iter().enumerate() {
+                    eprintln!("DEBUG: tactic {}: {:?}", i, t);
+                }
                 match generator.generate(&tactics) {
                     Ok(proof_term) => {
+                        eprintln!("DEBUG: Generated proof: {:?}", proof_term);
                         return Ok(proof_term);
                     }
                     Err(e) => {
@@ -727,17 +734,37 @@ impl<'a> Parser<'a> {
                 Token::Def |
                 Token::Structure |
                 Token::Inductive => break,
-                Token::Ident(s) if s == "intro" || s == "use" || s == "exact" ||
-                                   s == "apply" || s == "rw" || s == "calc" ||
-                                   s == "have" || s == "obtain" => {
+                // Handle special tactic tokens
+                Token::Intro => {
                     if !parts.is_empty() {
                         break; // New tactic starts
                     }
-                    parts.push(s.clone());
+                    parts.push("intro".to_string());
+                    self.advance();
+                }
+                Token::Use => {
+                    if !parts.is_empty() {
+                        break;
+                    }
+                    parts.push("use".to_string());
+                    self.advance();
+                }
+                Token::Exact => {
+                    if !parts.is_empty() {
+                        break;
+                    }
+                    parts.push("exact".to_string());
                     self.advance();
                 }
                 Token::Ident(s) => {
-                    parts.push(s.clone());
+                    let s = s.clone();
+                    if s == "apply" || s == "rw" || s == "calc" ||
+                       s == "have" || s == "obtain" || s == "sorry" {
+                        if !parts.is_empty() {
+                            break; // New tactic starts
+                        }
+                    }
+                    parts.push(s);
                     self.advance();
                 }
                 Token::LParen | Token::LBrace | Token::LBracket => {
@@ -746,9 +773,6 @@ impl<'a> Parser<'a> {
                     parts.push(bracket_content);
                 }
                 _ => {
-                    if let Token::Ident(s) = &self.current {
-                        parts.push(s.clone());
-                    }
                     self.advance();
                 }
             }

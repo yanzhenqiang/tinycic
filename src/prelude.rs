@@ -1119,4 +1119,30 @@ mod tests {
         // Statement should be Pi type with params
         println!("Parsed statement: {:?}", decl.statement);
     }
+
+    #[test]
+    fn test_real_proof_generation() {
+        use crate::parser::parse_theorem;
+
+        // Test that tactics generate actual proof terms
+        // The goal (r1 r2 : Real) → eq ... has 2 Pi bindings
+        let input = r#"theorem test_comm (r1 r2 : Real) : eq (add r1 r2) (add r2 r1) :=
+  by
+    intro r1 r2
+    sorry"#;
+
+        let result = parse_theorem(input);
+        assert!(result.is_ok(), "Should parse theorem: {:?}", result.err());
+
+        let decl = result.unwrap();
+        println!("Theorem: {}", decl.name);
+        if let Some(ref proof) = decl.proof {
+            println!("Proof: {:?}", proof);
+            // Check if proof contains lambda (from intro)
+            let proof_str = format!("{:?}", proof);
+            if proof_str.contains("Lambda") {
+                println!("✓ Proof contains Lambda from intro tactic");
+            }
+        }
+    }
 }

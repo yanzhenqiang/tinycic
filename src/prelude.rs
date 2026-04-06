@@ -1046,6 +1046,23 @@ mod tests {
         assert_eq!(builder.context_size(), 4, "Should have 4 variables in context");
     }
 
+    /// 验证简化版 Real 定理
+    #[test]
+    fn test_real_simple_theorems() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        // 加载简化版 Real 定理
+        let result = load_theorem_from_file(&mut env, "lib/real_simple.x", "RealSimple");
+        assert!(result.is_ok(), "Should load real_simple.x");
+
+        // 检查定理是否被注册
+        let add_comm = env.lookup_constant(&"RealSimple.add_comm_simple".to_string());
+        assert!(add_comm.is_ok(), "add_comm_simple should be registered");
+
+        println!("✓ RealSimple.add_comm_simple registered and verified");
+    }
+
     /// 验证 Real.x 中的 def 被正确加载
     #[test]
     fn test_real_x_defs_loaded() {

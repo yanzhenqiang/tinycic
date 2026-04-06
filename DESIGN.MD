@@ -177,8 +177,11 @@ env.add_inductive() / env.add_constant()
 - ✅ `src/tactic/parser.rs` - 解析 tactic 脚本 (intro/use/exact 等)
 - ✅ `TheoremProcessor` - 支持定理参数上下文
 
+**已完成证明:**
+- [x] ProofTest.trivial_nat - 直接 proof term 验证
+- [x] RealSimple.add_comm_simple - 简化版加法交换律
+
 **待完成证明 (使用 sorry):**
-- [x] ProofTest.trivial_nat - 直接 proof term 验证 (已完成)
 - [ ] Real.half_pos - ε/2 构造证明
 - [ ] Real.rat_triangle_ineq - 三角不等式  
 - [ ] Real.add_comm - 加法交换律 (复杂证明，需 intro/use/have/calc)

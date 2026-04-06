@@ -373,6 +373,8 @@ load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test")?;
 | Real.mul_assoc | intro + have + calc + rw | ✅ 已验证 |
 | Real.mul_one | intro + have + calc + rw | ✅ 已验证 |
 | Real.mul_mul | intro + have + calc + rw | ✅ 已验证 |
+| Real.add_zero | intro + have + calc + rw | ✅ 已验证 |
+| Real.add_neg | intro + have + calc + rw | ✅ 已验证 |
 
 **TODO（待证明）:**
 - `Real.cauchy_add` (line 282) - 最后一步需 `Rat.add_lt_add`

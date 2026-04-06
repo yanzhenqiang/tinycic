@@ -125,6 +125,34 @@ lemma abs_mul (a b : Rat) : eq (abs (mul a b)) (mul (abs a) (abs b)) :=
   by
     exact Int.abs_mul _ _
 
+// 绝对值减法三角不等式：|a - c| ≤ |a - b| + |b - c|
+lemma abs_sub_triangle (a b c : Rat) : le (abs (sub a c)) (add (abs (sub a b)) (abs (sub b c))) :=
+  by
+    -- |a - c| = |(a - b) + (b - c)| ≤ |a - b| + |b - c|
+    exact Int.abs_sub_triangle _ _ _
+
+// 序关系传递性：a ≤ b ∧ b ≤ c → a ≤ c
+lemma le_trans (a b c : Rat) (h1 : le a b) (h2 : le b c) : le a c :=
+  by
+    exact Int.le_trans _ _ _ h1 h2
+
+// 严格小于的加法保持：a < b → a + c < b + c
+lemma add_lt_add (a b c : Rat) (h : lt a b) : lt (add a c) (add b c) :=
+  by
+    -- (a/b) + (c/d) = (ad + bc) / bd
+    -- 交叉相乘后使用 Int.add_lt_add
+    exact Int.add_lt_add _ _ _ h
+
+// 小于等于的反射性：a ≤ a
+lemma le_refl (a : Rat) : le a a :=
+  by
+    exact Int.le_refl _
+
+// 零的绝对值：|0| = 0
+lemma abs_zero : eq (abs zero) zero :=
+  by
+    exact Int.abs_zero
+
 // =========================================================================
 // 基本性质
 // =========================================================================

@@ -335,6 +335,7 @@ pub fn init_prelude(env: &mut Environment) {
 
     // 从 .x 文件加载 def 定义（动态注册 - 简化版，带命名空间前缀）
     let _ = load_def_from_file(env, "lib/rat.x", "Rat");
+    let _ = load_def_from_file(env, "lib/cauchy.x", "CauchySeq");
     let _ = load_def_from_file(env, "lib/real.x", "Real");
 
     // 从 .x 文件加载 theorem 定义（动态注册并验证证明）

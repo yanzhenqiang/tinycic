@@ -5,6 +5,8 @@
 //! - 保证 Lean 4 的 C++ 部分和 Rust 的输出一致
 
 pub mod inductive;
+pub mod parser;
+pub mod prelude;
 pub mod tactic;
 pub mod term;
 pub mod typecheck;

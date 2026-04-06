@@ -24,6 +24,62 @@ impl<'a> Parser<'a> {
         self.current = self.lexer.next_token();
     }
 
+    /// Replace constants with De Bruijn indices based on a parameter stack
+    /// params: stack of parameter names, where index 0 is the innermost (most recent) binding
+    fn replace_params_with_vars(term: &Rc<Term>, params: &[Name]) -> Rc<Term> {
+        use crate::term::Term;
+
+        if params.is_empty() {
+            return term.clone();
+        }
+
+        match term.as_ref() {
+            Term::Const(name) => {
+                // Check if this constant matches any parameter
+                for (idx, param) in params.iter().enumerate() {
+                    if name == param {
+                        // Return De Bruijn index (0 is innermost)
+                        return Term::var(idx as u32);
+                    }
+                }
+                term.clone()
+            }
+            Term::App { func, arg } => {
+                let new_func = Self::replace_params_with_vars(func, params);
+                let new_arg = Self::replace_params_with_vars(arg, params);
+                if Rc::ptr_eq(func, &new_func) && Rc::ptr_eq(arg, &new_arg) {
+                    term.clone()
+                } else {
+                    Term::app(new_func, new_arg)
+                }
+            }
+            Term::Pi { name, domain, codomain } => {
+                let new_domain = Self::replace_params_with_vars(domain, params);
+                // Add name to params stack for codomain (shifting existing indices)
+                let mut new_params = params.to_vec();
+                new_params.insert(0, name.clone());
+                let new_codomain = Self::replace_params_with_vars(codomain, &new_params);
+                if Rc::ptr_eq(domain, &new_domain) && Rc::ptr_eq(codomain, &new_codomain) {
+                    term.clone()
+                } else {
+                    Term::pi(name.clone(), new_domain, new_codomain)
+                }
+            }
+            Term::Lambda { name, ty, body } => {
+                let new_ty = Self::replace_params_with_vars(ty, params);
+                let mut new_params = params.to_vec();
+                new_params.insert(0, name.clone());
+                let new_body = Self::replace_params_with_vars(body, &new_params);
+                if Rc::ptr_eq(ty, &new_ty) && Rc::ptr_eq(body, &new_body) {
+                    term.clone()
+                } else {
+                    Term::lambda(name.clone(), new_ty, new_body)
+                }
+            }
+            _ => term.clone(),
+        }
+    }
+
     fn expect(&mut self, expected: Token) -> Result<(), ParseError> {
         if std::mem::discriminant(&self.current) == std::mem::discriminant(&expected) {
             self.advance();
@@ -471,8 +527,13 @@ impl<'a> Parser<'a> {
             self.parse_theorem_statement()?
         } else {
             // Build Pi type from params and statement
+            // First collect param names for replacement
+            let param_names: Vec<Name> = params.iter().map(|(name, _)| name.clone()).collect();
             let stmt = self.parse_theorem_statement()?;
-            params.iter().rev().fold(stmt, |acc, (name, ty)| {
+            // Replace param names with De Bruijn indices in the statement
+            let stmt_subst = Self::replace_params_with_vars(&stmt, &param_names.iter().rev().cloned().collect::<Vec<_>>());
+            // Build Pi type from outside in
+            params.iter().rev().fold(stmt_subst, |acc, (name, ty)| {
                 Term::pi(name.clone(), ty.clone(), acc)
             })
         };
@@ -546,8 +607,21 @@ impl<'a> Parser<'a> {
         {
             match &self.current {
                 Token::Ident(s) => {
-                    components.push(s.clone());
+                    // Check for qualified name (e.g., "CauchySeq.isCauchy")
+                    let mut full_name = s.clone();
                     self.advance();
+                    // Handle dot-separated qualified names
+                    while self.current == Token::Dot {
+                        self.advance(); // skip '.'
+                        if let Token::Ident(field) = &self.current {
+                            full_name.push('.');
+                            full_name.push_str(field);
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    components.push(full_name);
                 }
                 Token::Arrow => {
                     self.advance();
@@ -584,8 +658,21 @@ impl<'a> Parser<'a> {
         while self.current != Token::Assign && self.current != Token::Eof {
             match &self.current {
                 Token::Ident(s) => {
-                    terms.push(Term::const_(s.clone()));
+                    // Check for qualified name (e.g., "CauchySeq.isCauchy")
+                    let mut full_name = s.clone();
                     self.advance();
+                    // Handle dot-separated qualified names
+                    while self.current == Token::Dot {
+                        self.advance(); // skip '.'
+                        if let Token::Ident(field) = &self.current {
+                            full_name.push('.');
+                            full_name.push_str(field);
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    terms.push(Term::const_(full_name));
                 }
                 Token::Arrow => {
                     self.advance();

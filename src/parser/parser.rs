@@ -350,21 +350,20 @@ impl<'a> Parser<'a> {
                     return self.parse_lambda();
                 }
 
-                // Check for field access: r1.rep.seq
-                let mut result = Term::const_(name);
+                // Check for qualified name: Nat.zero, Rat.add, etc.
+                let mut full_name = name.clone();
+
                 while self.current == Token::Dot {
                     self.advance();
                     if let Token::Ident(field) = &self.current {
-                        result = Term::app(
-                            Term::const_(format!(".{}", field)),
-                            result
-                        );
+                        full_name = format!("{}.{}", full_name, field);
                         self.advance();
                     } else {
                         break;
                     }
                 }
-                Ok(result)
+
+                Ok(Term::const_(full_name))
             }
             Token::LParen => {
                 self.advance();
@@ -917,20 +916,36 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_simple_term(&mut self) -> Result<Rc<Term>, ParseError> {
-        match &self.current {
-            Token::Ident(s) => {
-                let term = Term::const_(s.clone());
-                self.advance();
-                Ok(term)
+        // Parse function application chain: f a b c
+        let mut func = self.parse_atomic_term()?;
+
+        // Parse arguments
+        loop {
+            match &self.current {
+                Token::Ident(s) => {
+                    // Check if this is a keyword that ends the term
+                    if s == "def" || s == "theorem" || s == "lemma" ||
+                       s == "structure" || s == "inductive" || s == "namespace" ||
+                       s == "end" || s == "where" || s == "by" {
+                        break;
+                    }
+                    let arg = Term::const_(s.clone());
+                    self.advance();
+                    func = Term::app(func, arg);
+                }
+                Token::LParen => {
+                    self.advance();
+                    let arg = self.parse_term()?;
+                    if self.current == Token::RParen {
+                        self.advance();
+                    }
+                    func = Term::app(func, arg);
+                }
+                _ => break,
             }
-            Token::LParen => {
-                self.advance();
-                let term = self.parse_simple_term()?;
-                self.expect(Token::RParen)?;
-                Ok(term)
-            }
-            _ => Ok(Term::const_("_")),
         }
+
+        Ok(func)
     }
 
     fn parse_type(&mut self, inductive_name: &str, _params: &[Rc<Term>]) -> Result<Rc<Term>, ParseError> {

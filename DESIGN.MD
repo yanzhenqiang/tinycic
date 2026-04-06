@@ -171,6 +171,13 @@ env.add_inductive() / env.add_constant()
 
 **Proof Verification TODO:**
 当前 `lib/real.x` 中的定理使用 `sorry` 占位符，需要实现真正的证明：
+
+**基础设施 (已完成):**
+- ✅ `src/tactic/proofgen.rs` - ProofGen 结构，从 tactic 生成 proof term
+- ✅ `src/tactic/parser.rs` - 解析 tactic 脚本 (intro/use/exact 等)
+- ✅ `TheoremProcessor` - 支持定理参数上下文
+
+**待完成证明 (使用 sorry):**
 - [ ] Real.half_pos - ε/2 构造证明
 - [ ] Real.rat_triangle_ineq - 三角不等式
 - [ ] Real.add_comm - 加法交换律

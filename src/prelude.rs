@@ -981,6 +981,31 @@ mod tests {
         assert!(result.is_ok(), "Theorem Test.simple_true should be registered");
     }
 
+    /// 验证 proof_test.x 中的直接 proof term
+    #[test]
+    fn test_proof_term_verification() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        // 加载 proof_test.x 中的定理
+        let result = load_theorem_from_file(&mut env, "lib/proof_test.x", "ProofTest");
+        assert!(result.is_ok(), "Should load theorems from proof_test.x");
+
+        // 检查定理是否被注册
+        let trivial = env.lookup_constant(&"ProofTest.trivial_nat".to_string());
+        assert!(trivial.is_ok(), "trivial_nat should be registered");
+
+        let identity = env.lookup_constant(&"ProofTest.identity".to_string());
+        assert!(identity.is_ok(), "identity should be registered");
+
+        // 验证 trivial_nat 的类型是 Nat
+        let inference = crate::typecheck::TypeInference::new(&env);
+        let term = crate::term::Term::const_("ProofTest.trivial_nat");
+        let ty = inference.infer(&crate::typecheck::Context::new(), &term);
+        assert!(ty.is_ok(), "trivial_nat should have a type");
+        println!("ProofTest.trivial_nat type: {:?}", ty.unwrap());
+    }
+
     /// 验证 Real.x 中的 def 被正确加载
     #[test]
     fn test_real_x_defs_loaded() {

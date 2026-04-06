@@ -178,9 +178,10 @@ env.add_inductive() / env.add_constant()
 - ✅ `TheoremProcessor` - 支持定理参数上下文
 
 **待完成证明 (使用 sorry):**
+- [x] ProofTest.trivial_nat - 直接 proof term 验证 (已完成)
 - [ ] Real.half_pos - ε/2 构造证明
-- [ ] Real.rat_triangle_ineq - 三角不等式
-- [ ] Real.add_comm - 加法交换律
+- [ ] Real.rat_triangle_ineq - 三角不等式  
+- [ ] Real.add_comm - 加法交换律 (复杂证明，需 intro/use/have/calc)
 - [ ] Real.add_assoc - 加法结合律
 - [ ] Real.add_zero - 零元性质
 - [ ] Real.add_neg - 加法逆元

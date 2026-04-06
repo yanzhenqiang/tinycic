@@ -659,7 +659,33 @@ impl<'a> Parser<'a> {
                 Token::Ident(s) => {
                     let tactic = s.clone();
                     match tactic.as_str() {
-                        "apply" | "rw" | "calc" | "have" | "obtain" | "sorry" => {
+                        "calc" => {
+                            // Collect calc block as multiple lines
+                            let mut calc_lines = vec!["calc".to_string()];
+                            self.advance(); // skip "calc"
+
+                            // Collect calc steps until next tactic
+                            loop {
+                                match &self.current {
+                                    Token::Eof | Token::Namespace | Token::End |
+                                    Token::Theorem | Token::Lemma | Token::Def |
+                                    Token::Structure | Token::Inductive => break,
+                                    Token::Ident(name) if name == "intro" || name == "use" ||
+                                        name == "exact" || name == "apply" || name == "have" ||
+                                        name == "obtain" || name == "sorry" || name == "rw" => break,
+                                    Token::Intro | Token::Use | Token::Exact => break,
+                                    _ => {
+                                        // Collect this line
+                                        let line = self.collect_tactic_line();
+                                        if !line.is_empty() {
+                                            calc_lines.push(line);
+                                        }
+                                    }
+                                }
+                            }
+                            script_lines.push(calc_lines.join("\n"));
+                        }
+                        "apply" | "rw" | "have" | "obtain" | "sorry" => {
                             // Collect this line as part of script
                             let line = self.collect_tactic_line();
                             script_lines.push(line);
@@ -772,6 +798,14 @@ impl<'a> Parser<'a> {
                     let bracket_content = self.collect_balanced();
                     parts.push(bracket_content);
                 }
+                Token::Equal => {
+                    parts.push("=".to_string());
+                    self.advance();
+                }
+                Token::Assign => {
+                    parts.push(":=".to_string());
+                    self.advance();
+                }
                 _ => {
                     self.advance();
                 }
@@ -880,6 +914,55 @@ impl<'a> Parser<'a> {
             }
             self.advance();
         }
+    }
+
+    /// Collect a multi-line calc block
+    /// Returns the entire block as a string including calc keyword and all steps
+    fn collect_calc_block(&mut self) -> String {
+        let mut lines = vec!["calc".to_string()];
+
+        // Skip "calc" keyword
+        self.advance();
+
+        // Collect calc steps until we hit a non-calc line or block-ending token
+        loop {
+            match &self.current {
+                Token::Eof |
+                Token::Namespace |
+                Token::End |
+                Token::Theorem |
+                Token::Lemma |
+                Token::Def |
+                Token::Structure |
+                Token::Inductive => break,
+                Token::Ident(s) => {
+                    // Check if this is a new tactic (not part of calc)
+                    if s == "intro" || s == "use" || s == "exact" ||
+                       s == "apply" || s == "have" || s == "obtain" ||
+                       s == "sorry" || s == "calc" || s == "rw" {
+                        break;
+                    }
+                    // Collect this calc step line
+                    // Just collect the raw line content
+                    let mut parts = vec![s.clone()];
+                    self.advance();
+                    while let Token::Ident(word) = &self.current {
+                        parts.push(word.clone());
+                        self.advance();
+                    }
+                    lines.push(parts.join(" "));
+                }
+                Token::Intro | Token::Use | Token::Exact => {
+                    // New tactic starts, end of calc block
+                    break;
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+
+        lines.join("\n")
     }
 
     fn parse_field(&mut self) -> Result<(Name, Rc<Term>), ParseError> {

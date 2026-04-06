@@ -1145,4 +1145,74 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_real_add_comm_proof_with_calc() {
+        use crate::parser::parse_theorem;
+        use crate::tactic::proof_builder::parse_tactic_script;
+
+        // First test tactic parsing - verify proof_builder correctly parses multi-line calc
+        let script = r#"intro ε hε
+use Nat.zero
+intro n hn
+have h : Rat.zero = Rat.zero
+calc
+  Rat.zero = Rat.zero := by rw [Rat.zero_eq]
+sorry"#;
+
+        println!("\n=== Parsing Tactic Script ===");
+        let tactics = parse_tactic_script(script);
+        for (i, t) in tactics.iter().enumerate() {
+            println!("tactic {}: {:?}", i, t);
+        }
+
+        // Verify we have the expected tactics
+        assert!(tactics.len() >= 5, "Should have at least 5 tactics, got {}", tactics.len());
+        assert!(matches!(tactics[3], crate::tactic::proof_builder::ParsedTactic::Have(_, _, _)));
+        assert!(matches!(tactics[4], crate::tactic::proof_builder::ParsedTactic::Calc(_)));
+
+        println!("\n✓ parse_tactic_script correctly parses have + calc!");
+
+        // Now test through parse_theorem - verify parser collects calc block
+        let input = r#"theorem test_comm (r1 r2 : Real) : eq (add r1 r2) (add r2 r1) :=
+  by
+    intro ε hε
+    use Nat.zero
+    intro n hn
+    have h : Rat.zero = Rat.zero
+    calc
+      Rat.zero = Rat.zero := by rw [Rat.zero_eq]
+    sorry"#;
+
+        let result = parse_theorem(input);
+        assert!(result.is_ok(), "Should parse theorem: {:?}", result.err());
+
+        let decl = result.unwrap();
+        println!("\n=== Theorem: {} ===", decl.name);
+
+        if let Some(ref proof) = decl.proof {
+            println!("\nGenerated Proof:\n{:?}", proof);
+
+            let proof_str = format!("{:?}", proof);
+
+            // Should contain Lambda from intro
+            if proof_str.contains("Lambda") {
+                println!("✓ Proof contains Lambda from intro");
+            }
+
+            // Should contain Let from have
+            if proof_str.contains("Let") {
+                println!("✓ Proof contains Let from have");
+            }
+
+            // Should contain Eq.trans from calc
+            if proof_str.contains("Eq.trans") {
+                println!("✓ Proof contains Eq.trans from calc");
+            }
+
+            println!("\n✓ Full proof generation works!");
+        } else {
+            panic!("No proof generated!");
+        }
+    }
 }

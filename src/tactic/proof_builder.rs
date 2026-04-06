@@ -115,7 +115,7 @@ pub fn parse_tactic_script(script: &str) -> Vec<ParsedTactic> {
         }
 
         // Check if this is a calc block
-        if line == "calc" {
+        if line.trim() == "calc" {
             // Parse calc block
             let mut calc_steps = Vec::new();
             i += 1;

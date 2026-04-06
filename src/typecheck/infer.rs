@@ -66,8 +66,15 @@ impl<'env> TypeInference<'env> {
 
     /// 推导常量类型
     fn infer_const(&self, name: &Name) -> TcResult<Rc<Term>> {
-        let info = self.env.lookup_constant(name)?;
-        Ok(info.ty.clone())
+        // 首先尝试查找常量
+        if let Ok(info) = self.env.lookup_constant(name) {
+            return Ok(info.ty.clone());
+        }
+        // 如果找不到，尝试查找归纳类型
+        if let Ok(info) = self.env.lookup_inductive(name) {
+            return Ok(info.ty.clone());
+        }
+        Err(TypeError::UnknownConstant(name.clone()))
     }
 
     /// 推导 Pi 类型

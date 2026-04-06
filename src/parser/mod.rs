@@ -26,6 +26,12 @@ pub fn parse_def(input: &str) -> Result<crate::inductive::DefDecl, ParseError> {
     p.parse_def()
 }
 
+/// Parse a theorem from string
+pub fn parse_theorem(input: &str) -> Result<crate::inductive::TheoremDecl, ParseError> {
+    let mut p = parser::Parser::new(input);
+    p.parse_theorem()
+}
+
 #[derive(Debug, Clone)]
 pub enum ParseError {
     UnexpectedToken(String),

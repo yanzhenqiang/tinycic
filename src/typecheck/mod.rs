@@ -92,6 +92,12 @@ impl std::fmt::Display for TypeError {
 
 impl std::error::Error for TypeError {}
 
+impl From<String> for TypeError {
+    fn from(msg: String) -> Self {
+        TypeError::Other(msg)
+    }
+}
+
 /// 类型检查结果
 pub type TcResult<T> = Result<T, TypeError>;
 

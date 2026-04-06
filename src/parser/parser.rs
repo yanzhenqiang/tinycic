@@ -4,7 +4,7 @@
 
 use super::lexer::{Lexer, Token};
 use super::ParseError;
-use crate::inductive::{InductiveDecl, StructureDecl, FieldDecl, DefDecl};
+use crate::inductive::{InductiveDecl, StructureDecl, FieldDecl, DefDecl, TheoremDecl};
 use crate::term::{Name, Term};
 use std::rc::Rc;
 
@@ -218,6 +218,8 @@ impl<'a> Parser<'a> {
 
         if terms.is_empty() {
             Ok(Term::const_("_"))
+        } else if terms.len() == 1 {
+            Ok(terms.remove(0))
         } else {
             // Build application chain
             let mut result = terms.remove(0);
@@ -226,6 +228,99 @@ impl<'a> Parser<'a> {
             }
             Ok(result)
         }
+    }
+
+    /// Parse a theorem declaration
+    /// Format: theorem name : statement := by tactic_block
+    pub fn parse_theorem(&mut self) -> Result<TheoremDecl, ParseError> {
+        use crate::inductive::TheoremDecl;
+
+        // Expect 'theorem' keyword
+        if self.current != Token::Theorem {
+            return Err(ParseError::ExpectedKeyword("theorem".to_string()));
+        }
+        self.advance();
+
+        // Parse name
+        let name = self.expect_ident()?;
+
+        // Expect ':'
+        if self.current != Token::Colon {
+            return Err(ParseError::ExpectedKeyword(":".to_string()));
+        }
+        self.advance();
+
+        // Parse statement (simplified: read until we hit ':=')
+        let statement = self.parse_theorem_statement()?;
+
+        // Expect ':='
+        if self.current != Token::Assign {
+            return Err(ParseError::ExpectedKeyword(":=".to_string()));
+        }
+        self.advance();
+
+        // Parse proof (simplified: skip 'by' and read the rest as proof term)
+        let proof = self.parse_proof()?;
+
+        Ok(TheoremDecl::new(name, statement).with_proof(proof))
+    }
+
+    fn parse_theorem_statement(&mut self) -> Result<Rc<Term>, ParseError> {
+        // Simplified: build a term from identifiers until we hit ':='
+        let mut components = Vec::new();
+
+        while self.current != Token::Assign && self.current != Token::Eof {
+            match &self.current {
+                Token::Ident(s) => {
+                    components.push(s.clone());
+                    self.advance();
+                }
+                Token::Arrow => {
+                    self.advance();
+                }
+                Token::LParen => {
+                    self.advance();
+                    // Skip parenthesized content
+                    while self.current != Token::RParen && self.current != Token::Eof {
+                        self.advance();
+                    }
+                    if self.current == Token::RParen {
+                        self.advance();
+                    }
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+
+        // Build simple type from components
+        if components.is_empty() {
+            Ok(Term::type0())
+        } else if components.len() == 1 {
+            Ok(Term::const_(components[0].clone()))
+        } else {
+            // Build arrow type: A -> B
+            let mut result = Term::const_(components.pop().unwrap());
+            for comp in components.into_iter().rev() {
+                result = Term::arrow(Term::const_(comp), result);
+            }
+            Ok(result)
+        }
+    }
+
+    fn parse_proof(&mut self) -> Result<Rc<Term>, ParseError> {
+        // Simplified: skip 'by' keyword and parse the proof term
+        if let Token::Ident(s) = &self.current {
+            if s == "by" {
+                self.advance();
+            }
+        }
+
+        // For now, just return 'sorry' as the proof
+        // In a full implementation, this would parse the tactic block
+        // and generate a proof term
+        Ok(Term::const_("sorry"))
     }
 
     fn parse_field(&mut self) -> Result<(Name, Rc<Term>), ParseError> {

@@ -182,6 +182,107 @@ impl Default for DefProcessor {
     }
 }
 
+// ============================================================================
+// 定理 (Theorem) - 带证明的命题
+// ============================================================================
+
+/// 定理声明
+#[derive(Debug, Clone)]
+pub struct TheoremDecl {
+    /// 定理名称
+    pub name: Name,
+    /// 定理陈述（类型）
+    pub statement: Rc<Term>,
+    /// 证明项（ tactic 块生成的证明）
+    pub proof: Option<Rc<Term>>,
+}
+
+impl TheoremDecl {
+    /// 创建新的定理声明
+    pub fn new(name: impl Into<Name>, statement: Rc<Term>) -> Self {
+        Self {
+            name: name.into(),
+            statement,
+            proof: None,
+        }
+    }
+
+    /// 设置证明项
+    pub fn with_proof(mut self, proof: Rc<Term>) -> Self {
+        self.proof = Some(proof);
+        self
+    }
+}
+
+/// 定理处理器 - 验证并注册定理
+pub struct TheoremProcessor;
+
+impl TheoremProcessor {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// 处理定理声明，验证证明并注册
+    pub fn process(&self, env: &Environment, decl: &TheoremDecl) -> TcResult<(Name, Rc<Term>, Rc<Term>)> {
+        use crate::typecheck::TypeInference;
+
+        // 1. 验证陈述的类型是 Prop（或 Type）
+        let inference = TypeInference::new(env);
+        let stmt_ty = inference.infer(&crate::typecheck::Context::new(), &decl.statement)
+            .map_err(|e| format!("Theorem statement type inference failed: {:?}", e))?;
+
+        // 简化：允许 Prop 或 Type
+        match stmt_ty.as_ref() {
+            Term::Sort(_) => {}, // Prop 或 Type
+            _ => return Err(format!("Theorem statement must be a proposition, got: {:?}", stmt_ty).into()),
+        }
+
+        // 2. 处理证明项
+        // 如果证明是 "sorry" 常量，需要将其应用于陈述类型
+        let proof_term = if let Some(ref proof) = decl.proof {
+            if let Term::Const(name) = proof.as_ref() {
+                if name == "sorry" {
+                    // 应用 sorry 到陈述类型: sorry stmt
+                    Term::app(proof.clone(), decl.statement.clone())
+                } else {
+                    proof.clone()
+                }
+            } else {
+                proof.clone()
+            }
+        } else {
+            Term::app(Term::const_("sorry"), decl.statement.clone())
+        };
+
+        // 3. 验证证明类型
+        let proof_ty = inference.infer(&crate::typecheck::Context::new(), &proof_term)
+            .map_err(|e| format!("Proof type inference failed: {:?}", e))?;
+
+        // 检查证明类型是否与陈述 convertible
+        if !inference.convertible(&proof_ty, &decl.statement) {
+            return Err(format!("Proof type mismatch. Expected: {:?}, Got: {:?}",
+                decl.statement, proof_ty).into());
+        }
+
+        Ok((decl.name.clone(), decl.statement.clone(), proof_term))
+    }
+
+    /// 注册定理到环境
+    pub fn register(&self, env: &mut Environment, decl: &TheoremDecl) -> TcResult<()> {
+        let (name, statement, proof) = self.process(env, decl)?;
+
+        // 将定理作为常量注册（类型是陈述，值是证明）
+        env.add_constant(name, statement, Some(proof));
+        Ok(())
+    }
+}
+
+impl Default for TheoremProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 mod positivity;
 pub mod recursor;
 

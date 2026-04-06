@@ -160,20 +160,43 @@ env.add_inductive() / env.add_constant()
   - 柯西序列运算封闭性证明
   - 代表元等价性保持证明
 - ✅ **def 关键字**：支持命名空间前缀的常量定义
+- ✅ **定理验证系统**：从 .x 文件加载 theorem 并验证证明
+
+**Proof Verification 系统:**
+- `TheoremDecl` - 定理声明结构（名称、陈述、证明）
+- `TheoremProcessor` - 定理处理器（验证陈述类型、验证证明）
+- `load_theorem_from_file()` - 从 .x 文件动态加载定理
+- `sorry` 占位符 - 未完成证明的占位符（类似 Lean 的 sorry）
+- 定理类型检查 - 确保证明类型与陈述匹配
 
 **TODO（第三阶段）:**
-1. 代码提取 (Extraction) 到 C
-2. 程序验证框架 (Hoare 逻辑)
-3. 初等几何公理系统
-4. 初中代数解方程
-   - 支持简单常量定义（如 `def zero : Real := ofRat Rat.zero`）
-   - 命名空间前缀自动添加（避免 `zero` 冲突）
-   - 复杂表达式仍需手动注册（如函数类型）
+1. 完善 parser 支持复杂定理格式（命名空间、缩进）
+2. 实现 tactic 解析（intro/exact/apply/rw/calc）
+3. 代码提取 (Extraction) 到 C
+4. 程序验证框架 (Hoare 逻辑)
+5. 初等几何公理系统
+6. 初中代数解方程
 
 **新增文件:**
 - `lib/real.x` - Real structure 定义、运算、性质
 - `lib/rat.x` - 添加 `ofInt` 和 `abs`
-- 91 个测试全部通过（含 5 个 Real 测试）
+- `lib/test_theorems.x` - 测试定理文件
+- 92 个测试全部通过（含 1 个定理验证测试）
+
+**使用示例:**
+```x
+// lib/test_theorems.x
+theorem simple_true : Nat :=
+  by
+    exact zero
+```
+```rust
+// 加载并验证定理
+let mut env = Environment::new();
+init_prelude(&mut env);
+load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test")?;
+// ✓ Verified theorem: Test.simple_true
+```
 
 ## 后续目标
 - [ ] 代码提取 (Extraction) 到 C

@@ -129,8 +129,8 @@ impl DefEqChecker {
             // let 需要进一步检查
             (Term::Let { .. }, Term::Let { .. }) => None,
 
-            // 其他情况不匹配
-            _ => Some(false),
+            // 其他情况：需要进一步检查（可能是归约后的比较）
+            _ => None,
         }
     }
 
@@ -399,9 +399,7 @@ mod tests {
     }
 
     /// 测试归约后的定义等价 (来自 Lean 4 whnf + is_def_eq 测试)
-    /// 注意：当前实现需要完善归约逻辑
     #[test]
-    #[ignore = "requires full reduction in is_def_eq"]
     fn lean4_test_def_eq_after_reduction() {
         let env = Environment::new();
         let mut checker = DefEqChecker::new(env);

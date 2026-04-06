@@ -123,6 +123,65 @@ impl Default for StructureProcessor {
     }
 }
 
+// ============================================================================
+// 定义 (Def) - 常量定义
+// ============================================================================
+
+/// 常量定义声明
+#[derive(Debug, Clone)]
+pub struct DefDecl {
+    /// 定义名称
+    pub name: Name,
+    /// 定义类型（可选，None 表示需要推导）
+    pub ty: Option<Rc<Term>>,
+    /// 定义值
+    pub value: Rc<Term>,
+}
+
+impl DefDecl {
+    /// 创建新的定义声明
+    pub fn new(name: impl Into<Name>, value: Rc<Term>) -> Self {
+        Self {
+            name: name.into(),
+            ty: None,
+            value,
+        }
+    }
+
+    /// 设置类型
+    pub fn with_type(mut self, ty: Rc<Term>) -> Self {
+        self.ty = Some(ty);
+        self
+    }
+}
+
+/// 定义处理器
+pub struct DefProcessor;
+
+impl DefProcessor {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// 处理定义声明，返回要注册的常量
+    pub fn process(&self, decl: &DefDecl) -> (Name, Rc<Term>, Option<Rc<Term>>) {
+        (decl.name.clone(), decl.ty.clone().unwrap_or_else(|| Term::type0()), Some(decl.value.clone()))
+    }
+
+    /// 注册定义到环境
+    pub fn register(&self, env: &mut Environment, decl: &DefDecl) -> TcResult<()> {
+        let (name, ty, val) = self.process(decl);
+        env.add_constant(name, ty, val);
+        Ok(())
+    }
+}
+
+impl Default for DefProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 mod positivity;
 pub mod recursor;
 

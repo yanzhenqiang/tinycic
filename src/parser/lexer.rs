@@ -25,6 +25,7 @@ pub enum Token {
     LBrace,      // {
     RBrace,      // }
     Colon,       // :
+    Assign,      // :=
     Arrow,       // => or →
     Pipe,        // |
     Comma,       // ,
@@ -65,7 +66,15 @@ impl<'a> Lexer<'a> {
             ')' => { self.advance(); Token::RParen }
             '{' => { self.advance(); Token::LBrace }
             '}' => { self.advance(); Token::RBrace }
-            ':' => { self.advance(); Token::Colon }
+            ':' => {
+                self.advance();
+                if self.current_char() == '=' {
+                    self.advance();
+                    Token::Assign
+                } else {
+                    Token::Colon
+                }
+            }
             '|' => { self.advance(); Token::Pipe }
             ',' => { self.advance(); Token::Comma }
             '_' => { self.advance(); Token::Underscore }

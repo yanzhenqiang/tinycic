@@ -2,7 +2,7 @@
 //!
 //! 包含 Nat, List, Int 等基本归纳类型的定义
 
-use crate::inductive::{ConstructorDecl, InductiveDecl, InductiveProcessor, StructureProcessor};
+use crate::inductive::{ConstructorDecl, InductiveDecl, InductiveProcessor, StructureProcessor, DefProcessor};
 use crate::parser;
 use crate::term::Term;
 use crate::typecheck::{Environment, Context, TypeInference};
@@ -60,6 +60,42 @@ fn type_contains(ty: &Term, target: &Term) -> bool {
         }
         _ => false,
     }
+}
+
+/// 从 .x 文件加载 def 定义
+pub fn load_def_from_file(env: &mut Environment, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // 尝试多个可能的路径
+    let content = if let Ok(c) = std::fs::read_to_string(path) {
+        c
+    } else if let Ok(c) = std::fs::read_to_string(&format!("../{}", path)) {
+        c
+    } else if let Ok(c) = std::fs::read_to_string(&format!("../../{}", path)) {
+        c
+    } else {
+        return Ok(());
+    };
+
+    // 查找文件中的 def 定义
+    let mut pos = 0;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("def ") && !trimmed.starts_with("//") {
+            let def_section = &content[pos..];
+
+            match parser::parse_def(def_section) {
+                Ok(decl) => {
+                    let processor = DefProcessor::new();
+                    processor.register(env, &decl)?;
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to parse def: {}", e);
+                }
+            }
+        }
+        pos += line.len() + 1;
+    }
+
+    Ok(())
 }
 
 /// 从 .x 文件加载 inductive 类型定义

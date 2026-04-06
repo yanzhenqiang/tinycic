@@ -20,6 +20,12 @@ pub fn parse_structure(input: &str) -> Result<StructureDecl, ParseError> {
     p.parse_structure()
 }
 
+/// Parse a definition from string
+pub fn parse_def(input: &str) -> Result<crate::inductive::DefDecl, ParseError> {
+    let mut p = parser::Parser::new(input);
+    p.parse_def()
+}
+
 #[derive(Debug, Clone)]
 pub enum ParseError {
     UnexpectedToken(String),

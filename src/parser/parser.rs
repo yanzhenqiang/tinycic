@@ -4,7 +4,7 @@
 
 use super::lexer::{Lexer, Token};
 use super::ParseError;
-use crate::inductive::{InductiveDecl, StructureDecl, FieldDecl};
+use crate::inductive::{InductiveDecl, StructureDecl, FieldDecl, DefDecl};
 use crate::term::{Name, Term};
 use std::rc::Rc;
 
@@ -140,6 +140,92 @@ impl<'a> Parser<'a> {
             fields,
             ty: Term::type0(),
         })
+    }
+
+    /// Parse a definition
+    /// Format: def name : type := value
+    ///    or: def name := value
+    pub fn parse_def(&mut self) -> Result<DefDecl, ParseError> {
+        use crate::inductive::DefDecl;
+
+        // Expect 'def' keyword
+        if self.current != Token::Def {
+            return Err(ParseError::ExpectedKeyword("def".to_string()));
+        }
+        self.advance();
+
+        // Parse name
+        let name = self.expect_ident()?;
+
+        // Parse optional type annotation
+        let mut ty = None;
+        if self.current == Token::Colon {
+            self.advance();
+            // For now, just skip until we hit := or end of line
+            // This is a simplified type parser
+            let type_str = self.parse_simple_type_str()?;
+            ty = Some(Term::const_(type_str));
+        }
+
+        // Expect ':='
+        if self.current != Token::Assign {
+            return Err(ParseError::ExpectedKeyword(":=".to_string()));
+        }
+        self.advance();
+
+        // Parse value (simplified: just read until end of line or comment)
+        let value = self.parse_def_value()?;
+
+        Ok(DefDecl { name, ty, value })
+    }
+
+    fn parse_simple_type_str(&mut self) -> Result<String, ParseError> {
+        // Simplified: just read the next identifier as type
+        match &self.current {
+            Token::Ident(s) => {
+                let ty = s.clone();
+                self.advance();
+                Ok(ty)
+            }
+            _ => Ok("Type".to_string()),
+        }
+    }
+
+    fn parse_def_value(&mut self) -> Result<Rc<Term>, ParseError> {
+        // Simplified: parse a simple term
+        // For now, just parse a single identifier or application
+        let mut terms = Vec::new();
+
+        while self.current != Token::Eof {
+            match &self.current {
+                Token::Ident(s) => {
+                    terms.push(Term::const_(s.clone()));
+                    self.advance();
+                }
+                Token::LParen => {
+                    self.advance();
+                    // Skip parenthesized content for now
+                    let _ = self.parse_def_value()?;
+                    if self.current == Token::RParen {
+                        self.advance();
+                    }
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+
+        if terms.is_empty() {
+            Ok(Term::const_("_"))
+        } else {
+            // Build application chain
+            let mut result = terms.remove(0);
+            for arg in terms {
+                result = Term::app(result, arg);
+            }
+            Ok(result)
+        }
     }
 
     fn parse_field(&mut self) -> Result<(Name, Rc<Term>), ParseError> {

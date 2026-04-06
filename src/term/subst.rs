@@ -38,6 +38,9 @@ pub fn has_loose_bvars(term: &Term, cutoff: u32) -> bool {
         Term::Assume { ty, body, .. } => {
             has_loose_bvars(ty, cutoff) || has_loose_bvars(body, cutoff + 1)
         }
+        Term::By { target, proof_term } => {
+            has_loose_bvars(target, cutoff) || has_loose_bvars(proof_term, cutoff)
+        }
         Term::Inductive { params, .. } => {
             params.iter().any(|p| has_loose_bvars(p, cutoff))
         }
@@ -177,6 +180,10 @@ fn instantiate_with_offset(
             instantiate_with_offset(ty, s, offset, subst),
             instantiate_with_offset(body, s, offset + 1, subst),
         ),
+        Term::By { target, proof_term } => Term::by(
+            instantiate_with_offset(target, s, offset, subst),
+            instantiate_with_offset(proof_term, s, offset, subst),
+        ),
         Term::Inductive {
             name,
             levels,
@@ -307,6 +314,10 @@ pub fn lift(term: &Rc<Term>, cutoff: u32, amount: u32) -> Rc<Term> {
             name.clone(),
             lift(ty, cutoff, amount),
             lift(body, cutoff + 1, amount),
+        ),
+        Term::By { target, proof_term } => Term::by(
+            lift(target, cutoff, amount),
+            lift(proof_term, cutoff, amount),
         ),
         Term::Inductive {
             name,

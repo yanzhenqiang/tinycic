@@ -106,6 +106,13 @@ pub enum Term {
         body: Rc<Term>,
     },
 
+    /// by 块: by target { tactic_sequence }
+    /// 用于嵌入 tactic 证明
+    By {
+        target: Rc<Term>,  // 待证目标类型
+        proof_term: Rc<Term>,  // 生成的证明项（由 tactic 执行后填充）
+    },
+
     // ===== 归纳类型相关 =====
     /// 归纳类型引用
     Inductive {
@@ -242,6 +249,14 @@ impl Term {
         })
     }
 
+    /// 创建 by 块
+    pub fn by(target: Rc<Term>, proof_term: Rc<Term>) -> Rc<Self> {
+        Rc::new(Term::By {
+            target,
+            proof_term,
+        })
+    }
+
     // ===== 便捷构造函数 =====
 
     /// 创建箭头类型 A -> B (非依赖 Pi)
@@ -302,6 +317,9 @@ impl fmt::Display for Term {
             }
             Term::Assume { name, ty, body } => {
                 write!(f, "assume ({} : {}), {}", name, ty, body)
+            }
+            Term::By { target, proof_term } => {
+                write!(f, "by ({}) {{ {} }}", target, proof_term)
             }
             Term::Inductive { name, levels, params } => {
                 write!(f, "{}", name)?;

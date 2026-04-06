@@ -37,6 +37,9 @@ impl<'env> TypeInference<'env> {
             Term::Assume { name, ty, body } => {
                 self.infer_assume(ctx, name, ty, body)
             }
+            Term::By { target, proof_term } => {
+                self.infer_by(ctx, target, proof_term)
+            }
             Term::Inductive { name, levels, params } => {
                 self.infer_inductive(name, levels, params)
             }
@@ -195,6 +198,30 @@ impl<'env> TypeInference<'env> {
         Ok(Term::pi("_", ty.clone(), body_ty))
     }
 
+    /// 推导 by 块类型
+    /// by target { proof_term } 的类型是 target（如果 proof_term 证明它）
+    fn infer_by(
+        &self,
+        ctx: &Context,
+        target: &Rc<Term>,
+        proof_term: &Rc<Term>,
+    ) -> TcResult<Rc<Term>> {
+        // 检查 target 是有效的类型
+        let target_ty = self.infer(ctx, target)?;
+        self.extract_level(&target_ty)?; // 确保 target 是一个类型
+
+        // 检查 proof_term 的类型是否与 target convertible
+        let proof_ty = self.infer(ctx, proof_term)?;
+        if self.convertible(&proof_ty, target) {
+            Ok(target.clone())
+        } else {
+            Err(TypeError::TypeMismatch {
+                expected: target.clone(),
+                found: proof_ty,
+            })
+        }
+    }
+
     /// 推导归纳类型
     fn infer_inductive(
         &self,
@@ -297,7 +324,7 @@ impl<'env> TypeInference<'env> {
     }
 
     /// 弱头归约
-    fn whnf(&self, term: &Rc<Term>) -> Rc<Term> {
+    pub fn whnf(&self, term: &Rc<Term>) -> Rc<Term> {
         use crate::term::reduce::whnf;
         match whnf(term) {
             crate::term::reduce::Whnf::Term(t) | crate::term::reduce::Whnf::Stuck(t) => t,
@@ -328,7 +355,7 @@ impl<'env> TypeInference<'env> {
     }
 
     /// 判断两个项是否可转换
-    fn convertible(&self, t1: &Rc<Term>, t2: &Rc<Term>) -> bool {
+    pub fn convertible(&self, t1: &Rc<Term>, t2: &Rc<Term>) -> bool {
         use crate::term::reduce::nf;
         let nf1 = nf(t1);
         let nf2 = nf(t2);
@@ -369,6 +396,10 @@ impl<'env> TypeInference<'env> {
                 Term::Assume { ty: t1, body: b1, .. },
                 Term::Assume { ty: t2, body: b2, .. },
             ) => self.alpha_eq(t1, t2) && self.alpha_eq(b1, b2),
+            (
+                Term::By { target: t1, proof_term: p1 },
+                Term::By { target: t2, proof_term: p2 },
+            ) => self.alpha_eq(t1, t2) && self.alpha_eq(p1, p2),
             _ => false,
         }
     }

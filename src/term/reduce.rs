@@ -155,7 +155,8 @@ impl Reducer {
             Term::Inductive { .. } |
             Term::Constructor { .. } |
             Term::Have { .. } |
-            Term::Assume { .. } => Whnf::Term(term.clone()),
+            Term::Assume { .. } |
+            Term::By { .. } => Whnf::Term(term.clone()),
         }
     }
 
@@ -237,6 +238,11 @@ impl Reducer {
                 let body_nf = self.nf_no_cache(body);
                 Term::assume(name.clone(), ty_nf, body_nf)
             }
+            Term::By { target, proof_term } => {
+                let target_nf = self.nf_no_cache(target);
+                let proof_nf = self.nf_no_cache(proof_term);
+                Term::by(target_nf, proof_nf)
+            }
             _ => term.clone(),
         }
     }
@@ -274,6 +280,11 @@ impl Reducer {
                 let ty_nf = self.nf(ty);
                 let body_nf = self.nf(body);
                 Term::assume(name.clone(), ty_nf, body_nf)
+            }
+            Term::By { target, proof_term } => {
+                let target_nf = self.nf(target);
+                let proof_nf = self.nf(proof_term);
+                Term::by(target_nf, proof_nf)
             }
             // 其他形式不需要递归归约
             _ => term.clone(),

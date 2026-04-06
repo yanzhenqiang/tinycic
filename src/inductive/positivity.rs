@@ -113,6 +113,12 @@ impl PositivityChecker {
                 self.check_term(body, pos)
             }
 
+            // by 块
+            Term::By { target, proof_term } => {
+                self.check_term(target, Position::Positive)?;
+                self.check_term(proof_term, pos)
+            }
+
             // 归纳类型引用
             Term::Inductive { name, params, .. } => {
                 if name == &self.inductive_name {
@@ -207,6 +213,12 @@ impl PositivityChecker {
                 self.check_strict_positivity(body)
             }
 
+            // by
+            Term::By { target, proof_term } => {
+                self.check_strict_positivity(target)?;
+                self.check_strict_positivity(proof_term)
+            }
+
             // 其他形式
             _ => Ok(()),
         }
@@ -234,6 +246,10 @@ impl PositivityChecker {
             Term::Assume { ty, body, .. } => {
                 self.check_no_occurrence(ty)?;
                 self.check_no_occurrence(body)
+            }
+            Term::By { target, proof_term } => {
+                self.check_no_occurrence(target)?;
+                self.check_no_occurrence(proof_term)
             }
             _ => Ok(()),
         }

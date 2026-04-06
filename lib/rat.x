@@ -31,7 +31,7 @@ end PosInt
 // 有理数定义
 structure Rat where
   num : Int      // 分子
-  den : PosInt   // 分母（正整数）
+  den : Nat      // 分母（正整数，简化使用 Nat）
 
 namespace Rat
 

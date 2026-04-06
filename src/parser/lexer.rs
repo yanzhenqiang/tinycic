@@ -4,6 +4,7 @@
 pub enum Token {
     // Keywords
     Inductive,
+    Structure,
     Where,
     Namespace,
     End,
@@ -143,6 +144,7 @@ impl<'a> Lexer<'a> {
         let s = &self.input[start..self.pos];
         match s {
             "inductive" => Token::Inductive,
+            "structure" => Token::Structure,
             "where" => Token::Where,
             "namespace" => Token::Namespace,
             "end" => Token::End,

@@ -4,7 +4,7 @@
 
 use super::lexer::{Lexer, Token};
 use super::ParseError;
-use crate::inductive::InductiveDecl;
+use crate::inductive::{InductiveDecl, StructureDecl, FieldDecl};
 use crate::term::{Name, Term};
 use std::rc::Rc;
 
@@ -94,6 +94,85 @@ impl<'a> Parser<'a> {
             is_recursive: false,
             is_nested: false,
         })
+    }
+
+    /// Parse a structure type definition
+    /// Format: structure Name where | field1 : type | field2 : type | ...
+    ///    or:  structure Name where
+    ///            field1 : type
+    ///            field2 : type
+    pub fn parse_structure(&mut self) -> Result<StructureDecl, ParseError> {
+        // Expect 'structure' keyword
+        if self.current != Token::Structure {
+            return Err(ParseError::ExpectedKeyword("structure".to_string()));
+        }
+        self.advance();
+
+        // Parse name
+        let name = self.expect_ident()?;
+
+        // Expect 'where' keyword
+        if self.current != Token::Where {
+            return Err(ParseError::ExpectedKeyword("where".to_string()));
+        }
+        self.advance();
+
+        // Parse fields - support both | field and just field
+        let mut fields = Vec::new();
+        loop {
+            // Skip optional pipe
+            if self.current == Token::Pipe {
+                self.advance();
+            }
+
+            // Check if next token is an identifier (field name)
+            match &self.current {
+                Token::Ident(_) => {
+                    let (field_name, field_type) = self.parse_field()?;
+                    fields.push(FieldDecl { name: field_name, ty: field_type });
+                }
+                _ => break,
+            }
+        }
+
+        Ok(StructureDecl {
+            name,
+            fields,
+            ty: Term::type0(),
+        })
+    }
+
+    fn parse_field(&mut self) -> Result<(Name, Rc<Term>), ParseError> {
+        let name = self.expect_ident()?;
+
+        // Expect ':'
+        if self.current != Token::Colon {
+            return Err(ParseError::ExpectedKeyword(":".to_string()));
+        }
+        self.advance();
+
+        // Parse type (simplified: just read identifiers until pipe or end)
+        let ty = self.parse_field_type()?;
+        Ok((name, ty))
+    }
+
+    fn parse_field_type(&mut self) -> Result<Rc<Term>, ParseError> {
+        // Simplified type parsing for structure fields
+        // Only supports simple types: Int, Nat, Type, etc.
+        // Stops at newline (next field), pipe, or EOF
+
+        match &self.current {
+            Token::Ident(s) => {
+                let ty = Term::const_(s.clone());
+                self.advance();
+                Ok(ty)
+            }
+            _ => {
+                // For any other token, skip and return Type
+                self.advance();
+                Ok(Term::type0())
+            }
+        }
     }
 
     fn parse_params(&mut self, _params: &mut Vec<(Name, Rc<Term>)>) -> Result<(), ParseError> {

@@ -3,10 +3,7 @@
 //! Parses inductive type definitions and basic function definitions
 //! from .x files into InductiveDecl structures.
 
-use crate::inductive::InductiveDecl;
-use crate::term::{Name, Term};
-use std::collections::HashMap;
-use std::rc::Rc;
+use crate::inductive::{InductiveDecl, StructureDecl};
 
 pub mod lexer;
 pub mod parser;
@@ -15,6 +12,12 @@ pub mod parser;
 pub fn parse_inductive(input: &str) -> Result<InductiveDecl, ParseError> {
     let mut p = parser::Parser::new(input);
     p.parse_inductive()
+}
+
+/// Parse a structure type from string
+pub fn parse_structure(input: &str) -> Result<StructureDecl, ParseError> {
+    let mut p = parser::Parser::new(input);
+    p.parse_structure()
 }
 
 #[derive(Debug, Clone)]

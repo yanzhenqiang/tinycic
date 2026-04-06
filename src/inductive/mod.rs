@@ -11,6 +11,118 @@ use std::rc::Rc;
 use crate::typecheck::{TcResult, TypeError, Environment, InductiveInfo};
 use std::collections::HashSet;
 
+// ============================================================================
+// 结构体类型 (Structure/Record Types)
+// ============================================================================
+
+/// 结构体字段声明
+#[derive(Debug, Clone)]
+pub struct FieldDecl {
+    /// 字段名称
+    pub name: Name,
+    /// 字段类型
+    pub ty: Rc<Term>,
+}
+
+/// 结构体类型声明
+#[derive(Debug, Clone)]
+pub struct StructureDecl {
+    /// 类型名称
+    pub name: Name,
+    /// 参数字段（如 Rat 的 num, den）
+    pub fields: Vec<FieldDecl>,
+    /// 结构体类型（通常是 Type 0）
+    pub ty: Rc<Term>,
+}
+
+impl StructureDecl {
+    /// 创建新的结构体声明
+    pub fn new(name: impl Into<Name>) -> Self {
+        Self {
+            name: name.into(),
+            fields: Vec::new(),
+            ty: Term::type0(),
+        }
+    }
+
+    /// 添加字段
+    pub fn field(mut self, name: impl Into<Name>, ty: Rc<Term>) -> Self {
+        self.fields.push(FieldDecl {
+            name: name.into(),
+            ty,
+        });
+        self
+    }
+
+    /// 获取构造子（mk 函数）的类型
+    /// mk : field1_ty -> field2_ty -> ... -> Name
+    pub fn mk_type(&self) -> Rc<Term> {
+        let mut result = Term::const_(self.name.clone());
+        for field in self.fields.iter().rev() {
+            result = Term::arrow(field.ty.clone(), result);
+        }
+        result
+    }
+
+    /// 获取投影函数类型
+    /// proj_i : Name -> field_i_ty
+    pub fn proj_type(&self, field_idx: usize) -> Option<Rc<Term>> {
+        self.fields.get(field_idx).map(|field| {
+            Term::arrow(Term::const_(self.name.clone()), field.ty.clone())
+        })
+    }
+}
+
+/// 结构体处理器
+pub struct StructureProcessor;
+
+impl StructureProcessor {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// 处理结构体声明，返回需要注册的所有常量
+    pub fn process(&self, decl: &StructureDecl) -> Vec<(Name, Rc<Term>, Option<Rc<Term>>)> {
+        let mut constants = Vec::new();
+
+        // 1. 注册类型本身
+        constants.push((decl.name.clone(), decl.ty.clone(), None));
+
+        // 2. 注册构造子 mk
+        let mk_name = format!("{}.mk", decl.name);
+        constants.push((mk_name, decl.mk_type(), None));
+
+        // 3. 注册投影函数
+        for field in &decl.fields {
+            let proj_name = format!("{}.{}", decl.name, field.name);
+            let proj_ty = Term::arrow(
+                Term::const_(decl.name.clone()),
+                field.ty.clone(),
+            );
+            constants.push((proj_name, proj_ty, None));
+        }
+
+        constants
+    }
+
+    /// 注册结构体到环境
+    pub fn register(&self, env: &mut Environment, decl: &StructureDecl) -> TcResult<()> {
+        let constants = self.process(decl);
+
+        for (name, ty, val) in constants {
+            env.add_constant(name, ty, val);
+        }
+
+        Ok(())
+    }
+}
+
+impl Default for StructureProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 mod positivity;
 pub mod recursor;
 

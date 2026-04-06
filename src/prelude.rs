@@ -2,10 +2,127 @@
 //!
 //! 包含 Nat, List, Int 等基本归纳类型的定义
 
-use crate::inductive::{ConstructorDecl, InductiveDecl, InductiveProcessor};
+use crate::inductive::{ConstructorDecl, InductiveDecl, InductiveProcessor, StructureProcessor};
+use crate::parser;
 use crate::term::Term;
 use crate::typecheck::{Environment, Context, TypeInference};
 use std::rc::Rc;
+
+/// 从 .x 文件加载 structure 类型定义
+pub fn load_structure_from_file(env: &mut Environment, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // 尝试多个可能的路径（从测试或主程序运行时）
+    let content = if let Ok(c) = std::fs::read_to_string(path) {
+        c
+    } else if let Ok(c) = std::fs::read_to_string(&format!("../{}", path)) {
+        c
+    } else if let Ok(c) = std::fs::read_to_string(&format!("../../{}", path)) {
+        c
+    } else {
+        // 文件未找到，静默返回
+        return Ok(());
+    };
+
+    // 查找文件中的 structure 定义
+    // 跳过注释，找到 "structure" 关键字
+    if let Some(struct_start) = content.find("structure ") {
+        let structure_section = &content[struct_start..];
+
+        // 尝试解析 structure 定义
+        match parser::parse_structure(structure_section) {
+            Ok(decl) => {
+                let processor = StructureProcessor::new();
+                processor.register(env, &decl)?;
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to parse structure from {}: {}", path, e);
+                Ok(())
+            }
+        }
+    } else {
+        // 没有找到 structure 定义，静默返回
+        Ok(())
+    }
+}
+
+/// 检查类型是否包含特定项（用于检测递归）
+fn type_contains(ty: &Term, target: &Term) -> bool {
+    match ty {
+        Term::Const(name) => {
+            if let Term::Const(target_name) = target {
+                name == target_name
+            } else {
+                false
+            }
+        }
+        Term::Pi { domain, codomain, .. } => {
+            type_contains(domain, target) || type_contains(codomain, target)
+        }
+        _ => false,
+    }
+}
+
+/// 从 .x 文件加载 inductive 类型定义
+pub fn load_inductive_from_file(env: &mut Environment, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // 尝试多个可能的路径（从测试或主程序运行时）
+    let content = if let Ok(c) = std::fs::read_to_string(path) {
+        c
+    } else if let Ok(c) = std::fs::read_to_string(&format!("../{}", path)) {
+        c
+    } else if let Ok(c) = std::fs::read_to_string(&format!("../../{}", path)) {
+        c
+    } else {
+        // 文件未找到，静默返回（可能是测试环境）
+        return Ok(());
+    };
+
+    // 查找文件中的 inductive 定义（在行首，不在注释中）
+    let mut pos = 0;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("inductive ") {
+            // 从这个位置开始解析
+            let inductive_section = &content[pos..];
+            // 尝试解析 inductive 定义
+            match parser::parse_inductive(inductive_section) {
+                Ok(mut decl) => {
+                    // 检测是否为递归类型（构造子类型中包含自身）
+                    let type_const = Term::const_(&decl.name);
+                    decl.is_recursive = decl.constructors.iter().any(|ctor| {
+                        type_contains(&ctor.ty, &type_const)
+                    });
+
+                    let processor = InductiveProcessor::new();
+                    let (info, extra_ctors) = processor.process(&decl)?;
+
+                    // 注册归纳类型
+                    env.add_inductive(&decl.name, info.clone());
+
+                    // 添加构造子常量（不带前缀，保持与静态注册一致）
+                    for (name, ty) in &info.constructors {
+                        env.add_constant(name, ty.clone(), None);
+                    }
+
+                    // 添加额外常量（如消去式）
+                    for (name, ty) in extra_ctors {
+                        env.add_constant(&name, ty, None);
+                    }
+
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to parse inductive from {}: {}", path, e);
+                    return Ok(());
+                }
+            }
+        }
+        pos += line.len() + 1; // +1 for newline
+    }
+
+    // 没有找到 inductive 定义，静默返回
+    eprintln!("Debug: No inductive definition found in {}", path);
+    Ok(())
+}
 
 /// 创建 Nat 类型定义
 ///
@@ -105,33 +222,18 @@ pub fn define_int() -> InductiveDecl {
     }
 }
 
-/// 定义 Rat（有理数）类型
-///
-/// Rat 不是归纳类型，而是结构体：
-/// structure Rat where
-///   num : Int    -- 分子
-///   den : PosInt -- 分母（正整数）
-///
-/// 这里我们将 Rat 实现为常量定义
-pub fn define_rat(env: &mut Environment) {
-    use crate::typecheck::ConstantInfo;
+/// 初始化环境，从 .x 文件动态加载标准库
+pub fn init_prelude(env: &mut Environment) {
+    // 从 .x 文件加载所有归纳类型（动态注册）
+    let _ = load_inductive_from_file(env, "lib/nat.x");
+    let _ = load_inductive_from_file(env, "lib/list.x");
+    let _ = load_inductive_from_file(env, "lib/int.x");
 
-    // Rat : Type
-    let rat_type = Term::type0();
-    env.add_constant("Rat", rat_type, None);
+    // 从 .x 文件加载结构体类型（动态注册）
+    let _ = load_structure_from_file(env, "lib/rat.x");
 
-    // Rat.mk : Int → PosInt → Rat
-    let mk_type = Term::arrow(
-        Term::const_("Int"),
-        Term::arrow(
-            Term::const_("Nat"), // 简化：使用 Nat 代替 PosInt
-            Term::const_("Rat"),
-        ),
-    );
-    env.add_constant("Rat.mk", mk_type, None);
-
-    // 基本有理数常量
-    // Rat.zero = Rat.mk (Int.ofNat 0) 1
+    // 额外注册 Rat 基本常量（这些可以在 .x 文件中定义，但当前 parser 不支持 def）
+    // Rat.zero = Rat.mk (Int.ofNat 0) 0
     let rat_zero = Term::app(
         Term::app(
             Term::const_("Rat.mk"),
@@ -141,7 +243,7 @@ pub fn define_rat(env: &mut Environment) {
     );
     env.add_constant("Rat.zero", Term::const_("Rat"), Some(rat_zero));
 
-    // Rat.one = Rat.mk (Int.ofNat 1) 1
+    // Rat.one = Rat.mk (Int.ofNat 1) 0
     let one_nat = Term::app(Term::const_("succ"), Term::const_("zero"));
     let rat_one = Term::app(
         Term::app(
@@ -151,52 +253,6 @@ pub fn define_rat(env: &mut Environment) {
         Term::const_("zero"),
     );
     env.add_constant("Rat.one", Term::const_("Rat"), Some(rat_one));
-}
-
-/// 初始化环境，添加标准库定义
-pub fn init_prelude(env: &mut Environment) {
-    let processor = InductiveProcessor::new();
-
-    // 添加 Nat 类型
-    let nat_decl = define_nat();
-    if let Ok((info, extra_ctors)) = processor.process(&nat_decl) {
-        env.add_inductive(&nat_decl.name, info.clone());
-        // 添加构造子常量
-        for (name, ty) in &info.constructors {
-            env.add_constant(name, ty.clone(), None);
-        }
-        // 添加额外常量（如消去式）
-        for (name, ty) in extra_ctors {
-            env.add_constant(&name, ty, None);
-        }
-    }
-
-    // 添加 List 类型
-    let list_decl = define_list();
-    if let Ok((info, extra_ctors)) = processor.process(&list_decl) {
-        env.add_inductive(&list_decl.name, info.clone());
-        for (name, ty) in &info.constructors {
-            env.add_constant(name, ty.clone(), None);
-        }
-        for (name, ty) in extra_ctors {
-            env.add_constant(&name, ty, None);
-        }
-    }
-
-    // 添加 Int 类型
-    let int_decl = define_int();
-    if let Ok((info, extra_ctors)) = processor.process(&int_decl) {
-        env.add_inductive(&int_decl.name, info.clone());
-        for (name, ty) in &info.constructors {
-            env.add_constant(name, ty.clone(), None);
-        }
-        for (name, ty) in extra_ctors {
-            env.add_constant(&name, ty, None);
-        }
-    }
-
-    // 添加 Rat 类型（结构体，非归纳类型）
-    define_rat(env);
 }
 
 #[cfg(test)]

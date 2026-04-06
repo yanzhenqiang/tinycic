@@ -436,8 +436,8 @@ mod tests {
         assert!(checker.is_def_eq(&myid1, &myid2));
 
         // myId = λx. x (通过展开定义)
-        // 注意：这需要 delta reduction，当前实现可能不支持
-        // assert!(checker.is_def_eq(&myid1, &id_term));
+        // 这需要 lazy delta reduction
+        assert!(checker.is_def_eq(&myid1, &id_term), "Lazy delta reduction: myId should unfold to λx. x");
     }
 
     // =========================================================================
@@ -609,5 +609,62 @@ mod tests {
         // Type ≠ Type₁
         let type1_level = Term::sort(1);
         assert!(!checker.is_def_eq(&type1, &type1_level));
+    }
+
+    /// 测试嵌套常量展开 (来自 Lean 4 lazy delta reduction 测试)
+    #[test]
+    fn lean4_test_nested_unfolding() {
+        let mut env = Environment::new();
+
+        // 定义 a := b, b := λx. x
+        let id_term = Term::lambda("x", Term::type0(), Term::var(0));
+        env.add_constant("b", Term::type0(), Some(id_term.clone()));
+        env.add_constant("a", Term::type0(), Some(Term::const_("b")));
+
+        let mut checker = DefEqChecker::new(env);
+
+        // a = λx. x (需要展开两次)
+        let a = Term::const_("a");
+        assert!(checker.is_def_eq(&a, &id_term), "Nested unfolding: a -> b -> λx. x");
+    }
+
+    /// 测试部分应用常量的展开 (来自 Lean 4 部分应用测试)
+    #[test]
+    fn lean4_test_partial_app_unfolding() {
+        let mut env = Environment::new();
+
+        // 定义 const := λx y. x
+        let const_term = Term::lambda("x", Term::type0(),
+            Term::lambda("y", Term::type0(), Term::var(1)));
+        env.add_constant("const", Term::type0(), Some(const_term));
+
+        let mut checker = DefEqChecker::new(env);
+
+        // const a = λy. a
+        let a = Term::const_("a");
+        let const_a = Term::app(Term::const_("const"), a.clone());
+        let expected = Term::lambda("y", Term::type0(), a.clone());
+
+        assert!(checker.is_def_eq(&const_a, &expected),
+            "Partial application unfolding: const a -> λy. a");
+    }
+
+    /// 测试常量与常量的等价（通过展开）
+    #[test]
+    fn lean4_test_const_to_const_unfolding() {
+        let mut env = Environment::new();
+
+        // 定义 id1 := λx. x, id2 := λx. x
+        let id_term = Term::lambda("x", Term::type0(), Term::var(0));
+        env.add_constant("id1", Term::type0(), Some(id_term.clone()));
+        env.add_constant("id2", Term::type0(), Some(id_term.clone()));
+
+        let mut checker = DefEqChecker::new(env);
+
+        // id1 = id2 (两者展开后相同)
+        let id1 = Term::const_("id1");
+        let id2 = Term::const_("id2");
+        assert!(checker.is_def_eq(&id1, &id2),
+            "Const to const unfolding: id1 -> λx.x, id2 -> λx.x");
     }
 }

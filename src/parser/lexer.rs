@@ -110,6 +110,8 @@ impl<'a> Lexer<'a> {
                 }
             }
             '→' => { self.advance(); Token::Arrow }
+            '>' => { self.advance(); Token::Ident(">".to_string()) }
+            '<' => { self.advance(); Token::Ident("<".to_string()) }
             _ => {
                 // Skip unknown character
                 self.advance();
@@ -208,5 +210,26 @@ mod tests {
         assert_eq!(lexer.next_token(), Token::Where);
         assert_eq!(lexer.next_token(), Token::Pipe);
         assert_eq!(lexer.next_token(), Token::Ident("zero".to_string()));
+    }
+}
+
+#[test]
+fn test_greek_letters() {
+    let mut lexer = Lexer::new("ε δ");
+    let t1 = lexer.next_token();
+    let t2 = lexer.next_token();
+    
+    println!("t1: {:?}", t1);
+    println!("t2: {:?}", t2);
+    
+    // 希腊字母应该被识别为 Ident
+    match t1 {
+        Token::Ident(s) => assert_eq!(s, "ε"),
+        _ => panic!("Expected Ident for ε, got {:?}", t1),
+    }
+    
+    match t2 {
+        Token::Ident(s) => assert_eq!(s, "δ"),
+        _ => panic!("Expected Ident for δ, got {:?}", t2),
     }
 }

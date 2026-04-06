@@ -1199,3 +1199,7 @@ mod tests {
     // 注意：parser 测试主要通过 prelude::tests 中的集成测试进行
     // 例如 test_nat_type_exists, test_list_type_exists 等
 }
+
+// 注意：希腊字母参数绑定测试暂时跳过
+// 问题：ε > Rat.zero 中的 > 需要被正确解析为操作符
+// 当前解析器将类型表达式和值表达式混合处理，需要更清晰的分离

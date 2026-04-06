@@ -396,3 +396,60 @@ load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test")?;
 1. **测试用例** - 复现 bug 的测试
 2. **修复代码** - 修复 bug 的代码
 3. **测试通过** - 修复后测试必须通过
+
+---
+
+## 开发流程示例
+
+以修复 "UniverseMismatch 错误" 为例，演示完整开发流程：
+
+### 1. 问题分析
+```bash
+# 运行测试发现错误
+cargo test test_cauchy -- --nocapture
+# 错误：UniverseMismatch { expected: Level(0), found: Level(999) }
+```
+
+### 2. 根因定位
+通过添加调试输出，发现 `extract_level` 收到 `Const("Prop")` 而不是 `Sort(...)`。
+问题：`Prop` 是 Sort(0) 的别名，但代码未处理。
+
+### 3. 修复代码
+```rust
+// src/typecheck/infer.rs
+fn extract_level(&self, term: &Rc<Term>) -> TcResult<Level> {
+    let whnf_term = self.whnf(term);
+    match whnf_term.as_ref() {
+        Term::Sort(lvl) => Ok(Level(lvl.0)),
+        // 添加 Prop 作为 Sort(0) 的别名
+        Term::Const(name) if name == "Prop" => Ok(Level(0)),
+        _ => Err(TypeError::UniverseMismatch { ... }),
+    }
+}
+```
+
+### 4. 验证修复
+```bash
+cargo test  # 114 个测试通过
+```
+
+### 5. 更新 DESIGN.MD
+- 记录修复的问题
+- 更新 TODO 列表状态
+
+### 6. 提交 Git
+```bash
+git add -A
+git commit -m "修复 UniverseMismatch：识别 Prop 为 Sort(0)
+
+- Pi 类型的 codomain 可能是 Prop，需要被识别为有效的 universe
+- 添加 Term::Const("Prop") 匹配返回 Level(0)
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+```
+
+**关键点：**
+- 从错误信息出发，通过调试定位根因
+- 最小化修复，只改必要代码
+- 所有测试通过后提交
+- 提交信息包含：问题、解决方案、验证结果

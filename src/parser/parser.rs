@@ -145,6 +145,7 @@ impl<'a> Parser<'a> {
     /// Parse a definition
     /// Format: def name : type := value
     ///    or: def name := value
+    ///    or: def name (params) : type := value
     pub fn parse_def(&mut self) -> Result<DefDecl, ParseError> {
         use crate::inductive::DefDecl;
 
@@ -157,14 +158,16 @@ impl<'a> Parser<'a> {
         // Parse name
         let name = self.expect_ident()?;
 
+        // Parse optional parameters (p1 p2 : Type)
+        let params = self.parse_def_params()?;
+
         // Parse optional type annotation
         let mut ty = None;
         if self.current == Token::Colon {
             self.advance();
-            // For now, just skip until we hit := or end of line
-            // This is a simplified type parser
-            let type_str = self.parse_simple_type_str()?;
-            ty = Some(Term::const_(type_str));
+            // Parse type expression
+            let type_expr = self.parse_type_expr()?;
+            ty = Some(type_expr);
         }
 
         // Expect ':='
@@ -173,10 +176,252 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
-        // Parse value (simplified: just read until end of line or comment)
-        let value = self.parse_def_value()?;
+        // Parse value - a proper term
+        let value = self.parse_term()?;
 
-        Ok(DefDecl { name, ty, value })
+        // Wrap value with lambdas for parameters
+        let final_value = params.iter().rev().fold(value, |body, (name, ty)| {
+            Term::lambda(name.clone(), ty.clone(), body)
+        });
+
+        // Wrap type with Pis for parameters
+        let final_ty = if let Some(t) = ty {
+            params.iter().rev().fold(t, |codomain, (name, ty)| {
+                Term::pi(name.clone(), ty.clone(), codomain)
+            })
+        } else {
+            Term::type0()
+        };
+
+        Ok(DefDecl {
+            name,
+            ty: Some(final_ty),
+            value: final_value,
+        })
+    }
+
+    /// Parse definition parameters like (r : Rat)
+    fn parse_def_params(&mut self) -> Result<Vec<(Name, Rc<Term>)>, ParseError> {
+        let mut params = Vec::new();
+
+        // Parse multiple parameter groups: (r : Rat) (n : Nat)
+        while self.current == Token::LParen {
+            self.advance(); // skip '('
+
+            // Collect parameter names
+            let mut names = Vec::new();
+            loop {
+                match &self.current {
+                    Token::Ident(s) => {
+                        names.push(s.clone());
+                        self.advance();
+                    }
+                    Token::Colon => break,
+                    Token::RParen => break,
+                    _ => break,
+                }
+            }
+
+            // Expect ':'
+            if self.current != Token::Colon {
+                // No type annotation, skip
+                if self.current == Token::RParen {
+                    self.advance();
+                }
+                continue;
+            }
+            self.advance();
+
+            // Parse type - handle complex types like Rat > Rat.zero
+            let ty = self.parse_def_param_type()?;
+
+            // Add all params with this type
+            for name in names {
+                params.push((name, ty.clone()));
+            }
+
+            // Expect ')'
+            if self.current == Token::RParen {
+                self.advance();
+            }
+        }
+
+        Ok(params)
+    }
+
+    /// Parse definition parameter type (may include > for inequalities)
+    fn parse_def_param_type(&mut self) -> Result<Rc<Term>, ParseError> {
+        let mut components = Vec::new();
+
+        while self.current != Token::RParen
+            && self.current != Token::Assign
+            && self.current != Token::Eof
+        {
+            match &self.current {
+                Token::Ident(s) => {
+                    components.push(s.clone());
+                    self.advance();
+                }
+                Token::LParen => {
+                    // Skip parenthesized content in type
+                    self.advance();
+                    let mut depth = 1;
+                    while depth > 0 && self.current != Token::Eof {
+                        if self.current == Token::LParen {
+                            depth += 1;
+                        } else if self.current == Token::RParen {
+                            depth -= 1;
+                        }
+                        self.advance();
+                    }
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+
+        if components.is_empty() {
+            Ok(Term::type0())
+        } else {
+            Ok(Term::const_(components.join(" ")))
+        }
+    }
+
+    /// Parse a term expression
+    /// Supports: identifiers, applications, lambda, parentheses
+    fn parse_term(&mut self) -> Result<Rc<Term>, ParseError> {
+        self.parse_app_or_atomic()
+    }
+
+    /// Parse an application or atomic term
+    fn parse_app_or_atomic(&mut self) -> Result<Rc<Term>, ParseError> {
+        let mut func = self.parse_atomic_term()?;
+
+        // Parse arguments (function application)
+        loop {
+            match &self.current {
+                Token::Ident(s) => {
+                    // Check if this is a keyword that ends the term
+                    if s == "def" || s == "theorem" || s == "lemma" ||
+                       s == "structure" || s == "inductive" || s == "namespace" ||
+                       s == "end" || s == "where" {
+                        break;
+                    }
+                    let arg = Term::const_(s.clone());
+                    self.advance();
+                    func = Term::app(func, arg);
+                }
+                Token::LParen => {
+                    self.advance();
+                    // Parse parenthesized term as argument
+                    let arg = self.parse_term()?;
+                    // Expect ')'
+                    if self.current == Token::RParen {
+                        self.advance();
+                    }
+                    func = Term::app(func, arg);
+                }
+                Token::LBrace => {
+                    self.advance();
+                    // Parse brace content
+                    let inner = self.parse_term()?;
+                    if self.current == Token::RBrace {
+                        self.advance();
+                    }
+                    func = Term::app(func, inner);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(func)
+    }
+
+    /// Parse an atomic term (identifier, lambda, parenthesized)
+    fn parse_atomic_term(&mut self) -> Result<Rc<Term>, ParseError> {
+        match &self.current {
+            Token::Ident(s) => {
+                let name = s.clone();
+                self.advance();
+
+                // Check for lambda syntax: λ x => body  or  fun x => body
+                if name == "λ" || name == "fun" || name == "lambda" {
+                    return self.parse_lambda();
+                }
+
+                // Check for field access: r1.rep.seq
+                let mut result = Term::const_(name);
+                while self.current == Token::Dot {
+                    self.advance();
+                    if let Token::Ident(field) = &self.current {
+                        result = Term::app(
+                            Term::const_(format!(".{}", field)),
+                            result
+                        );
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                Ok(result)
+            }
+            Token::LParen => {
+                self.advance();
+                let term = self.parse_term()?;
+                if self.current == Token::RParen {
+                    self.advance();
+                }
+                Ok(term)
+            }
+            Token::Underscore => {
+                self.advance();
+                Ok(Term::var(0)) // Use var(0) for wildcard
+            }
+            _ => {
+                // Unexpected token, return a placeholder
+                self.advance();
+                Ok(Term::const_("_"))
+            }
+        }
+    }
+
+    /// Parse a lambda expression: λ x => body
+    fn parse_lambda(&mut self) -> Result<Rc<Term>, ParseError> {
+        // Parse parameter name
+        let param_name = match &self.current {
+            Token::Ident(s) => {
+                let name = s.clone();
+                self.advance();
+                name
+            }
+            Token::Underscore => {
+                self.advance();
+                "_".to_string()
+            }
+            _ => "_".to_string(),
+        };
+
+        // Expect '=>' or '=>'
+        // Handle both => and →
+        match &self.current {
+            Token::Arrow => {
+                self.advance();
+            }
+            Token::Ident(s) if s == "=>" => {
+                self.advance();
+            }
+            _ => {
+                // No arrow, just return the parameter as a term
+                return Ok(Term::const_(param_name));
+            }
+        }
+
+        // Parse body
+        let body = self.parse_term()?;
+
+        // Create lambda with inferred type (Type 0 for now)
+        Ok(Term::lambda(param_name, Term::type0(), body))
     }
 
     fn parse_simple_type_str(&mut self) -> Result<String, ParseError> {
@@ -192,42 +437,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_def_value(&mut self) -> Result<Rc<Term>, ParseError> {
-        // Simplified: parse a simple term
-        // For now, just parse a single identifier or application
-        let mut terms = Vec::new();
-
-        while self.current != Token::Eof {
-            match &self.current {
-                Token::Ident(s) => {
-                    terms.push(Term::const_(s.clone()));
-                    self.advance();
-                }
-                Token::LParen => {
-                    self.advance();
-                    // Skip parenthesized content for now
-                    let _ = self.parse_def_value()?;
-                    if self.current == Token::RParen {
-                        self.advance();
-                    }
-                }
-                _ => {
-                    self.advance();
-                }
-            }
-        }
-
-        if terms.is_empty() {
-            Ok(Term::const_("_"))
-        } else if terms.len() == 1 {
-            Ok(terms.remove(0))
-        } else {
-            // Build application chain
-            let mut result = terms.remove(0);
-            for arg in terms {
-                result = Term::app(result, arg);
-            }
-            Ok(result)
-        }
+        // Use the new parse_term for better parsing
+        self.parse_term()
     }
 
     /// Parse a theorem or lemma declaration

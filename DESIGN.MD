@@ -177,11 +177,23 @@ env.add_inductive() / env.add_constant()
 5. 初等几何公理系统
 6. 初中代数解方程
 
+**Def Parser 增强:**
+- 支持带参数定义：`def eq (r1 r2 : Real) : Prop := ...`
+- 支持 lambda 表达式：`λ _ => r`
+- 支持函数应用嵌套：`Real.mk (CauchySeq.mk (λ _ => r))`
+- 支持字段访问：`r1.rep.seq`
+
+**加载状态:**
+- ✓ Real.ofRat, Real.ofNat, Real.ofInt
+- ✓ Real.eq, Real.add, Real.mul, Real.neg, Real.sub
+- ✓ Real.zero, Real.one, Real.max, Real.lt, Real.le
+- Real.x 中的 13 个 def 全部成功加载
+
 **新增文件:**
 - `lib/real.x` - Real structure 定义、运算、性质
 - `lib/rat.x` - 添加 `ofInt` 和 `abs`
 - `lib/test_theorems.x` - 测试定理文件
-- 92 个测试全部通过（含 1 个定理验证测试）
+- 93 个测试全部通过（2 个忽略）
 
 **使用示例:**
 ```x

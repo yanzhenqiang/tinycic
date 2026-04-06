@@ -208,6 +208,22 @@ env.add_inductive() / env.add_constant()
 - [ ] Real.lt_trans - 序关系传递性
 - [ ] Real.cauchy_add - Cauchy 序列加法封闭性
 
+**最近完成的工作 (2026-04-07):**
+
+1. **Parser 修复** - 解决了 tactic 解析失败的问题
+   - 问题：`parse_proof` 使用 `Ident("by")` 匹配，但 lexer 将 `by` 识别为 `Token::By`
+   - 问题：`collect_tactic_line` 只处理了 `Ident` token，忽略了 `Intro`/`Use`/`Exact` 等特殊 token
+   - 修复后：`intro r1 r2` 正确生成 `λr1:Real, λr2:Real, sorry ...` 的证明项
+
+2. **ProofTermGenerator 增强**
+   - 添加错误回退：当 tactic 应用失败时返回 `sorry` 而不是 panic
+   - 添加 `CalcState` 和 `pending_rewrite` 跟踪 calc/rw 状态
+   - 实现 `build_equality_proof` 和 `build_calc_proof`（待测试）
+
+3. **测试验证**
+   - 添加 `test_real_proof_generation` 测试验证 lambda 生成
+   - 110 个测试全部通过
+
 **下一步工作:**
 1. 实现 `rw` tactic 的完整证明生成（使用等式替换）
 2. 实现 `calc` 块的等式链证明生成

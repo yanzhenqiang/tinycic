@@ -84,10 +84,29 @@ impl<'env> ProofTermGenerator<'env> {
         }
 
         // Build final proof term
-        // Start with sorry for the final goal
+        // Check if we have a calc proof to use
         let final_goal = self.goal_stack.last()
             .ok_or("No goal")?;
-        let mut proof = Term::app(Term::const_("sorry"), final_goal.clone());
+
+        // Try to build a proper proof term
+        let mut proof = if let Some(ref calc_state) = self.calc_state {
+            // We have a calc block, build proof from it
+            if calc_state.steps.len() >= 2 {
+                self.build_calc_proof(calc_state)
+            } else {
+                Term::app(Term::const_("sorry"), final_goal.clone())
+            }
+        } else if self.pending_rewrite.is_some() {
+            // We have pending rewrites, build equality proof
+            if let Some(ref rewrites) = self.pending_rewrite {
+                self.build_equality_proof(rewrites)
+            } else {
+                Term::app(Term::const_("sorry"), final_goal.clone())
+            }
+        } else {
+            // Default to sorry
+            Term::app(Term::const_("sorry"), final_goal.clone())
+        };
 
         // Wrap with let bindings (have statements)
         for (name, ty, value) in self.let_bindings.iter().rev() {
@@ -170,6 +189,63 @@ impl<'env> ProofTermGenerator<'env> {
     /// Get current goal
     pub fn current_goal(&self) -> Option<&Rc<Term>> {
         self.goal_stack.last()
+    }
+
+    /// Build a proof term for equality using rewrite theorems
+    /// For rw [thm1, thm2], builds eq.trans (eq.symm thm1) (eq.symm thm2) etc.
+    fn build_equality_proof(&self, rewrite_terms: &[Rc<Term>]) -> Rc<Term> {
+        if rewrite_terms.is_empty() {
+            // No rewrites, use reflexivity
+            return Term::const_("Eq.refl");
+        }
+
+        // Build a proof using the first rewrite theorem
+        // For simplicity, we apply the theorems directly
+        // In a full implementation, we'd use eq.rec for proper rewriting
+        let first_thm = rewrite_terms.first().unwrap();
+
+        if rewrite_terms.len() == 1 {
+            // Single rewrite: use the theorem directly (with eq.symm if needed)
+            Term::app(Term::const_("Eq.symm"), first_thm.clone())
+        } else {
+            // Multiple rewrites: chain with eq.trans
+            let mut proof = Term::app(Term::const_("Eq.symm"), first_thm.clone());
+            for thm in &rewrite_terms[1..] {
+                let thm_proof = Term::app(Term::const_("Eq.symm"), thm.clone());
+                proof = Term::app(Term::app(Term::const_("Eq.trans"), proof), thm_proof);
+            }
+            proof
+        }
+    }
+
+    /// Build proof term from calc state
+    fn build_calc_proof(&self, calc_state: &CalcState) -> Rc<Term> {
+        if calc_state.steps.len() < 2 {
+            // Not enough steps for a calc proof
+            return Term::const_("sorry");
+        }
+
+        // Build transitivity chain: step0 = step1 = step2 = ...
+        // For each step, we need the equality proof
+        let mut combined_proof = None;
+
+        for (i, rewrites) in calc_state.rewrites.iter().enumerate() {
+            if i >= calc_state.steps.len() - 1 {
+                break;
+            }
+
+            let eq_proof = self.build_equality_proof(rewrites);
+
+            combined_proof = match combined_proof {
+                None => Some(eq_proof),
+                Some(prev) => {
+                    // Chain with transitivity
+                    Some(Term::app(Term::app(Term::const_("Eq.trans"), prev), eq_proof))
+                }
+            };
+        }
+
+        combined_proof.unwrap_or_else(|| Term::const_("sorry"))
     }
 }
 

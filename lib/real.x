@@ -40,10 +40,16 @@ def sub (r1 r2 : Real) : Real :=
   add r1 (neg r2)
 
 // 零元
- def zero : Real := ofRat Rat.zero
+def zero : Real := ofRat Rat.zero
 
 // 单位元
 def one : Real := ofRat Rat.one
+
+// 加法（简化声明，完整定义在注释中）
+-- def add : Real -> Real -> Real
+
+// 乘法（简化声明）
+-- def mul : Real -> Real -> Real
 
 // =========================================================================
 // 基本性质证明

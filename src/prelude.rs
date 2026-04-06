@@ -2,7 +2,7 @@
 //!
 //! 包含 Nat, List, Int 等基本归纳类型的定义
 
-use crate::inductive::{ConstructorDecl, InductiveDecl, InductiveProcessor, StructureProcessor, DefProcessor};
+use crate::inductive::{ConstructorDecl, InductiveDecl, InductiveProcessor, StructureProcessor, DefProcessor, DefDecl};
 use crate::parser;
 use crate::term::Term;
 use crate::typecheck::{Environment, Context, TypeInference};
@@ -62,8 +62,8 @@ fn type_contains(ty: &Term, target: &Term) -> bool {
     }
 }
 
-/// 从 .x 文件加载 def 定义
-pub fn load_def_from_file(env: &mut Environment, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+/// 从 .x 文件加载 def 定义（带命名空间前缀）
+pub fn load_def_from_file(env: &mut Environment, path: &str, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
     // 尝试多个可能的路径
     let content = if let Ok(c) = std::fs::read_to_string(path) {
         c
@@ -84,8 +84,13 @@ pub fn load_def_from_file(env: &mut Environment, path: &str) -> Result<(), Box<d
 
             match parser::parse_def(def_section) {
                 Ok(decl) => {
+                    // 添加命名空间前缀
+                    let full_name = format!("{}.{}", namespace, decl.name);
+                    let namespaced_decl = DefDecl::new(full_name, decl.value).with_type(
+                        decl.ty.unwrap_or_else(|| Term::type0())
+                    );
                     let processor = DefProcessor::new();
-                    processor.register(env, &decl)?;
+                    processor.register(env, &namespaced_decl)?;
                 }
                 Err(e) => {
                     eprintln!("Warning: Failed to parse def: {}", e);
@@ -270,7 +275,12 @@ pub fn init_prelude(env: &mut Environment) {
     let _ = load_structure_from_file(env, "lib/cauchy.x");
     let _ = load_structure_from_file(env, "lib/real.x");
 
-    // 额外注册 Rat 基本常量（这些可以在 .x 文件中定义，但当前 parser 不支持 def）
+    // 从 .x 文件加载 def 定义（动态注册 - 简化版，带命名空间前缀）
+    let _ = load_def_from_file(env, "lib/rat.x", "Rat");
+    let _ = load_def_from_file(env, "lib/real.x", "Real");
+
+    // 手动注册 Rat 常量（parser 暂不支持复杂 def 表达式）
+    // TODO: 完善 parser 后迁移到 .x 文件
     // Rat.zero = Rat.mk (Int.ofNat 0) 0
     let rat_zero = Term::app(
         Term::app(
@@ -292,7 +302,8 @@ pub fn init_prelude(env: &mut Environment) {
     );
     env.add_constant("Rat.one", Term::const_("Rat"), Some(rat_one));
 
-    // 额外注册 Real 基本常量（parser 暂不支持 def）
+    // 手动注册 Real 基本运算（parser 暂不支持复杂 def 表达式）
+    // TODO: 完善 parser 后迁移到 .x 文件
     // Real.zero = Real.mk (CauchySeq.mk (λ _ => Rat.zero))
     let real_zero = Term::app(
         Term::const_("Real.mk"),

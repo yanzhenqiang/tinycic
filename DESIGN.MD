@@ -148,7 +148,10 @@ env.add_inductive() / env.add_constant()
 
 **TODO:**
 1. **严格证明实数性质**：当前 `Real.add_comm` 等定理直接调用 `Rat.add_comm`，但严格证明需要 ε-N 论证验证序列等价性
-2. ~~引入 `def` 关键字~~ ✅ 已完成：parser 支持 `def name : type := value` 语法
+2. ~~引入 `def` 关键字~~ ✅ 已完成：parser 支持 `def name : type := value` 语法（简化版）
+   - 支持简单常量定义（如 `def zero : Real := ofRat Rat.zero`）
+   - 命名空间前缀自动添加（避免 `zero` 冲突）
+   - 复杂表达式仍需手动注册（如函数类型）
 
 **新增文件:**
 - `lib/real.x` - Real structure 定义、运算、性质

@@ -636,78 +636,12 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Collect tactic script as string
-        let mut script_lines = Vec::new();
-
-        loop {
-            match &self.current {
-                Token::Eof |
-                Token::Namespace |
-                Token::End |
-                Token::Theorem |
-                Token::Lemma |
-                Token::Def |
-                Token::Structure |
-                Token::Inductive => {
-                    break;
-                }
-                // Collect tactic lines - handle special tokens
-                Token::Intro | Token::Use | Token::Exact => {
-                    let line = self.collect_tactic_line();
-                    script_lines.push(line);
-                }
-                Token::Ident(s) => {
-                    let tactic = s.clone();
-                    match tactic.as_str() {
-                        "calc" => {
-                            // Collect calc block as multiple lines
-                            let mut calc_lines = vec!["calc".to_string()];
-                            self.advance(); // skip "calc"
-
-                            // Collect calc steps until next tactic
-                            loop {
-                                match &self.current {
-                                    Token::Eof | Token::Namespace | Token::End |
-                                    Token::Theorem | Token::Lemma | Token::Def |
-                                    Token::Structure | Token::Inductive => break,
-                                    Token::Ident(name) if name == "intro" || name == "use" ||
-                                        name == "exact" || name == "apply" || name == "have" ||
-                                        name == "obtain" || name == "sorry" || name == "rw" => break,
-                                    Token::Intro | Token::Use | Token::Exact => break,
-                                    _ => {
-                                        // Collect this line
-                                        let line = self.collect_tactic_line();
-                                        if !line.is_empty() {
-                                            calc_lines.push(line);
-                                        }
-                                    }
-                                }
-                            }
-                            script_lines.push(calc_lines.join("\n"));
-                        }
-                        "apply" | "rw" | "have" | "obtain" | "sorry" => {
-                            // Collect this line as part of script
-                            let line = self.collect_tactic_line();
-                            script_lines.push(line);
-                        }
-                        "by" => {
-                            self.advance();
-                        }
-                        _ => {
-                            self.advance();
-                        }
-                    }
-                }
-                // Skip symbols and other tokens
-                _ => {
-                    self.advance();
-                }
-            }
-        }
+        // Collect the remaining input as raw string and use parse_tactic_script
+        // This is more reliable than token-by-token collection for multi-line structures
+        let script = self.collect_remaining_as_script();
 
         // Build proof from tactic script
-        if !script_lines.is_empty() {
-            let script = script_lines.join("\n");
+        if !script.trim().is_empty() {
             let tactics = crate::tactic::proof_builder::parse_tactic_script(&script);
 
             // Check if all tactics are "sorry" or trivial
@@ -867,6 +801,50 @@ impl<'a> Parser<'a> {
         }
 
         result.join(" ")
+    }
+
+    /// Collect remaining input as script until block end
+    /// This uses the lexer's remaining input for reliable multi-line parsing
+    fn collect_remaining_as_script(&mut self) -> String {
+        // Get remaining input from lexer - copy to avoid borrow issues
+        let remaining: String = self.lexer.remaining_input().to_string();
+
+        // Split into lines and collect until we hit a block-ending keyword
+        let lines: Vec<&str> = remaining.lines().collect();
+        let mut script_lines = Vec::new();
+
+        for line in lines {
+            let trimmed = line.trim();
+
+            // Check for block-ending keywords
+            if trimmed.starts_with("namespace ") ||
+               trimmed.starts_with("end") ||
+               trimmed.starts_with("theorem ") ||
+               trimmed.starts_with("lemma ") ||
+               trimmed.starts_with("def ") ||
+               trimmed.starts_with("structure ") ||
+               trimmed.starts_with("inductive ") {
+                break;
+            }
+
+            // Skip empty lines and comments
+            if !trimmed.is_empty() && !trimmed.starts_with("--") && !trimmed.starts_with("//") {
+                script_lines.push(line);
+            }
+        }
+
+        // Calculate total characters to skip (including newlines)
+        let total_chars: usize = script_lines.iter().map(|l| l.len() + 1).sum();
+
+        // Advance parser to end of collected script
+        for _ in 0..total_chars {
+            if self.current == Token::Eof {
+                break;
+            }
+            self.advance();
+        }
+
+        script_lines.join("\n")
     }
 
     /// Skip arguments of a tactic until we reach the end of the tactic

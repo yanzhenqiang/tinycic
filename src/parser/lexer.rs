@@ -184,6 +184,16 @@ impl<'a> Lexer<'a> {
             _ => Token::Ident(s.to_string()),
         }
     }
+
+    /// Get the remaining input from current position
+    pub fn remaining_input(&self) -> &str {
+        &self.input[self.pos..]
+    }
+
+    /// Get the current position
+    pub fn position(&self) -> usize {
+        self.pos
+    }
 }
 
 #[cfg(test)]

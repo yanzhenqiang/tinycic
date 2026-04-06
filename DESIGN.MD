@@ -221,21 +221,30 @@ env.add_inductive() / env.add_constant()
    - 添加 `Token::Equal` 用于识别 `=` 符号（calc 块的等号）
    - 支持解析 `expr1 = expr2` 结构
 
-3. **Calc 块多行解析** ✅
-   - 重写 `parse_tactic_script` 支持多行 calc 块
-   - 添加 `parse_calc_step` 解析 `lhs = rhs := by rw [...]` 格式
-   - 添加 `is_tactic_line` 检测 calc 块结束
-   - 112 个测试全部通过
+3. **Calc 块解析** (部分完成)
+   - ✅ `parse_tactic_script` 支持多行 calc 块（从字符串解析）
+   - ✅ `parse_calc_step` 解析 `lhs = rhs := by rw [...]` 格式
+   - ✅ `CalcStep` 结构携带 lhs/rhs/rewrites
+   - ⚠️ Parser 中的 `collect_tactic_line` 与 calc 块多行收集有冲突
+   - 当直接使用 `parse_theorem` 时，have/calc 行被合并到前一行
 
-4. **CalcStep 结构**
-   - 添加 `CalcStep { lhs, rhs, rewrites }` 结构体
-   - 更新 `ParsedTactic::Calc(Vec<CalcStep>)` 以携带 calc 步骤信息
-   - 更新 `CalcState` 跟踪 lhs/rhs 表达式
+4. **ProofTermGenerator 完成**
+   - ✅ `build_calc_proof` 生成 `Eq.trans` 链
+   - ✅ Underscore `_` 解析为前一个 rhs
+   - ✅ `Eq.symm` 应用重写定理
 
-**下一步工作:**
-1. ✅ **构建完整证明**：将 calc 步骤转换为 `Eq.trans` 链 - **已完成**
-2. **验证 Real 定理**：测试 `Real.add_comm` 等定理的完整证明生成
-3. ✅ **处理 underscore**：在 calc 步骤中 `_` 引用前一个 rhs - **已完成**
+**当前问题:**
+Parser 的 token-based 逐行收集与多行 calc 块有冲突：
+- `collect_tactic_line` 在遇到 `=`、`:=` 时继续收集，导致 `have` 行与下一行合并
+- 需要重构 parser 以正确处理多行结构，或使用不同的解析策略
+
+**解决方案选项:**
+1. 在 `collect_tactic_line` 中添加换行检测（但 lexer 不保留换行信息）
+2. 重构 `parse_proof` 直接操作字符串行而不是 token
+3. 在 lexer 中添加行号信息，用于检测行边界
+
+**下一步:**
+修复 parser 的 calc 块多行收集问题，确保 `parse_theorem` 能正确生成包含 calc 的证明项。
 
 **已完成的证明生成:**
 - ✅ `intro` 生成 lambda 绑定：`λr1:Real, λr2:Real, ...`

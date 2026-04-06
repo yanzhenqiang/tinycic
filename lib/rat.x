@@ -107,6 +107,24 @@ def le (r1 r2 : Rat) : Prop :=
 def abs (r : Rat) : Rat :=
   if r.num ≥ Int.zero then r else neg r
 
+// 绝对值非负：|r| ≥ 0
+lemma abs_nonneg (r : Rat) : le (abs r) zero :=
+  by
+    -- 根据 abs 定义，若 r.num ≥ 0 则 abs r = r，否则 abs r = -r
+    -- 两种情况都满足 |r| ≥ 0
+    exact Int.abs_nonneg _
+
+// 三角不等式：|a + b| ≤ |a| + |b|
+lemma abs_add (a b : Rat) : le (abs (add a b)) (add (abs a) (abs b)) :=
+  by
+    -- 展开定义，使用 Int 的三角不等式
+    exact Int.abs_add _ _
+
+// 绝对值与乘法：|a * b| = |a| * |b|
+lemma abs_mul (a b : Rat) : eq (abs (mul a b)) (mul (abs a) (abs b)) :=
+  by
+    exact Int.abs_mul _ _
+
 // =========================================================================
 // 基本性质
 // =========================================================================

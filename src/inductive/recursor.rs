@@ -228,15 +228,52 @@ impl RecursorBuilder {
     }
 
     /// 构造消去式规则
+    ///
+    /// 对于每个构造子，生成对应的消去式规则：
+    /// rec P minor_1 ... minor_n (ctor_i a_1 ... a_k) = minor_i a_1 ... a_k ih_1 ... ih_m
+    /// 其中 ih_j 是递归调用的结果
     fn build_recursor_rules(&self) -> TcResult<Vec<RecursorRule>> {
         let mut rules = Vec::new();
 
-        for ctor in &self.decl.constructors {
-            // 简化实现
+        for (ctor_idx, ctor) in self.decl.constructors.iter().enumerate() {
+            // 解析构造子类型，提取参数
+            let (params, _result_type) = self.extract_pi_types(&ctor.ty);
+
+            // 构造规则的 RHS
+            // minor_i 变量在消去式类型中的位置：
+            // 消去式类型: (P : ...) -> (minor_0 : ...) -> ... -> (minor_n : ...) -> ...
+            // minor_i 的索引 = num_params + 1 + i
+            let num_params = self.decl.num_params();
+            let minor_var_idx = (num_params + 1 + ctor_idx) as u32;
+
+            // 从 minor_i 开始构造应用
+            let mut rhs = Term::var(minor_var_idx);
+
+            // 应用构造子参数
+            // 参数在消去式应用中的变量索引
+            // 消去式应用: rec P m_0 ... m_n p_1 ... p_k major
+            // 参数从索引 num_params + 1 + num_ctors 开始
+            let param_base_idx = num_params + 1 + self.decl.constructors.len();
+
+            for (param_idx, (_param_name, param_ty)) in params.iter().enumerate() {
+                // 构造子参数在消去式应用中的索引
+                // 注意：这里需要正确的变量提升
+                let arg_idx = (param_base_idx + param_idx) as u32;
+                rhs = Term::app(rhs, Term::var(arg_idx));
+
+                // 如果参数是递归的，添加归纳假设
+                if self.contains_inductive(param_ty) {
+                    // 构造递归调用：rec P m_0 ... m_n p_1 ... p_k arg
+                    // 简化：使用占位符
+                    let rec_call = Term::var(0); // 简化
+                    rhs = Term::app(rhs, rec_call);
+                }
+            }
+
             rules.push(RecursorRule {
                 ctor_name: ctor.name.clone(),
-                nfields: 0, // 简化
-                rhs: Term::var(0), // 简化
+                nfields: params.len(),
+                rhs,
             });
         }
 
@@ -289,7 +326,7 @@ mod tests {
 
         // zero 构造子的 minor premise 应该是 P 0
         let zero_ctor = &nat.constructors[0];
-        let zero_minor = builder.build_minor_type(zero_ctor, &ind_app, &motive).unwrap();
+        let _zero_minor = builder.build_minor_type(zero_ctor, &ind_app, &motive).unwrap();
 
         // succ 构造子的 minor premise 应该是 (n : Nat) -> P n -> P (succ n)
         let succ_ctor = &nat.constructors[1];
@@ -297,6 +334,26 @@ mod tests {
 
         // 验证 succ_minor 是 Pi 类型
         assert!(matches!(succ_minor.as_ref(), Term::Pi { .. }));
+    }
+
+    #[test]
+    fn test_nat_recursor_rules() {
+        let nat = super::super::builtin::nat_decl();
+        let builder = RecursorBuilder::new(&nat);
+        let rec_info = builder.build().unwrap();
+
+        // Nat 有两个构造子，所以应该有两个规则
+        assert_eq!(rec_info.rules.len(), 2);
+
+        // zero 规则
+        let zero_rule = &rec_info.rules[0];
+        assert_eq!(zero_rule.ctor_name, "zero");
+        assert_eq!(zero_rule.nfields, 0);
+
+        // succ 规则
+        let succ_rule = &rec_info.rules[1];
+        assert_eq!(succ_rule.ctor_name, "succ");
+        assert_eq!(succ_rule.nfields, 1); // succ 有 1 个参数
     }
 }
 

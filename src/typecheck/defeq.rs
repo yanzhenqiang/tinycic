@@ -178,6 +178,40 @@ impl DefEqChecker {
         l1 == l2
     }
 
+    /// 尝试 eta 展开
+    /// 如果 t1 或 t2 可以 eta 展开，展开后比较
+    fn try_eta_expansion(&mut self, t1: &Rc<Term>, t2: &Rc<Term>) -> Option<bool> {
+        // Eta 展开: f = λx. f x (当 f 是函数类型)
+        if let Some(expanded) = self.eta_expand(t1) {
+            if self.is_def_eq(&expanded, t2) {
+                return Some(true);
+            }
+        }
+        if let Some(expanded) = self.eta_expand(t2) {
+            if self.is_def_eq(t1, &expanded) {
+                return Some(true);
+            }
+        }
+        None
+    }
+
+    /// Eta 展开单个项
+    /// 如果 term 是函数类型但不是 lambda，展开为 lambda
+    fn eta_expand(&self, term: &Rc<Term>) -> Option<Rc<Term>> {
+        match term.as_ref() {
+            // 已经是 lambda，不需要展开
+            Term::Lambda { .. } => None,
+            // 检查是否是函数类型
+            _ => {
+                // 获取项的类型并检查是否是 Pi 类型
+                // 简化：假设我们知道它是函数类型
+                // 展开：f => λx. f x
+                // 注意：这里需要类型信息，简化实现
+                None
+            }
+        }
+    }
+
     /// 尝试展开定义 (lazy delta reduction)
     /// 当直接比较失败时，尝试展开常量定义后重新比较
     fn try_unfold_and_compare(

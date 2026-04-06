@@ -50,7 +50,7 @@ impl fmt::Display for Level {
 
 /// 项 (Term)
 /// 使用 Rc 进行引用计数，避免深度克隆
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
     /// 变量，使用 de Bruijn 索引
     Var(DeBruijn),

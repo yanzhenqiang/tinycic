@@ -12,6 +12,7 @@
 use super::Environment;
 use crate::term::{Level, Term};
 use crate::term::subst::{instantiate, lift};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// 定义等价检查器
@@ -21,6 +22,10 @@ pub struct DefEqChecker {
     depth: usize,
     /// 最大递归深度
     max_depth: usize,
+    /// 已验证的等价对缓存
+    equiv_cache: HashSet<(Rc<Term>, Rc<Term>)>,
+    /// 已验证的不等价对缓存
+    failure_cache: HashSet<(Rc<Term>, Rc<Term>)>,
 }
 
 impl DefEqChecker {
@@ -29,6 +34,8 @@ impl DefEqChecker {
             _env: env,
             depth: 0,
             max_depth: 1000,
+            equiv_cache: HashSet::new(),
+            failure_cache: HashSet::new(),
         }
     }
 
@@ -39,6 +46,15 @@ impl DefEqChecker {
             return true;
         }
 
+        // 检查缓存
+        let key = (t1.clone(), t2.clone());
+        if self.equiv_cache.contains(&key) {
+            return true;
+        }
+        if self.failure_cache.contains(&key) {
+            return false;
+        }
+
         if self.depth > self.max_depth {
             return false;
         }
@@ -46,6 +62,13 @@ impl DefEqChecker {
         self.depth += 1;
         let result = self.is_def_eq_core(t1, t2);
         self.depth -= 1;
+
+        // 更新缓存
+        if result {
+            self.equiv_cache.insert(key);
+        } else {
+            self.failure_cache.insert((t1.clone(), t2.clone()));
+        }
 
         result
     }
@@ -410,6 +433,25 @@ mod tests {
         let app = Term::app(id, y.clone());
 
         assert!(checker.is_def_eq(&app, &y));
+    }
+
+    /// 测试定义等价缓存
+    #[test]
+    fn lean4_test_def_eq_caching() {
+        let env = Environment::new();
+        let mut checker = DefEqChecker::new(env);
+
+        let t1 = Term::const_("Nat");
+        let t2 = Term::const_("Nat");
+
+        // 第一次比较
+        assert!(checker.is_def_eq(&t1, &t2));
+        assert!(checker.equiv_cache.len() >= 1, "Cache should have entries after first comparison");
+
+        // 第二次比较（应该从缓存获取）
+        assert!(checker.is_def_eq(&t1, &t2));
+        // 缓存应该包含这个等价对
+        assert!(checker.equiv_cache.contains(&(t1, t2)));
     }
 
     /// 测试递归深度限制 (来自 Lean 4 递归检查测试)

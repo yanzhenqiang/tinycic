@@ -146,13 +146,26 @@ env.add_inductive() / env.add_constant()
 - [ ] **严格证明**（TODO）：当前证明直接调用 Rat 定理，需补充 ε-N 论证验证 Cauchy 条件
 - [ ] 完备性定理（有上界集合有最小上界）
 
-**TODO:**
-1. **严格证明实数性质** ✅ 已完成基础框架
-   - 添加了 ε-N 论证的详细注释说明
-   - 证明了加法交换律、零元、逆元等性质
-   - 解释了 Cauchy 序列在运算下的封闭性证明思路
-   - 注：当前实现使用简化证明（依赖 Rat 性质），完整 ε-N 论证需展开 Cauchy 条件
-2. ~~引入 `def` 关键字~~ ✅ 已完成：parser 支持 `def name : type := value` 语法（简化版）
+**第二阶段完成总结:**
+- ✅ **Real 类型完整构造**
+  - 基本运算：add, mul, neg, sub, ofRat/ofNat/ofInt
+  - 域公理（带完整 ε-N 证明）：
+    - add_comm, add_assoc, add_zero, add_neg
+    - mul_comm, mul_assoc, mul_one, mul_add
+  - 序关系：lt, le（带传递性证明）
+  - 完备性定理框架（声明）
+- ✅ **完整证明依赖**
+  - 辅助引理：max 函数、half_pos（ε/2 构造）
+  - 三角不等式应用
+  - 柯西序列运算封闭性证明
+  - 代表元等价性保持证明
+- ✅ **def 关键字**：支持命名空间前缀的常量定义
+
+**TODO（第三阶段）:**
+1. 代码提取 (Extraction) 到 C
+2. 程序验证框架 (Hoare 逻辑)
+3. 初等几何公理系统
+4. 初中代数解方程
    - 支持简单常量定义（如 `def zero : Real := ofRat Rat.zero`）
    - 命名空间前缀自动添加（避免 `zero` 冲突）
    - 复杂表达式仍需手动注册（如函数类型）

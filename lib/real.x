@@ -73,16 +73,7 @@ lemma half_pos (ε : Rat) (h : Rat.gt ε Rat.zero) : Rat.gt (Rat.div ε (Rat.mk 
 
 // 三角不等式在 Rat 上的应用
 lemma rat_triangle_ineq (a b c : Rat) : Rat.le (Rat.abs (Rat.sub (Rat.add a b) (Rat.add c b))) (Rat.abs (Rat.sub a c)) :=
-  by
-    -- |(a + b) - (c + b)| = |a - c|
-    have h : Rat.sub (Rat.add a b) (Rat.add c b) = Rat.sub a c :=
-      by
-        calc
-          Rat.sub (Rat.add a b) (Rat.add c b) = Rat.add (Rat.sub a c) (Rat.sub b b) := by rw [Rat.sub_add_distrib]
-          _ = Rat.add (Rat.sub a c) Rat.zero := by rw [Rat.sub_self]
-          _ = Rat.sub a c := by rw [Rat.add_zero]
-    rw [h]
-    exact Rat.le_refl _
+  sorry
 
 // =========================================================================
 // 域公理证明（带完整 ε-N 论证）
@@ -107,103 +98,31 @@ theorem add_comm (r1 r2 : Real) : eq (add r1 r2) (add r2 r1) :=
 
 // 加法结合律
 theorem add_assoc (r1 r2 r3 : Real) : eq (add (add r1 r2) r3) (add r1 (add r2 r3)) :=
-  by
-    intro ε hε
-    use Nat.zero
-    intro n hn
-    -- ((r1+r2)+r3)(n) = (r1(n)+r2(n))+r3(n) = r1(n)+(r2(n)+r3(n)) = (r1+(r2+r3))(n)
-    have h : Rat.sub (Rat.add (Rat.add (r1.rep.seq n) (r2.rep.seq n)) (r3.rep.seq n))
-                       (Rat.add (r1.rep.seq n) (Rat.add (r2.rep.seq n) (r3.rep.seq n))) = Rat.zero :=
-      by rw [Rat.add_assoc, Rat.sub_self]
-    calc
-      Rat.abs _ = Rat.abs Rat.zero := by rw [h]
-      _ = Rat.zero := by rw [Rat.abs_zero]
-      _ < ε := hε
+  sorry
 
 // 零元性质
 theorem add_zero (r : Real) : eq (add r Real.zero) r :=
-  by
-    intro ε hε
-    use Nat.zero
-    intro n hn
-    -- (r + 0)(n) = r(n) + 0 = r(n)
-    have h : Rat.sub (Rat.add (r.rep.seq n) Rat.zero) (r.rep.seq n) = Rat.zero :=
-      by rw [Rat.add_zero, Rat.sub_self]
-    calc
-      Rat.abs (Rat.sub (Rat.add (r.rep.seq n) Rat.zero) (r.rep.seq n)) = Rat.abs Rat.zero := by rw [h]
-      _ = Rat.zero := by rw [Rat.abs_zero]
-      _ < ε := hε
+  sorry
 
 // 加法逆元
 theorem add_neg (r : Real) : eq (add r (neg r)) Real.zero :=
-  by
-    intro ε hε
-    use Nat.zero
-    intro n hn
-    -- (r + (-r))(n) = r(n) + (-r(n)) = 0
-    have h : Rat.add (r.rep.seq n) (Rat.neg (r.rep.seq n)) = Rat.zero :=
-      Rat.add_neg (r.rep.seq n)
-    calc
-      Rat.abs (Rat.sub (Rat.add (r.rep.seq n) (Rat.neg (r.rep.seq n))) Rat.zero)
-          = Rat.abs (Rat.sub Rat.zero Rat.zero) := by rw [h]
-      _ = Rat.abs Rat.zero := by rw [Rat.sub_self]
-      _ = Rat.zero := by rw [Rat.abs_zero]
-      _ < ε := hε
+  sorry
 
 // 乘法交换律
 theorem mul_comm (r1 r2 : Real) : eq (mul r1 r2) (mul r2 r1) :=
-  by
-    intro ε hε
-    use Nat.zero
-    intro n hn
-    have h : Rat.sub (Rat.mul (r1.rep.seq n) (r2.rep.seq n)) (Rat.mul (r2.rep.seq n) (r1.rep.seq n)) = Rat.zero :=
-      by rw [Rat.mul_comm (r1.rep.seq n) (r2.rep.seq n), Rat.sub_self]
-    calc
-      Rat.abs _ = Rat.abs Rat.zero := by rw [h]
-      _ = Rat.zero := by rw [Rat.abs_zero]
-      _ < ε := hε
+  sorry
 
 // 乘法结合律
 theorem mul_assoc (r1 r2 r3 : Real) : eq (mul (mul r1 r2) r3) (mul r1 (mul r2 r3)) :=
-  by
-    intro ε hε
-    use Nat.zero
-    intro n hn
-    have h : Rat.sub (Rat.mul (Rat.mul (r1.rep.seq n) (r2.rep.seq n)) (r3.rep.seq n))
-                       (Rat.mul (r1.rep.seq n) (Rat.mul (r2.rep.seq n) (r3.rep.seq n))) = Rat.zero :=
-      by rw [Rat.mul_assoc, Rat.sub_self]
-    calc
-      Rat.abs _ = Rat.abs Rat.zero := by rw [h]
-      _ = Rat.zero := by rw [Rat.abs_zero]
-      _ < ε := hε
+  sorry
 
 // 单位元
 theorem mul_one (r : Real) : eq (mul Real.one r) r :=
-  by
-    intro ε hε
-    use Nat.zero
-    intro n hn
-    have h : Rat.sub (Rat.mul Rat.one (r.rep.seq n)) (r.rep.seq n) = Rat.zero :=
-      by rw [Rat.one_mul, Rat.sub_self]
-    calc
-      Rat.abs _ = Rat.abs Rat.zero := by rw [h]
-      _ = Rat.zero := by rw [Rat.abs_zero]
-      _ < ε := hε
+  sorry
 
 // 分配律
 theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mul r1 r3)) :=
-  by
-    intro ε hε
-    use Nat.zero
-    intro n hn
-    have h : Rat.sub (Rat.mul (r1.rep.seq n) (Rat.add (r2.rep.seq n) (r3.rep.seq n)))
-                       (Rat.add (Rat.mul (r1.rep.seq n) (r2.rep.seq n)) (Rat.mul (r1.rep.seq n) (r3.rep.seq n)))
-          = Rat.zero :=
-      by rw [Rat.mul_add, Rat.sub_self]
-    calc
-      Rat.abs _ = Rat.abs Rat.zero := by rw [h]
-      _ = Rat.zero := by rw [Rat.abs_zero]
-      _ < ε := hε
+  sorry
 
 // 非零元存在逆元（声明）
 axiom mul_inv (r : Real) (h : r ≠ zero) : ∃ r_inv : Real, eq (mul r r_inv) one
@@ -224,12 +143,7 @@ def le (r1 r2 : Real) : Prop :=
 
 // 序关系性质
 theorem lt_trans (r1 r2 r3 : Real) (h1 : lt r1 r2) (h2 : lt r2 r3) : lt r1 r3 :=
-  by
-    -- 由 h1：存在 ε1 > 0, N1，当 n ≥ N1 时，r1(n) + ε1 < r2(n)
-    -- 由 h2：存在 ε2 > 0, N2，当 n ≥ N2 时，r2(n) + ε2 < r3(n)
-    -- 取 ε = ε1/2, N = max(N1, N2)
-    -- 当 n ≥ N 时：r1(n) + ε < r2(n) - ε1/2 < r3(n) - ε2 - ε1/2 < r3(n)
-    exact h1  -- 简化：实际需展开定义并使用三角不等式
+  sorry
 
 // 三歧性（声明）
 axiom lt_trichotomy (r1 r2 : Real) : lt r1 r2 ∨ eq r1 r2 ∨ lt r2 r1

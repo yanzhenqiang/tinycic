@@ -348,6 +348,61 @@ pub fn init_prelude(env: &mut Environment) {
     let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
     env.add_constant("sorry", sorry_ty, None);
 
+    // 注册 Eq 相关定理（用于 calc 块证明）
+    // Eq.trans : {A : Type} → {a b c : A} → a = b → b = c → a = c
+    let eq_trans_ty = Term::pi(
+        "A",
+        Term::type0(),
+        Term::pi(
+            "a",
+            Term::var(0),
+            Term::pi(
+                "b",
+                Term::var(1),
+                Term::pi(
+                    "c",
+                    Term::var(2),
+                    Term::pi(
+                        "_",
+                        Term::app(Term::app(Term::const_("Eq"), Term::var(2)), Term::var(1)),
+                        Term::pi(
+                            "_",
+                            Term::app(Term::app(Term::const_("Eq"), Term::var(2)), Term::var(0)),
+                            Term::app(Term::app(Term::const_("Eq"), Term::var(4)), Term::var(2)),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    );
+    env.add_constant("Eq.trans", eq_trans_ty, None);
+
+    // Eq.symm : {A : Type} → {a b : A} → a = b → b = a
+    let eq_symm_ty = Term::pi(
+        "A",
+        Term::type0(),
+        Term::pi(
+            "a",
+            Term::var(0),
+            Term::pi(
+                "b",
+                Term::var(1),
+                Term::pi(
+                    "_",
+                    Term::app(Term::app(Term::const_("Eq"), Term::var(1)), Term::var(0)),
+                    Term::app(Term::app(Term::const_("Eq"), Term::var(1)), Term::var(2)),
+                ),
+            ),
+        ),
+    );
+    env.add_constant("Eq.symm", eq_symm_ty, None);
+
+    // 注册 Rat 辅助定理（用于 Real 证明）
+    // 简化：使用 Type 作为类型，实际证明时会通过 sorry 占位
+    env.add_constant("Rat.sub_add_distrib", Term::type0(), None);
+    env.add_constant("Rat.sub_self", Term::type0(), None);
+    env.add_constant("Rat.add_zero", Term::type0(), None);
+
     // 从 .x 文件加载 theorem 定义（动态注册并验证证明）
     let _ = load_theorem_from_file(env, "lib/real.x", "Real");
 

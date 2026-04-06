@@ -157,12 +157,23 @@ impl<'env> TypeInference<'env> {
         value: &Rc<Term>,
         body: &Rc<Term>,
     ) -> TcResult<Rc<Term>> {
-        // 检查 value 是否具有 ty 类型
-        self.check(ctx, value, ty)?;
+        // 如果类型是占位符 "_"，从 value 推导类型
+        let actual_ty = if let Term::Const(name) = ty.as_ref() {
+            if name == "_" {
+                self.infer(ctx, value)?
+            } else {
+                ty.clone()
+            }
+        } else {
+            ty.clone()
+        };
+
+        // 检查 value 是否具有 actual_ty 类型
+        self.check(ctx, value, &actual_ty)?;
 
         // 在扩展上下文中推导 body 的类型
         let mut new_ctx = ctx.clone();
-        new_ctx.push(LocalDecl::with_value("_", ty.clone(), value.clone()));
+        new_ctx.push(LocalDecl::with_value("_", actual_ty, value.clone()));
         let body_ty = self.infer(&new_ctx, body)?;
 
         // 返回 body_ty[value/0]
@@ -178,12 +189,24 @@ impl<'env> TypeInference<'env> {
         proof: &Rc<Term>,
         body: &Rc<Term>,
     ) -> TcResult<Rc<Term>> {
-        // 检查 proof 是否具有 ty 类型（验证引理）
-        self.check(ctx, proof, ty)?;
+        // 如果类型是占位符 "_"，从 proof 推导类型
+        let actual_ty = if let Term::Const(name) = ty.as_ref() {
+            if name == "_" {
+                // 从 proof 推导类型
+                self.infer(ctx, proof)?
+            } else {
+                ty.clone()
+            }
+        } else {
+            ty.clone()
+        };
+
+        // 检查 proof 是否具有 actual_ty 类型（验证引理）
+        self.check(ctx, proof, &actual_ty)?;
 
         // 在扩展上下文中推导 body 的类型
         let mut new_ctx = ctx.clone();
-        new_ctx.push(LocalDecl::with_value("_", ty.clone(), proof.clone()));
+        new_ctx.push(LocalDecl::with_value("_", actual_ty, proof.clone()));
         let body_ty = self.infer(&new_ctx, body)?;
 
         // 返回 body_ty[proof/0]

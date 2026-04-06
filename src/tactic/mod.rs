@@ -12,6 +12,7 @@ use crate::typecheck::{Context, Environment, LocalDecl};
 use std::rc::Rc;
 
 pub mod tactics;
+pub mod proofgen;
 
 /// 证明目标
 #[derive(Debug, Clone)]

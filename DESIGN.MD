@@ -169,9 +169,24 @@ env.add_inductive() / env.add_constant()
 - `sorry` 占位符 - 未完成证明的占位符（类似 Lean 的 sorry）
 - 定理类型检查 - 确保证明类型与陈述匹配
 
-**TODO（第三阶段）:**
-1. 完善 parser 支持复杂定理格式（命名空间、缩进）
-2. 实现 tactic 解析（intro/exact/apply/rw/calc）
+**Proof Verification TODO:**
+当前 `lib/real.x` 中的定理使用 `sorry` 占位符，需要实现真正的证明：
+- [ ] Real.half_pos - ε/2 构造证明
+- [ ] Real.rat_triangle_ineq - 三角不等式
+- [ ] Real.add_comm - 加法交换律
+- [ ] Real.add_assoc - 加法结合律
+- [ ] Real.add_zero - 零元性质
+- [ ] Real.add_neg - 加法逆元
+- [ ] Real.mul_comm - 乘法交换律
+- [ ] Real.mul_assoc - 乘法结合律
+- [ ] Real.mul_one - 单位元
+- [ ] Real.mul_add - 分配律
+- [ ] Real.lt_trans - 序关系传递性
+- [ ] Real.cauchy_add - Cauchy 序列加法封闭性
+
+**下一阶段目标:**
+1. 实现真正的 tactic proof term 生成（intro/exact/apply/rw/calc）
+2. 将 `sorry` 替换为实际证明
 3. 代码提取 (Extraction) 到 C
 4. 程序验证框架 (Hoare 逻辑)
 5. 初等几何公理系统

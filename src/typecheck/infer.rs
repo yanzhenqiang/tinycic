@@ -208,16 +208,26 @@ impl<'env> TypeInference<'env> {
         params: &[Rc<Term>],
         motive: &Rc<Term>,
         major: &Rc<Term>,
-        clauses: &[Rc<Term>],
+        clauses: &[(Name, Rc<Term>)],
     ) -> TcResult<Rc<Term>> {
         let info = self.env.lookup_inductive(inductive_name)?;
 
         // 检查 major 具有归纳类型
-        let major_ty = self.infer(&Context::new(), major)?;
+        let _major_ty = self.infer(&Context::new(), major)?;
 
-        // 检查 clauses 匹配构造子
+        // 检查 clauses 匹配构造子（按名称匹配）
         if clauses.len() != info.constructors.len() {
             return Err(TypeError::EliminatorTypeError);
+        }
+
+        // 验证每个 clause 的构造子名称都有效
+        for (ctor_name, _clause) in clauses {
+            if !info.constructors.iter().any(|(name, _)| name == ctor_name) {
+                return Err(TypeError::Other(format!(
+                    "Unknown constructor {} in eliminator for {}",
+                    ctor_name, inductive_name
+                )));
+            }
         }
 
         // 消去式的类型是 motive 应用到 major

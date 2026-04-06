@@ -6,7 +6,7 @@
 //! - let x := t in u → u[t/x]
 //! - elim 应用
 
-use super::Term;
+use super::{Name, Term};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -125,15 +125,13 @@ impl Reducer {
                 match major_whnf {
                     Whnf::Term(major_term) => {
                         if let Term::Constructor {
-                            ctor_name: _,
+                            ctor_name,
                             args,
                             ..
                         } = major_term.as_ref()
                         {
-                            // 找到对应的 clause 并应用
-                            // 简化：假设 clauses 和构造子按顺序对应
-                            // 实际实现需要更复杂的匹配
-                            self.reduce_elim(motive, args, clauses, steps)
+                            // 找到对应的 clause 并应用（按构造子名称匹配）
+                            self.reduce_elim(motive, ctor_name, args, clauses, steps)
                         } else {
                             Whnf::Stuck(term.clone())
                         }
@@ -157,20 +155,25 @@ impl Reducer {
     fn reduce_elim(
         &mut self,
         _motive: &Rc<Term>,
+        ctor_name: &str,
         ctor_args: &[Rc<Term>],
-        clauses: &[Rc<Term>],
+        clauses: &[(Name, Rc<Term>)],
         steps: usize,
     ) -> Whnf {
-        // 简化实现：找到对应的 clause 并应用构造子参数
-        // 实际实现需要根据构造子名称匹配
-        if let Some(clause) = clauses.first() {
+        // 按构造子名称查找对应的 clause
+        let clause = clauses
+            .iter()
+            .find(|(name, _)| name == ctor_name)
+            .map(|(_, c)| c);
+
+        if let Some(clause) = clause {
             // 将 clause 应用到构造子参数
             let result = ctor_args.iter().fold(clause.clone(), |f, arg| {
                 Term::app(f, arg.clone())
             });
             self.whnf_with_steps(&result, steps + 1)
         } else {
-            Whnf::Stuck(Rc::new(Term::Const("no_clause".to_string())))
+            Whnf::Stuck(Rc::new(Term::Const(format!("no_clause_for_{}", ctor_name))))
         }
     }
 

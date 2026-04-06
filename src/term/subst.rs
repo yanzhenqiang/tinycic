@@ -42,7 +42,7 @@ pub fn has_loose_bvars(term: &Term, cutoff: u32) -> bool {
         } => {
             has_loose_bvars(motive, cutoff)
                 || has_loose_bvars(major, cutoff)
-                || clauses.iter().any(|c| has_loose_bvars(c, cutoff))
+                || clauses.iter().any(|(_, c)| has_loose_bvars(c, cutoff))
         }
     }
 }
@@ -187,7 +187,7 @@ fn instantiate_with_offset(
             major: instantiate_with_offset(major, s, offset, subst),
             clauses: clauses
                 .iter()
-                .map(|c| instantiate_with_offset(c, s, offset, subst))
+                .map(|(name, c)| (name.clone(), instantiate_with_offset(c, s, offset, subst)))
                 .collect(),
         }),
     }
@@ -295,7 +295,7 @@ pub fn lift(term: &Rc<Term>, cutoff: u32, amount: u32) -> Rc<Term> {
             major: lift(major, cutoff, amount),
             clauses: clauses
                 .iter()
-                .map(|c| lift(c, cutoff, amount))
+                .map(|(name, c)| (name.clone(), lift(c, cutoff, amount)))
                 .collect(),
         }),
     }

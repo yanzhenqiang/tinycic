@@ -115,7 +115,7 @@ pub enum Term {
         params: Vec<Rc<Term>>,
         motive: Rc<Term>,        // 归纳原理
         major: Rc<Term>,         // 被消去的主项
-        clauses: Vec<Rc<Term>>,  // 各构造子的处理分支
+        clauses: Vec<(Name, Rc<Term>)>,  // 各构造子的处理分支 (构造子名称, clause)
     },
 }
 

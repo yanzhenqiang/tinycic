@@ -113,8 +113,14 @@ impl DefEqChecker {
                 self.is_def_eq(v1, v2) &&
                 self.is_def_eq(b1, b2),
 
-            // 其他情况：尝试 Eta 展开和 lazy delta reduction
+            // 其他情况：尝试 Proof irrelevance, Eta 展开和 lazy delta reduction
             _ => {
+                // 尝试 Proof irrelevance
+                let pi_result = self.try_proof_irrelevance(&t1_n, &t2_n);
+                if pi_result {
+                    return true;
+                }
+
                 // 尝试 Eta 展开
                 if let Some(result) = self.try_eta_expansion(&t1_n, &t2_n) {
                     return result;
@@ -144,8 +150,15 @@ impl DefEqChecker {
             // 宇宙层级比较
             (Term::Sort(l1), Term::Sort(l2)) => Some(l1 == l2),
 
-            // 常量比较（名称相同则等价，不考虑 universe levels）
-            (Term::Const(n1), Term::Const(n2)) => Some(n1 == n2),
+            // 常量比较（名称相同则等价，不同则需要进一步检查）
+            (Term::Const(n1), Term::Const(n2)) => {
+                if n1 == n2 {
+                    Some(true)
+                } else {
+                    // 不同的常量可能需要 Proof irrelevance 等处理
+                    None
+                }
+            }
 
             // Lambda 和 Pi 需要进一步检查
             (Term::Lambda { .. }, Term::Lambda { .. }) |
@@ -204,6 +217,40 @@ impl DefEqChecker {
     /// 检查宇宙层级等价
     pub fn is_def_eq_level(&self, l1: Level, l2: Level) -> bool {
         l1 == l2
+    }
+
+    /// 尝试 Proof irrelevance
+    /// 如果两个项的类型都是 Prop (Sort 0)，则它们等价
+    fn try_proof_irrelevance(&self, t1: &Rc<Term>, t2: &Rc<Term>) -> bool {
+        // 获取两个项的类型
+        let ty1 = match self.infer_type(t1) {
+            Some(t) => t,
+            None => return false,
+        };
+        let ty2 = match self.infer_type(t2) {
+            Some(t) => t,
+            None => return false,
+        };
+
+        // 检查类型的类型是否是 Prop
+        self.is_type_of_prop(&ty1) && self.is_type_of_prop(&ty2)
+    }
+
+    /// 检查一个类型是否是 Prop (即 t : Prop)
+    fn is_type_of_prop(&self, t: &Rc<Term>) -> bool {
+        // 直接检查是否是 Sort(0)
+        if matches!(t.as_ref(), Term::Sort(Level(0))) {
+            return true;
+        }
+
+        // 对于常量（如 P），检查其定义
+        if let Term::Const(name) = t.as_ref() {
+            if let Ok(info) = self._env.lookup_constant(name) {
+                return self.is_type_of_prop(&info.ty);
+            }
+        }
+
+        false
     }
 
     /// 尝试 eta 展开
@@ -499,6 +546,33 @@ mod tests {
 
         // 两者应该等价（通过 Eta 展开）
         assert!(checker.is_def_eq(&lam, &f), "Eta expansion should make λx. f x = f");
+    }
+
+    /// 测试 Proof irrelevance (来自 Lean 4 proof irrelevance 测试)
+    #[test]
+    fn lean4_test_proof_irrelevance() {
+        let mut env = Environment::new();
+
+        // 定义 P : Prop
+        env.add_constant("P", Term::prop(), None);
+
+        // 定义两个证明 p1, p2 : P
+        env.add_constant("p1", Term::const_("P"), None);
+        env.add_constant("p2", Term::const_("P"), None);
+
+        let p1 = Term::const_("p1");
+        let p2 = Term::const_("p2");
+
+        let mut checker = DefEqChecker::new(env);
+
+        // 检查 p1 和 p2 的类型
+        let ty1 = checker.infer_type(&p1);
+        let ty2 = checker.infer_type(&p2);
+        eprintln!("p1 type: {:?}", ty1);
+        eprintln!("p2 type: {:?}", ty2);
+
+        // 在 Prop 中，任何两个证明都是等价的
+        assert!(checker.is_def_eq(&p1, &p2), "Proof irrelevance: all proofs of same Prop are equal");
     }
 
     /// 测试递归深度限制 (来自 Lean 4 递归检查测试)

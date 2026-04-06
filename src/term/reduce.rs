@@ -7,6 +7,7 @@
 //! - elim 应用
 
 use super::Term;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// 弱头归约结果
@@ -18,29 +19,72 @@ pub enum Whnf {
     Stuck(Rc<Term>),
 }
 
+/// 缓存键：使用 Rc 指针地址
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CacheKey(*const Term);
+
+impl CacheKey {
+    fn from_term(term: &Rc<Term>) -> Self {
+        CacheKey(Rc::as_ptr(term))
+    }
+}
+
 /// 归约上下文环境
 pub struct Reducer {
     /// 最大归约步数，防止无限循环
     max_steps: usize,
+    /// WHNF 缓存：term 指针 -> 归约结果
+    cache: HashMap<CacheKey, Whnf>,
 }
 
 impl Default for Reducer {
     fn default() -> Self {
-        Self { max_steps: 1000 }
+        Self {
+            max_steps: 1000,
+            cache: HashMap::new(),
+        }
     }
 }
 
 impl Reducer {
     pub fn new(max_steps: usize) -> Self {
-        Self { max_steps }
+        Self {
+            max_steps,
+            cache: HashMap::new(),
+        }
     }
 
-    /// 弱头归约
-    pub fn whnf(&self, term: &Rc<Term>) -> Whnf {
-        self.whnf_with_steps(term, 0)
+    /// 创建带缓存的 Reducer（用于多次归约相同项）
+    pub fn with_cache() -> Self {
+        Self::default()
     }
 
-    fn whnf_with_steps(&self, term: &Rc<Term>, steps: usize) -> Whnf {
+    /// 弱头归约（带缓存）
+    pub fn whnf(&mut self, term: &Rc<Term>) -> Whnf {
+        let key = CacheKey::from_term(term);
+
+        // 检查缓存
+        if let Some(result) = self.cache.get(&key) {
+            return result.clone();
+        }
+
+        // 执行归约
+        let result = self.whnf_with_steps(term, 0);
+
+        // 存入缓存
+        self.cache.insert(key, result.clone());
+
+        result
+    }
+
+    /// 弱头归约（不使用缓存，直接计算）
+    pub fn whnf_no_cache(&self, term: &Rc<Term>) -> Whnf {
+        // 创建临时 Reducer 进行计算（避免修改当前缓存）
+        let mut temp_reducer = Reducer::new(self.max_steps);
+        temp_reducer.whnf_with_steps(term, 0)
+    }
+
+    fn whnf_with_steps(&mut self, term: &Rc<Term>, steps: usize) -> Whnf {
         if steps > self.max_steps {
             return Whnf::Stuck(term.clone());
         }
@@ -48,7 +92,7 @@ impl Reducer {
         match term.as_ref() {
             // 应用：检查函数部分是否可约
             Term::App { func, arg } => {
-                let func_whnf = self.whnf_with_steps(func, steps + 1);
+                let func_whnf = self.whnf(func);
                 match func_whnf {
                     Whnf::Term(func_term) => {
                         if let Term::Lambda { body, .. } = func_term.as_ref() {
@@ -77,7 +121,7 @@ impl Reducer {
                 clauses,
                 ..
             } => {
-                let major_whnf = self.whnf_with_steps(major, steps + 1);
+                let major_whnf = self.whnf(major);
                 match major_whnf {
                     Whnf::Term(major_term) => {
                         if let Term::Constructor {
@@ -111,7 +155,7 @@ impl Reducer {
 
     /// 归约消去式
     fn reduce_elim(
-        &self,
+        &mut self,
         _motive: &Rc<Term>,
         ctor_args: &[Rc<Term>],
         clauses: &[Rc<Term>],
@@ -130,15 +174,52 @@ impl Reducer {
         }
     }
 
-    /// 完全归约（非弱头）
-    pub fn nf(&self, term: &Rc<Term>) -> Rc<Term> {
+    /// 完全归约（非弱头，带缓存）
+    pub fn nf(&mut self, term: &Rc<Term>) -> Rc<Term> {
         match self.whnf(term) {
             Whnf::Term(t) => self.normalize_deep(&t),
             Whnf::Stuck(t) => self.normalize_deep(&t),
         }
     }
 
-    fn normalize_deep(&self, term: &Rc<Term>) -> Rc<Term> {
+    /// 完全归约（无缓存）
+    pub fn nf_no_cache(&self, term: &Rc<Term>) -> Rc<Term> {
+        // 创建临时 Reducer 进行计算
+        let mut temp_reducer = Reducer::new(self.max_steps);
+        match temp_reducer.whnf(term) {
+            Whnf::Term(t) => temp_reducer.normalize_deep(&t),
+            Whnf::Stuck(t) => temp_reducer.normalize_deep(&t),
+        }
+    }
+
+    fn normalize_deep_no_cache(&self, term: &Rc<Term>) -> Rc<Term> {
+        match term.as_ref() {
+            Term::App { func, arg } => {
+                let func_nf = self.nf_no_cache(func);
+                let arg_nf = self.nf_no_cache(arg);
+                Term::app(func_nf, arg_nf)
+            }
+            Term::Lambda { name, ty, body } => {
+                let ty_nf = self.nf_no_cache(ty);
+                let body_nf = self.nf_no_cache(body);
+                Term::lambda(name.clone(), ty_nf, body_nf)
+            }
+            Term::Pi { name, domain, codomain } => {
+                let domain_nf = self.nf_no_cache(domain);
+                let codomain_nf = self.nf_no_cache(codomain);
+                Term::pi(name.clone(), domain_nf, codomain_nf)
+            }
+            Term::Let { name, ty, value, body } => {
+                let ty_nf = self.nf_no_cache(ty);
+                let value_nf = self.nf_no_cache(value);
+                let body_nf = self.nf_no_cache(body);
+                Term::let_(name.clone(), ty_nf, value_nf, body_nf)
+            }
+            _ => term.clone(),
+        }
+    }
+
+    fn normalize_deep(&mut self, term: &Rc<Term>) -> Rc<Term> {
         match term.as_ref() {
             Term::App { func, arg } => {
                 let func_nf = self.nf(func);
@@ -167,14 +248,14 @@ impl Reducer {
     }
 }
 
-/// 便捷的 WHNF 函数
+/// 便捷的 WHNF 函数（无缓存）
 pub fn whnf(term: &Rc<Term>) -> Whnf {
-    Reducer::default().whnf(term)
+    Reducer::default().whnf_no_cache(term)
 }
 
-/// 便捷的完全归约函数
+/// 便捷的完全归约函数（无缓存）
 pub fn nf(term: &Rc<Term>) -> Rc<Term> {
-    Reducer::default().nf(term)
+    Reducer::default().nf_no_cache(term)
 }
 
 #[cfg(test)]
@@ -237,5 +318,27 @@ mod tests {
             }
             Whnf::Stuck(_) => panic!("Expected normalization to succeed"),
         }
+    }
+
+    #[test]
+    fn test_whnf_cache() {
+        // 使用带缓存的 Reducer
+        let mut reducer = Reducer::with_cache();
+
+        // (λx. x) y → y
+        let id = Term::lambda("x", Term::type0(), Term::var(0));
+        let y = Term::const_("y");
+        let app = Term::app(id, y.clone());
+
+        // 第一次归约
+        let result1 = reducer.whnf(&app);
+        assert!(matches!(result1, Whnf::Term(ref t) if t == &y));
+
+        // 第二次归约（应该从缓存获取）
+        let result2 = reducer.whnf(&app);
+        assert!(matches!(result2, Whnf::Term(ref t) if t == &y));
+
+        // 验证缓存命中（缓存中至少应该有 1 个条目）
+        assert!(reducer.cache.len() >= 1, "Cache should have entries");
     }
 }

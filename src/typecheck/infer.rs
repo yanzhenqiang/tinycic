@@ -34,6 +34,9 @@ impl<'env> TypeInference<'env> {
             Term::Have { name, ty, proof, body } => {
                 self.infer_have(ctx, name, ty, proof, body)
             }
+            Term::Assume { name, ty, body } => {
+                self.infer_assume(ctx, name, ty, body)
+            }
             Term::Inductive { name, levels, params } => {
                 self.infer_inductive(name, levels, params)
             }
@@ -168,6 +171,28 @@ impl<'env> TypeInference<'env> {
 
         // 返回 body_ty[proof/0]
         Ok(body_ty.subst_zero(proof))
+    }
+
+    /// 推导 assume 类型
+    /// assume (x : A), body 的类型是 (x : A) → body_ty
+    fn infer_assume(
+        &self,
+        ctx: &Context,
+        _name: &Name,
+        ty: &Rc<Term>,
+        body: &Rc<Term>,
+    ) -> TcResult<Rc<Term>> {
+        // 检查 ty 是有效的类型
+        let ty_ty = self.infer(ctx, ty)?;
+        self.extract_level(&ty_ty)?; // 确保 ty 是一个类型（Sort）
+
+        // 在扩展上下文中推导 body 的类型
+        let mut new_ctx = ctx.clone();
+        new_ctx.push(LocalDecl::new("_", ty.clone()));
+        let body_ty = self.infer(&new_ctx, body)?;
+
+        // assume (x : A), body 的类型是 (x : A) → body_ty
+        Ok(Term::pi("_", ty.clone(), body_ty))
     }
 
     /// 推导归纳类型
@@ -340,6 +365,10 @@ impl<'env> TypeInference<'env> {
                 Term::Have { ty: t1, proof: p1, body: b1, .. },
                 Term::Have { ty: t2, proof: p2, body: b2, .. },
             ) => self.alpha_eq(t1, t2) && self.alpha_eq(p1, p2) && self.alpha_eq(b1, b2),
+            (
+                Term::Assume { ty: t1, body: b1, .. },
+                Term::Assume { ty: t2, body: b2, .. },
+            ) => self.alpha_eq(t1, t2) && self.alpha_eq(b1, b2),
             _ => false,
         }
     }
@@ -390,6 +419,49 @@ mod tests {
                 assert_eq!(t, Term::type0(), "Have should reduce to body[proof/h]");
             }
             _ => panic!("Have should reduce to a term"),
+        }
+    }
+
+    /// 测试 assume 关键字的基本功能
+    #[test]
+    fn test_assume_basic() {
+        // assume (h : P), h 的类型应该是 (h : P) → P
+        let mut env = Environment::new();
+        env.add_constant("P", Term::prop(), None);
+
+        let inference = TypeInference::new(&env);
+
+        let ty = Term::const_("P");   // P : Prop
+        let body = Term::var(0);       // h (引用 assume 绑定的变量)
+
+        let assume_expr = Term::assume("h", ty.clone(), body);
+
+        // 推导类型
+        let result = inference.infer(&Context::new(), &assume_expr);
+        assert!(result.is_ok(), "Assume expression should type check: {:?}", result.err());
+
+        // 类型应该是 (P) → P
+        let expected_ty = Term::pi("_", ty.clone(), ty);
+        assert_eq!(result.unwrap(), expected_ty);
+    }
+
+    /// 测试 assume 归约行为（assume 是 WHNF，不归约）
+    #[test]
+    fn test_assume_whnf() {
+        use crate::term::reduce::whnf;
+
+        let ty = Term::type0();
+        let body = Term::var(0);
+
+        let assume_expr = Term::assume("h", ty, body);
+
+        // assume 应该是 WHNF，不归约
+        match whnf(&assume_expr) {
+            crate::term::reduce::Whnf::Term(t) => {
+                // 应该返回原始的 assume 表达式
+                assert!(matches!(t.as_ref(), Term::Assume { .. }));
+            }
+            _ => panic!("Assume should be WHNF"),
         }
     }
 }

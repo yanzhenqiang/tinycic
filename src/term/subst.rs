@@ -35,6 +35,9 @@ pub fn has_loose_bvars(term: &Term, cutoff: u32) -> bool {
                 || has_loose_bvars(proof, cutoff)
                 || has_loose_bvars(body, cutoff + 1)
         }
+        Term::Assume { ty, body, .. } => {
+            has_loose_bvars(ty, cutoff) || has_loose_bvars(body, cutoff + 1)
+        }
         Term::Inductive { params, .. } => {
             params.iter().any(|p| has_loose_bvars(p, cutoff))
         }
@@ -83,6 +86,11 @@ pub fn get_loose_bvar_range(term: &Term) -> u32 {
             let p = get_loose_bvar_range(proof);
             let b = get_loose_bvar_range(body);
             t.max(p).max(if b > 0 { b - 1 } else { 0 })
+        }
+        Term::Assume { ty, body, .. } => {
+            let t = get_loose_bvar_range(ty);
+            let b = get_loose_bvar_range(body);
+            t.max(if b > 0 { b - 1 } else { 0 })
         }
         _ => 0, // 简化处理其他情况
     }
@@ -158,6 +166,15 @@ fn instantiate_with_offset(
             name.clone(),
             instantiate_with_offset(ty, s, offset, subst),
             instantiate_with_offset(proof, s, offset, subst),
+            instantiate_with_offset(body, s, offset + 1, subst),
+        ),
+        Term::Assume {
+            name,
+            ty,
+            body,
+        } => Term::assume(
+            name.clone(),
+            instantiate_with_offset(ty, s, offset, subst),
             instantiate_with_offset(body, s, offset + 1, subst),
         ),
         Term::Inductive {
@@ -280,6 +297,15 @@ pub fn lift(term: &Rc<Term>, cutoff: u32, amount: u32) -> Rc<Term> {
             name.clone(),
             lift(ty, cutoff, amount),
             lift(proof, cutoff, amount),
+            lift(body, cutoff + 1, amount),
+        ),
+        Term::Assume {
+            name,
+            ty,
+            body,
+        } => Term::assume(
+            name.clone(),
+            lift(ty, cutoff, amount),
             lift(body, cutoff + 1, amount),
         ),
         Term::Inductive {

@@ -98,6 +98,14 @@ pub enum Term {
         body: Rc<Term>,
     },
 
+    /// assume 绑定: assume (x : A), body
+    /// 用于证明中引入假设，语义同 Lambda 但更明确用于证明
+    Assume {
+        name: Name,
+        ty: Rc<Term>,
+        body: Rc<Term>,
+    },
+
     // ===== 归纳类型相关 =====
     /// 归纳类型引用
     Inductive {
@@ -225,6 +233,15 @@ impl Term {
         })
     }
 
+    /// 创建 assume
+    pub fn assume(name: impl Into<Name>, ty: Rc<Term>, body: Rc<Term>) -> Rc<Self> {
+        Rc::new(Term::Assume {
+            name: name.into(),
+            ty,
+            body,
+        })
+    }
+
     // ===== 便捷构造函数 =====
 
     /// 创建箭头类型 A -> B (非依赖 Pi)
@@ -282,6 +299,9 @@ impl fmt::Display for Term {
             }
             Term::Have { name, ty, proof, body } => {
                 write!(f, "have {} : {} := {} in {}", name, ty, proof, body)
+            }
+            Term::Assume { name, ty, body } => {
+                write!(f, "assume ({} : {}), {}", name, ty, body)
             }
             Term::Inductive { name, levels, params } => {
                 write!(f, "{}", name)?;

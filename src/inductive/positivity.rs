@@ -107,6 +107,12 @@ impl PositivityChecker {
                 self.check_term(body, pos)
             }
 
+            // assume：与 Lambda 相同处理
+            Term::Assume { ty, body, .. } => {
+                self.check_term(ty, Position::Positive)?;
+                self.check_term(body, pos)
+            }
+
             // 归纳类型引用
             Term::Inductive { name, params, .. } => {
                 if name == &self.inductive_name {
@@ -195,6 +201,12 @@ impl PositivityChecker {
                 self.check_strict_positivity(body)
             }
 
+            // assume
+            Term::Assume { ty, body, .. } => {
+                self.check_strict_positivity(ty)?;
+                self.check_strict_positivity(body)
+            }
+
             // 其他形式
             _ => Ok(()),
         }
@@ -217,6 +229,10 @@ impl PositivityChecker {
             Term::Have { ty, proof, body, .. } => {
                 self.check_no_occurrence(ty)?;
                 self.check_no_occurrence(proof)?;
+                self.check_no_occurrence(body)
+            }
+            Term::Assume { ty, body, .. } => {
+                self.check_no_occurrence(ty)?;
                 self.check_no_occurrence(body)
             }
             _ => Ok(()),

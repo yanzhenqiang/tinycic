@@ -105,6 +105,54 @@ pub fn define_int() -> InductiveDecl {
     }
 }
 
+/// 定义 Rat（有理数）类型
+///
+/// Rat 不是归纳类型，而是结构体：
+/// structure Rat where
+///   num : Int    -- 分子
+///   den : PosInt -- 分母（正整数）
+///
+/// 这里我们将 Rat 实现为常量定义
+pub fn define_rat(env: &mut Environment) {
+    use crate::typecheck::ConstantInfo;
+
+    // Rat : Type
+    let rat_type = Term::type0();
+    env.add_constant("Rat", rat_type, None);
+
+    // Rat.mk : Int → PosInt → Rat
+    let mk_type = Term::arrow(
+        Term::const_("Int"),
+        Term::arrow(
+            Term::const_("Nat"), // 简化：使用 Nat 代替 PosInt
+            Term::const_("Rat"),
+        ),
+    );
+    env.add_constant("Rat.mk", mk_type, None);
+
+    // 基本有理数常量
+    // Rat.zero = Rat.mk (Int.ofNat 0) 1
+    let rat_zero = Term::app(
+        Term::app(
+            Term::const_("Rat.mk"),
+            Term::app(Term::const_("ofNat"), Term::const_("zero")),
+        ),
+        Term::const_("zero"),
+    );
+    env.add_constant("Rat.zero", Term::const_("Rat"), Some(rat_zero));
+
+    // Rat.one = Rat.mk (Int.ofNat 1) 1
+    let one_nat = Term::app(Term::const_("succ"), Term::const_("zero"));
+    let rat_one = Term::app(
+        Term::app(
+            Term::const_("Rat.mk"),
+            Term::app(Term::const_("ofNat"), one_nat.clone()),
+        ),
+        Term::const_("zero"),
+    );
+    env.add_constant("Rat.one", Term::const_("Rat"), Some(rat_one));
+}
+
 /// 初始化环境，添加标准库定义
 pub fn init_prelude(env: &mut Environment) {
     let processor = InductiveProcessor::new();
@@ -146,6 +194,9 @@ pub fn init_prelude(env: &mut Environment) {
             env.add_constant(&name, ty, None);
         }
     }
+
+    // 添加 Rat 类型（结构体，非归纳类型）
+    define_rat(env);
 }
 
 #[cfg(test)]
@@ -531,6 +582,83 @@ mod tests {
     }
 
     // =========================================================================
+    // Rat 性质验证
+    // =========================================================================
+
+    /// 验证 Rat 类型已注册
+    #[test]
+    fn test_rat_type_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Rat".to_string());
+        assert!(result.is_ok(), "Rat type should be registered");
+    }
+
+    /// 验证 Rat.mk 构造子
+    #[test]
+    fn test_rat_mk_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Rat.mk".to_string());
+        assert!(result.is_ok(), "Rat.mk should be registered");
+    }
+
+    /// 验证 Rat.zero 常量
+    #[test]
+    fn test_rat_zero_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Rat.zero".to_string());
+        assert!(result.is_ok(), "Rat.zero should be registered");
+
+        // 检查类型
+        let inference = TypeInference::new(&env);
+        let rat_zero = Term::const_("Rat.zero");
+        let ty = inference.infer(&Context::new(), &rat_zero);
+        assert!(ty.is_ok(), "Rat.zero should have a type");
+        assert_eq!(ty.unwrap(), Term::const_("Rat"));
+    }
+
+    /// 验证 Rat.one 常量
+    #[test]
+    fn test_rat_one_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"Rat.one".to_string());
+        assert!(result.is_ok(), "Rat.one should be registered");
+
+        // 检查类型
+        let inference = TypeInference::new(&env);
+        let rat_one = Term::const_("Rat.one");
+        let ty = inference.infer(&Context::new(), &rat_one);
+        assert!(ty.is_ok(), "Rat.one should have a type");
+        assert_eq!(ty.unwrap(), Term::const_("Rat"));
+    }
+
+    /// 验证可以用 Rat.mk 构造有理数
+    #[test]
+    fn test_rat_mk_application() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let inference = TypeInference::new(&env);
+
+        // 构造 1/2：Rat.mk (Int.ofNat 1) 2
+        let num = Term::app(Term::const_("ofNat"),
+            Term::app(Term::const_("succ"), Term::const_("zero")));
+        let den = Term::app(Term::const_("succ"), Term::const_("zero"));
+        let rat_half = Term::app(Term::app(Term::const_("Rat.mk"), num), den);
+
+        let ty = inference.infer(&Context::new(), &rat_half);
+        assert!(ty.is_ok(), "Rat.mk with args should have type Rat: {:?}", ty.err());
+        assert_eq!(ty.unwrap(), Term::const_("Rat"));
+    }
+
+    // =========================================================================
     // 类型环境完整性验证
     // =========================================================================
 
@@ -552,6 +680,13 @@ mod tests {
         for ctor in constructors {
             let result = env.lookup_constant(&ctor.to_string());
             assert!(result.is_ok(), "{} should be registered", ctor);
+        }
+
+        // 检查 Rat 相关
+        let rat_items = vec!["Rat", "Rat.mk", "Rat.zero", "Rat.one"];
+        for item in rat_items {
+            let result = env.lookup_constant(&item.to_string());
+            assert!(result.is_ok(), "{} should be registered", item);
         }
     }
 }

@@ -483,8 +483,8 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
-        // Parse proof
-        let proof = self.parse_proof()?;
+        // Parse proof with the statement as the goal type
+        let proof = self.parse_proof(Some(statement.clone()))?;
 
         Ok(TheoremDecl::new(name, statement).with_proof(proof))
     }
@@ -624,7 +624,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_proof(&mut self) -> Result<Rc<Term>, ParseError> {
+    fn parse_proof(&mut self, goal_type: Option<Rc<Term>>) -> Result<Rc<Term>, ParseError> {
         // Expect 'by' keyword
         match &self.current {
             Token::Ident(s) if s == "by" => {
@@ -681,11 +681,6 @@ impl<'a> Parser<'a> {
             let script = script_lines.join("\n");
             let tactics = crate::tactic::proof_builder::parse_tactic_script(&script);
 
-            // For now, we still return sorry, but the infrastructure is in place
-            // to generate actual proof terms
-            // TODO: Integrate with ProofBuilder to generate real proof terms
-            let _builder = crate::tactic::proof_builder::ProofBuilder::new();
-
             // Check if all tactics are "sorry" or trivial
             let all_sorry = tactics.iter().all(|t| {
                 matches!(t, crate::tactic::proof_builder::ParsedTactic::Sorry)
@@ -695,8 +690,22 @@ impl<'a> Parser<'a> {
                 return Ok(Term::const_("sorry"));
             }
 
-            // For mixed tactics, still return sorry for now
-            // A full implementation would build the proof term
+            // Use ProofTermGenerator to generate actual proof term
+            if let Some(goal) = goal_type {
+                let mut generator = crate::tactic::proof_term_gen::ProofTermGenerator::new_without_env(goal);
+                match generator.generate(&tactics) {
+                    Ok(proof_term) => {
+                        return Ok(proof_term);
+                    }
+                    Err(e) => {
+                        // If generation fails, fall back to sorry but log the error
+                        eprintln!("Warning: Proof generation failed: {}", e);
+                        return Ok(Term::const_("sorry"));
+                    }
+                }
+            }
+
+            // No goal type provided, return sorry
             Ok(Term::const_("sorry"))
         } else {
             Ok(Term::const_("sorry"))

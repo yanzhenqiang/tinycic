@@ -158,7 +158,18 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
             }
         }
         "calc" => Some(ParsedTactic::Calc),
-        "rw" => Some(ParsedTactic::Rw(vec![])),
+        "rw" => {
+            // Parse rw [term1, term2, ...] format
+            // The line looks like: rw [Rat.add_comm, Rat.add_zero]
+            if parts.len() > 1 {
+                let rest = parts[1..].join(" ");
+                // Extract terms inside brackets
+                let terms = parse_rewrite_terms(&rest);
+                Some(ParsedTactic::Rw(terms))
+            } else {
+                Some(ParsedTactic::Rw(vec![]))
+            }
+        }
         "sorry" => Some(ParsedTactic::Sorry),
         _ => None,
     }
@@ -178,6 +189,29 @@ fn parse_simple_term(s: &str) -> Rc<Term> {
     }
 
     Term::const_(s.to_string())
+}
+
+/// Parse rewrite terms from string like "[Rat.add_comm, Rat.add_zero]"
+fn parse_rewrite_terms(s: &str) -> Vec<Rc<Term>> {
+    let mut terms = Vec::new();
+    let s = s.trim();
+
+    // Check if starts with '[' and ends with ']'
+    if s.starts_with('[') && s.ends_with(']') {
+        let inner = &s[1..s.len()-1];
+        // Split by comma
+        for term_str in inner.split(',') {
+            let term_str = term_str.trim();
+            if !term_str.is_empty() {
+                terms.push(parse_simple_term(term_str));
+            }
+        }
+    } else {
+        // Single term without brackets
+        terms.push(parse_simple_term(s));
+    }
+
+    terms
 }
 
 #[cfg(test)]

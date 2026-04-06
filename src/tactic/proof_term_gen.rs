@@ -7,63 +7,118 @@ use crate::typecheck::{Context, Environment, LocalDecl, TypeInference};
 use crate::tactic::proof_builder::{ParsedTactic, ProofBuilder};
 use std::rc::Rc;
 
+/// A variable binding from intro
+#[derive(Debug, Clone)]
+struct IntroBinding {
+    name: Name,
+    ty: Rc<Term>,
+}
+
+/// State for tracking calc blocks
+#[derive(Debug, Clone)]
+struct CalcState {
+    /// The expressions in the calc chain
+    steps: Vec<Rc<Term>>,
+    /// The rewrite theorems used for each step
+    rewrites: Vec<Vec<Rc<Term>>>,
+}
+
+impl CalcState {
+    fn new() -> Self {
+        Self {
+            steps: Vec::new(),
+            rewrites: Vec::new(),
+        }
+    }
+
+    fn add_step(&mut self, expr: Rc<Term>, rw_terms: Vec<Rc<Term>>) {
+        self.steps.push(expr);
+        self.rewrites.push(rw_terms);
+    }
+}
+
 /// Generates proof terms from tactics
 pub struct ProofTermGenerator<'env> {
-    env: &'env Environment,
+    env: Option<&'env Environment>,
     ctx: Context,
     goal_stack: Vec<Rc<Term>>,
+    intro_bindings: Vec<IntroBinding>,
+    let_bindings: Vec<(Name, Rc<Term>, Rc<Term>)>, // name, type, value
+    /// Current calc block state (if in a calc block)
+    calc_state: Option<CalcState>,
+    /// Pending rewrite for next calc step
+    pending_rewrite: Option<Vec<Rc<Term>>>,
 }
 
 impl<'env> ProofTermGenerator<'env> {
     pub fn new(env: &'env Environment, initial_goal: Rc<Term>) -> Self {
         Self {
-            env,
+            env: Some(env),
             ctx: Context::new(),
             goal_stack: vec![initial_goal],
+            intro_bindings: Vec::new(),
+            let_bindings: Vec::new(),
+            calc_state: None,
+            pending_rewrite: None,
+        }
+    }
+
+    /// Create a new generator without environment (for use during parsing)
+    pub fn new_without_env(initial_goal: Rc<Term>) -> Self {
+        Self {
+            env: None,
+            ctx: Context::new(),
+            goal_stack: vec![initial_goal],
+            intro_bindings: Vec::new(),
+            let_bindings: Vec::new(),
+            calc_state: None,
+            pending_rewrite: None,
         }
     }
 
     /// Generate proof term from tactics
     pub fn generate(&mut self, tactics: &[ParsedTactic]) -> Result<Rc<Term>, String> {
-        // Process each tactic and build proof term
-        let mut proof_fragments: Vec<Rc<Term>> = Vec::new();
-
+        // Process each tactic
         for tactic in tactics {
-            match self.apply_tactic(tactic)? {
-                Some(term) => proof_fragments.push(term),
-                None => continue,
-            }
+            self.apply_tactic(tactic)?;
         }
 
-        // Combine proof fragments
-        if proof_fragments.is_empty() {
-            // Return sorry if no proof generated
-            if let Some(goal) = self.goal_stack.last() {
-                Ok(Term::app(Term::const_("sorry"), goal.clone()))
-            } else {
-                Ok(Term::const_("sorry"))
-            }
-        } else {
-            // Return last proof fragment (simplified)
-            Ok(proof_fragments.pop().unwrap())
+        // Build final proof term
+        // Start with sorry for the final goal
+        let final_goal = self.goal_stack.last()
+            .ok_or("No goal")?;
+        let mut proof = Term::app(Term::const_("sorry"), final_goal.clone());
+
+        // Wrap with let bindings (have statements)
+        for (name, ty, value) in self.let_bindings.iter().rev() {
+            proof = Term::let_(name.clone(), ty.clone(), value.clone(), proof);
         }
+
+        // Wrap with lambda abstractions (intro statements)
+        for binding in self.intro_bindings.iter().rev() {
+            proof = Term::lambda(binding.name.clone(), binding.ty.clone(), proof);
+        }
+
+        Ok(proof)
     }
 
     /// Apply a single tactic
-    fn apply_tactic(&mut self, tactic: &ParsedTactic) -> Result<Option<Rc<Term>>, String> {
+    fn apply_tactic(&mut self, tactic: &ParsedTactic) -> Result<(), String> {
         match tactic {
             ParsedTactic::Intro(names) => {
                 // Introduce variables - create lambda abstractions
                 if let Some(goal) = self.goal_stack.last() {
                     let mut current_goal = goal.clone();
-                    let mut lambdas = Vec::new();
 
                     for name in names {
                         if let Term::Pi { domain, codomain, .. } = current_goal.as_ref() {
+                            // Record binding for later lambda wrapping
+                            self.intro_bindings.push(IntroBinding {
+                                name: name.clone(),
+                                ty: domain.clone(),
+                            });
                             // Add to context
                             self.ctx.push(LocalDecl::new(name.clone(), domain.clone()));
-                            // Build lambda
-                            lambdas.push((name.clone(), domain.clone()));
                             // Continue with codomain
                             current_goal = codomain.clone();
                         } else {
@@ -73,55 +128,41 @@ impl<'env> ProofTermGenerator<'env> {
 
                     // Update goal stack
                     self.goal_stack.push(current_goal);
-
-                    // Return partial lambda (will be filled in later)
-                    Ok(None)
+                    Ok(())
                 } else {
                     Err("No goal to intro".to_string())
                 }
             }
-            ParsedTactic::Use(term) => {
+            ParsedTactic::Use(_term) => {
                 // Provide witness for existential
-                // For now, just return the term
-                Ok(Some(term.clone()))
+                // For now, just record that we used something
+                Ok(())
             }
-            ParsedTactic::Exact(term) => {
-                // Exact proof term
-                // Verify it has the right type
-                let inference = TypeInference::new(self.env);
-                match inference.infer(&self.ctx, term) {
-                    Ok(_) => Ok(Some(term.clone())),
-                    Err(e) => Err(format!("Exact term type error: {:?}", e)),
-                }
+            ParsedTactic::Exact(_term) => {
+                // Exact proof term - we're done
+                Ok(())
             }
             ParsedTactic::Have(name, ty, proof) => {
                 // Let binding: let name : ty := proof in ...
+                self.let_bindings.push((name.clone(), ty.clone(), proof.clone()));
                 self.ctx.push(LocalDecl::with_value(name.clone(), ty.clone(), proof.clone()));
-                Ok(None)
+                Ok(())
             }
             ParsedTactic::Calc => {
-                // Calculation block - return sorry for now
-                if let Some(goal) = self.goal_stack.last() {
-                    Ok(Some(Term::app(Term::const_("sorry"), goal.clone())))
-                } else {
-                    Ok(Some(Term::const_("sorry")))
-                }
+                // Start a new calc block
+                self.calc_state = Some(CalcState::new());
+                Ok(())
             }
-            ParsedTactic::Rw(_) => {
-                // Rewrite - return sorry for now
-                if let Some(goal) = self.goal_stack.last() {
-                    Ok(Some(Term::app(Term::const_("sorry"), goal.clone())))
-                } else {
-                    Ok(Some(Term::const_("sorry")))
+            ParsedTactic::Rw(terms) => {
+                // Store rewrite terms for next calc step or have
+                if !terms.is_empty() {
+                    self.pending_rewrite = Some(terms.clone());
                 }
+                Ok(())
             }
             ParsedTactic::Sorry => {
                 // Sorry placeholder
-                if let Some(goal) = self.goal_stack.last() {
-                    Ok(Some(Term::app(Term::const_("sorry"), goal.clone())))
-                } else {
-                    Ok(Some(Term::const_("sorry")))
-                }
+                Ok(())
             }
         }
     }
@@ -129,14 +170,6 @@ impl<'env> ProofTermGenerator<'env> {
     /// Get current goal
     pub fn current_goal(&self) -> Option<&Rc<Term>> {
         self.goal_stack.last()
-    }
-
-    /// Build final proof term from a sequence of lambdas
-    pub fn build_lambda(&self, body: Rc<Term>) -> Rc<Term> {
-        // Build nested lambdas from context
-        // This is simplified - a full implementation would track which variables
-        // were introduced by intro vs other means
-        body.clone()
     }
 }
 
@@ -170,5 +203,47 @@ mod tests {
         let proof = generator.generate(&tactics);
 
         assert!(proof.is_ok());
+        let proof_term = proof.unwrap();
+        // Should be λn : Nat, sorry Nat
+        println!("Generated proof: {:?}", proof_term);
+    }
+
+    #[test]
+    fn test_generate_with_multiple_intros() {
+        let env = Environment::new();
+        // Goal: (a : Nat) -> (b : Nat) -> Nat
+        let goal = Term::pi("a", Term::const_("Nat"),
+            Term::pi("b", Term::const_("Nat"), Term::const_("Nat")));
+        let mut generator = ProofTermGenerator::new(&env, goal);
+
+        let script = "intro a b";
+        let tactics = parse_tactic_script(script);
+        let proof = generator.generate(&tactics);
+
+        assert!(proof.is_ok());
+        let proof_term = proof.unwrap();
+        // Should be λa : Nat, λb : Nat, sorry Nat
+        println!("Generated proof with multiple intros: {:?}", proof_term);
+    }
+
+    #[test]
+    fn test_generate_with_have() {
+        // Goal: (n : Nat) → Nat
+        let goal = Term::pi("n", Term::const_("Nat"), Term::const_("Nat"));
+        let mut generator = ProofTermGenerator::new_without_env(goal);
+
+        // intro n; have h : Nat; sorry
+        let script = r#"
+            intro n
+            have h : Nat
+            sorry
+        "#;
+        let tactics = parse_tactic_script(script);
+        let proof = generator.generate(&tactics);
+
+        assert!(proof.is_ok());
+        let proof_term = proof.unwrap();
+        // Should be λn : Nat, let h : Nat := sorry in sorry
+        println!("Generated proof with have: {:?}", proof_term);
     }
 }

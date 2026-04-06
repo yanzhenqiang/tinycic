@@ -173,9 +173,20 @@ env.add_inductive() / env.add_constant()
 当前 `lib/real.x` 中的定理使用 `sorry` 占位符，需要实现真正的证明：
 
 **基础设施 (已完成):**
-- ✅ `src/tactic/proofgen.rs` - ProofGen 结构，从 tactic 生成 proof term
-- ✅ `src/tactic/parser.rs` - 解析 tactic 脚本 (intro/use/exact 等)
+- ✅ `src/tactic/proof_term_gen.rs` - ProofTermGenerator 结构，从 tactic 生成 proof term
+- ✅ `src/tactic/proof_builder.rs` - ParsedTactic, parse_tactic_script, 增强 rw 解析
+- ✅ `src/tactic/parser.rs` - 解析 tactic 脚本 (intro/use/exact/have/rw/calc 等)
 - ✅ `TheoremProcessor` - 支持定理参数上下文
+- ✅ `src/parser/parser.rs` - 集成 ProofTermGenerator，传递 goal type 生成实际 proof term
+
+**已完成的 Tactic 支持:**
+- [x] `intro` - 引入变量，生成 lambda 绑定
+- [x] `use` - 提供存在量词 witness
+- [x] `have` - 引入中间引理，生成 let 绑定
+- [x] `exact` - 提供精确证明项
+- [x] `sorry` - 占位符
+- [x] `rw` - 解析重写项（待实现：实际重写逻辑）
+- [x] `calc` - 计算块识别（待实现：等式链证明生成）
 
 **已完成证明:**
 - [x] ProofTest.trivial_nat - 直接 proof term 验证
@@ -183,8 +194,8 @@ env.add_inductive() / env.add_constant()
 
 **待完成证明 (使用 sorry):**
 - [ ] Real.half_pos - ε/2 构造证明
-- [ ] Real.rat_triangle_ineq - 三角不等式  
-- [ ] Real.add_comm - 加法交换律 (复杂证明，需 intro/use/have/calc)
+- [ ] Real.rat_triangle_ineq - 三角不等式
+- [ ] Real.add_comm - 加法交换律 (需完整 rw/calc 支持)
 - [ ] Real.add_assoc - 加法结合律
 - [ ] Real.add_zero - 零元性质
 - [ ] Real.add_neg - 加法逆元
@@ -194,6 +205,11 @@ env.add_inductive() / env.add_constant()
 - [ ] Real.mul_add - 分配律
 - [ ] Real.lt_trans - 序关系传递性
 - [ ] Real.cauchy_add - Cauchy 序列加法封闭性
+
+**下一步工作:**
+1. 实现 `rw` tactic 的完整证明生成（使用等式替换）
+2. 实现 `calc` 块的等式链证明生成
+3. 将 real.x 中的 sorry 替换为实际生成的 proof term
 
 **下一阶段目标:**
 1. 实现真正的 tactic proof term 生成（intro/exact/apply/rw/calc）

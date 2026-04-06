@@ -136,14 +136,19 @@ env.add_inductive() / env.add_constant()
   - `add/mul/neg/sub`: 加、乘、负、减
   - `zero/one`: 零元、单位元
 - [x] 序关系 `lt`（用 ε-N 定义）
-- [x] 基本性质证明
+- [x] 基本性质证明（框架）
   - `add_comm`: 加法交换律
   - `add_zero`: 零元性质
   - `add_neg`: 加法逆元
   - `mul_comm`: 乘法交换律
   - `mul_one`: 单位元性质
   - `mul_add`: 分配律
+- [ ] **严格证明**（TODO）：当前证明直接调用 Rat 定理，需补充 ε-N 论证验证 Cauchy 条件
 - [ ] 完备性定理（有上界集合有最小上界）
+
+**TODO:**
+1. **严格证明实数性质**：当前 `Real.add_comm` 等定理直接调用 `Rat.add_comm`，但严格证明需要 ε-N 论证验证序列等价性
+2. **引入 `def` 关键字**：parser 暂不支持 `def` 语法，导致 `Real.zero/add/mul` 等需在 Rust 中手动注册
 
 **新增文件:**
 - `lib/real.x` - Real structure 定义、运算、性质

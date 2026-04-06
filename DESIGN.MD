@@ -218,16 +218,23 @@ env.add_inductive() / env.add_constant()
 2. **ProofTermGenerator 增强**
    - 添加错误回退：当 tactic 应用失败时返回 `sorry` 而不是 panic
    - 添加 `CalcState` 和 `pending_rewrite` 跟踪 calc/rw 状态
-   - 实现 `build_equality_proof` 和 `build_calc_proof`（待测试）
+   - 实现 `build_equality_proof` 和 `build_calc_proof`
+   - calc 块中现在会跟踪 rw 定理（通过 `calc.add_step`）
 
 3. **测试验证**
    - 添加 `test_real_proof_generation` 测试验证 lambda 生成
    - 110 个测试全部通过
 
+**当前挑战:**
+- calc 块的表达式解析（`expr1 = expr2 := by rw [...]`）尚未实现
+- Parser 目前只收集 tactic 行，不解析 calc 内部的等式表达式
+- 需要扩展 parser 来捕获 calc 步骤中的左右表达式
+
 **下一步工作:**
-1. 实现 `rw` tactic 的完整证明生成（使用等式替换）
-2. 实现 `calc` 块的等式链证明生成
-3. 将 real.x 中的 sorry 替换为实际生成的 proof term
+1. **扩展 Parser**：解析 calc 块的 `expr = expr := by rw [...]` 结构
+2. **实现表达式跟踪**：在 `CalcState` 中记录每步的左右表达式
+3. **构建完整证明**：将 calc 步骤转换为 `Eq.trans` 链
+4. **验证 Real 定理**：测试 `Real.add_comm` 等定理的完整证明生成
 
 **下一阶段目标:**
 1. 实现真正的 tactic proof term 生成（intro/exact/apply/rw/calc）

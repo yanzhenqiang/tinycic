@@ -178,6 +178,8 @@ env.add_inductive() / env.add_constant()
 - ✅ `src/tactic/parser.rs` - 解析 tactic 脚本 (intro/use/exact/have/rw/calc 等)
 - ✅ `TheoremProcessor` - 支持定理参数上下文
 - ✅ `src/parser/parser.rs` - 集成 ProofTermGenerator，传递 goal type 生成实际 proof term
+- ✅ Parser 修复：正确处理 Token::By, Token::Intro, Token::Use 等特殊 token
+- ✅ Parser 修复：collect_tactic_line 处理特殊 tactic token
 
 **已完成的 Tactic 支持:**
 - [x] `intro` - 引入变量，生成 lambda 绑定

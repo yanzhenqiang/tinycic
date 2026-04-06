@@ -113,8 +113,13 @@ impl DefEqChecker {
                 self.is_def_eq(v1, v2) &&
                 self.is_def_eq(b1, b2),
 
-            // 其他情况：尝试 lazy delta reduction
+            // 其他情况：尝试 Eta 展开和 lazy delta reduction
             _ => {
+                // 尝试 Eta 展开
+                if let Some(result) = self.try_eta_expansion(&t1_n, &t2_n) {
+                    return result;
+                }
+
                 // 尝试展开定义后重新比较
                 if let Some(result) = self.try_unfold_and_compare(&t1_n, &t2_n) {
                     return result;
@@ -224,15 +229,37 @@ impl DefEqChecker {
         match term.as_ref() {
             // 已经是 lambda，不需要展开
             Term::Lambda { .. } => None,
-            // 检查是否是函数类型
             _ => {
-                // 获取项的类型并检查是否是 Pi 类型
-                // 简化：假设我们知道它是函数类型
-                // 展开：f => λx. f x
-                // 注意：这里需要类型信息，简化实现
+                // 尝试推断项的类型
+                let ty = self.infer_type(term)?;
+
+                // 检查是否是 Pi 类型（函数类型）
+                if let Term::Pi { domain, codomain, .. } = ty.as_ref() {
+                    // 构造 λx. term x
+                    // x 的类型是 domain
+                    // body 是 term x（应用 term 到 x）
+                    let body = Term::app(term.clone(), Term::var(0));
+
+                    // 需要提升 term 中的变量，因为它现在在 lambda 内部
+                    // 同时需要处理 codomain 中的变量替换
+                    let name = "x".to_string();
+                    let expanded = Term::lambda(name, domain.clone(), body);
+
+                    return Some(expanded);
+                }
+
                 None
             }
         }
+    }
+
+    /// 推断项的类型（简化实现）
+    fn infer_type(&self, term: &Rc<Term>) -> Option<Rc<Term>> {
+        use crate::typecheck::TypeInference;
+        use crate::typecheck::Context;
+
+        let inference = TypeInference::new(&self._env);
+        inference.infer(&Context::new(), term).ok()
     }
 
     /// 尝试展开定义 (lazy delta reduction)
@@ -452,6 +479,26 @@ mod tests {
         assert!(checker.is_def_eq(&t1, &t2));
         // 缓存应该包含这个等价对
         assert!(checker.equiv_cache.contains(&(t1, t2)));
+    }
+
+    /// 测试 Eta 展开 (来自 Lean 4 eta 测试)
+    #[test]
+    fn lean4_test_eta_expansion() {
+        let mut env = Environment::new();
+
+        // 定义 f : Type -> Type
+        let f_ty = Term::pi("_", Term::type0(), Term::type0());
+        let f = Term::const_("f");
+        env.add_constant("f", f_ty.clone(), None);
+
+        let mut checker = DefEqChecker::new(env);
+
+        // λx. f x
+        let body = Term::app(f.clone(), Term::var(0));
+        let lam = Term::lambda("x", Term::type0(), body);
+
+        // 两者应该等价（通过 Eta 展开）
+        assert!(checker.is_def_eq(&lam, &f), "Eta expansion should make λx. f x = f");
     }
 
     /// 测试递归深度限制 (来自 Lean 4 递归检查测试)

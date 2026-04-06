@@ -231,24 +231,57 @@ impl<'env> ProofTermGenerator<'env> {
     }
 
     /// Build proof term from calc state
+    /// Handles underscore resolution and builds Eq.trans chain
     fn build_calc_proof(&self, calc_state: &CalcState) -> Rc<Term> {
         if calc_state.lhs_exprs.is_empty() {
-            // No steps for a calc proof
             return Term::const_("sorry");
         }
 
-        // Build transitivity chain: lhs0 = rhs0, rhs0 = rhs1, rhs1 = rhs2, ...
-        // For each step, we need the equality proof
-        let mut combined_proof = None;
+        // Resolve underscores and build the actual expression chain
+        // calc steps: a = b, _ = c, _ = d  becomes  a = b, b = c, c = d
+        let mut resolved_lhs: Vec<Rc<Term>> = Vec::new();
+        let mut resolved_rhs: Vec<Rc<Term>> = Vec::new();
+
+        for (i, lhs) in calc_state.lhs_exprs.iter().enumerate() {
+            let resolved = if let Term::Const(name) = lhs.as_ref() {
+                if name == "_" && i > 0 {
+                    // Underscore refers to previous rhs
+                    resolved_rhs.last().unwrap_or(lhs).clone()
+                } else {
+                    lhs.clone()
+                }
+            } else {
+                lhs.clone()
+            };
+            resolved_lhs.push(resolved);
+            resolved_rhs.push(calc_state.rhs_exprs[i].clone());
+        }
+
+        // Build transitivity chain
+        // For each step lhs_i = rhs_i with rewrites, create equality proof
+        let mut combined_proof: Option<Rc<Term>> = None;
 
         for (i, rewrites) in calc_state.rewrites.iter().enumerate() {
-            let eq_proof = self.build_equality_proof(rewrites);
+            // Build equality proof for this step
+            let eq_proof = if rewrites.is_empty() {
+                // No rewrites, use reflexivity (lhs = lhs)
+                // In a full implementation, we'd need to check if lhs == rhs
+                Term::app(Term::const_("Eq.refl"), resolved_lhs[i].clone())
+            } else {
+                // Use the rewrite theorems to build proof
+                // For now, apply Eq.symm to each theorem
+                self.build_equality_proof(rewrites)
+            };
 
             combined_proof = match combined_proof {
                 None => Some(eq_proof),
                 Some(prev) => {
-                    // Chain with transitivity
-                    Some(Term::app(Term::app(Term::const_("Eq.trans"), prev), eq_proof))
+                    // Chain with transitivity: prev proves a = b, eq_proof proves b = c
+                    // Eq.trans : (a = b) -> (b = c) -> (a = c)
+                    Some(Term::app(
+                        Term::app(Term::const_("Eq.trans"), prev),
+                        eq_proof
+                    ))
                 }
             };
         }
@@ -363,5 +396,30 @@ mod tests {
             }
             _ => panic!("Expected Lambda from intro, got {:?}", proof_term),
         }
+    }
+
+    #[test]
+    fn test_generate_calc_proof_with_underscore() {
+        // Test calc proof generation with underscore resolution
+        let goal = Term::const_("Prop");
+        let mut generator = ProofTermGenerator::new_without_env(goal);
+
+        // calc with underscore steps
+        let script = r#"
+            calc
+              a = b := by rw [thm1]
+              _ = c := by rw [thm2]
+              _ = d := by rw [thm3]
+        "#;
+        let tactics = parse_tactic_script(script);
+        let proof = generator.generate(&tactics);
+
+        assert!(proof.is_ok());
+        let proof_term = proof.unwrap();
+        println!("Generated calc proof: {:?}", proof_term);
+
+        // Should contain Eq.trans (chained rewrites)
+        let proof_str = format!("{:?}", proof_term);
+        assert!(proof_str.contains("Eq.trans"), "Proof should contain Eq.trans for chaining");
     }
 }

@@ -217,6 +217,9 @@ env.add_inductive() / env.add_constant()
 - [ ] lib/real_simple.x (line 7, 11) - 简化版定理占位符
 - [ ] lib/test_theorems.x (line 5, 9) - 测试定理占位符
 
+**TODO - 代码架构改进:**
+- [ ] 加载 def 时 Rust 和 .x 没有完全分离 - `load_def_from_file` 仍依赖手动调用，应将 def 加载也改为纯 .x 文件驱动
+
 **注**: 标 [x] 的定理 proof term 生成已支持，但需验证生成的 proof term 能否通过类型检查。Real 域公理的证明都使用相同的 calc/rw 模式，因此一旦一个能工作，其他都能工作。
 
 **最近完成的工作 (2026-04-07):**

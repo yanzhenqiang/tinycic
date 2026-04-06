@@ -122,7 +122,7 @@ theorem add_assoc (r1 r2 r3 : Real) : eq (add (add r1 r2) r3) (add r1 (add r2 r3
       _ < ε := hε
 
 // 零元性质
-theorem add_zero (r : Real) : eq (add r zero) r :=
+theorem add_zero (r : Real) : eq (add r Real.zero) r :=
   by
     intro ε hε
     use Nat.zero
@@ -136,7 +136,7 @@ theorem add_zero (r : Real) : eq (add r zero) r :=
       _ < ε := hε
 
 // 加法逆元
-theorem add_neg (r : Real) : eq (add r (neg r)) zero :=
+theorem add_neg (r : Real) : eq (add r (neg r)) Real.zero :=
   by
     intro ε hε
     use Nat.zero
@@ -179,7 +179,7 @@ theorem mul_assoc (r1 r2 r3 : Real) : eq (mul (mul r1 r2) r3) (mul r1 (mul r2 r3
       _ < ε := hε
 
 // 单位元
-theorem mul_one (r : Real) : eq (mul one r) r :=
+theorem mul_one (r : Real) : eq (mul Real.one r) r :=
   by
     intro ε hε
     use Nat.zero

@@ -74,6 +74,13 @@ impl<'env> TypeInference<'env> {
         if let Ok(info) = self.env.lookup_inductive(name) {
             return Ok(info.ty.clone());
         }
+        // 尝试添加常见命名空间前缀
+        for prefix in &["Real.", "Rat.", "Nat.", "Int."] {
+            let full_name = format!("{}{}", prefix, name);
+            if let Ok(info) = self.env.lookup_constant(&full_name) {
+                return Ok(info.ty.clone());
+            }
+        }
         Err(TypeError::UnknownConstant(name.clone()))
     }
 

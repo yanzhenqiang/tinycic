@@ -222,13 +222,27 @@ impl TheoremProcessor {
         Self
     }
 
+    /// 从 Pi 类型中提取参数列表和结果类型
+    /// Pi {name, domain, codomain} -> accumulates (name, domain) and recurses on codomain
+    fn extract_pi_params(ty: &Rc<Term>) -> (Vec<(Name, Rc<Term>)>, Rc<Term>) {
+        let mut params = Vec::new();
+        let mut current = ty.clone();
+
+        while let Term::Pi { name, domain, codomain } = current.as_ref() {
+            params.push((name.clone(), domain.clone()));
+            current = codomain.clone();
+        }
+
+        (params, current)
+    }
+
     /// 处理定理声明，验证证明并注册
     pub fn process(&self, env: &Environment, decl: &TheoremDecl) -> TcResult<(Name, Rc<Term>, Rc<Term>)> {
-        use crate::typecheck::TypeInference;
+        use crate::typecheck::{TypeInference, Context, LocalDecl};
 
         // 1. 验证陈述的类型是 Prop（或 Type）
         let inference = TypeInference::new(env);
-        let stmt_ty = inference.infer(&crate::typecheck::Context::new(), &decl.statement)
+        let stmt_ty = inference.infer(&Context::new(), &decl.statement)
             .map_err(|e| format!("Theorem statement type inference failed: {:?}", e))?;
 
         // 简化：允许 Prop 或 Type
@@ -237,13 +251,24 @@ impl TheoremProcessor {
             _ => return Err(format!("Theorem statement must be a proposition, got: {:?}", stmt_ty).into()),
         }
 
-        // 2. 处理证明项
-        // 如果证明是 "sorry" 常量，需要将其应用于陈述类型
+        // 2. 从陈述中提取参数并创建上下文
+        // 陈述是 Pi 类型: (r1 : Real) -> (r2 : Real) -> eq (add r1 r2) (add r2 r1)
+        let (params, result_ty) = Self::extract_pi_params(&decl.statement);
+
+        // 创建带有定理参数的上下文
+        let mut ctx = Context::new();
+        for (name, ty) in &params {
+            ctx.push(LocalDecl::new(name.clone(), ty.clone()));
+        }
+
+        // 3. 处理证明项
+        // 对于 sorry 占位符，直接使用 sorry 应用到结果类型
         let proof_term = if let Some(ref proof) = decl.proof {
             if let Term::Const(name) = proof.as_ref() {
                 if name == "sorry" {
-                    // 应用 sorry 到陈述类型: sorry stmt
-                    Term::app(proof.clone(), decl.statement.clone())
+                    // sorry 的类型是 {A : Type} -> A
+                    // 应用 sorry 到整个陈述类型: sorry (Pi r1 r2, result_ty)
+                    Term::app(Term::const_("sorry"), decl.statement.clone())
                 } else {
                     proof.clone()
                 }
@@ -254,8 +279,10 @@ impl TheoremProcessor {
             Term::app(Term::const_("sorry"), decl.statement.clone())
         };
 
-        // 3. 验证证明类型
-        let proof_ty = inference.infer(&crate::typecheck::Context::new(), &proof_term)
+        // 4. 在扩展上下文中验证证明类型
+        // 注意：对于带参数的定理，证明应该是一个 lambda
+        // 但 sorry 是一个魔法常量，可以接受任何类型
+        let proof_ty = inference.infer(&ctx, &proof_term)
             .map_err(|e| format!("Proof type inference failed: {:?}", e))?;
 
         // 检查证明类型是否与陈述 convertible

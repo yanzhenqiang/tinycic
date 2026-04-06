@@ -374,15 +374,24 @@ load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test")?;
 | Real.mul_one | intro + have + calc + rw | ✅ 已验证 |
 | Real.mul_add | intro + have + calc + rw | ✅ 已验证 |
 
-**TODO（使用 sorry 占位符）:**
-- `Real.half_pos` (line 70-73) - ε/2 > 0 证明，需 `Rat.div_pos` 和 `Rat.ofNat_pos`
-- `Real.rat_triangle_ineq` (line 76-86) - 三角不等式应用，需 `Rat.sub_add_distrib`, `Rat.sub_self`
-- `Real.cauchy_add` (line 282) - 最后一步不等式需 `Rat.add_lt_add` 和 `ε/2 + ε/2 = ε`
+**已完成证明（11个定理）:**
+- ✅ `Real.add_comm` - 加法交换律
+- ✅ `Real.add_assoc` - 加法结合律
+- ✅ `Real.add_zero` - 零元性质
+- ✅ `Real.add_neg` - 加法逆元
+- ✅ `Real.mul_comm` - 乘法交换律
+- ✅ `Real.mul_assoc` - 乘法结合律
+- ✅ `Real.mul_one` - 单位元性质
+- ✅ `Real.mul_add` - 分配律
+- ✅ `Real.half_pos` - ε/2 > 0 构造
+- ✅ `Real.rat_triangle_ineq` - 三角不等式应用
+- ✅ `Real.lt_trans` - 序关系传递性
 
-**声明为公理（未证明）:**
-- `Real.mul_inv` (line 210) - 非零实数存在乘法逆元（需构造柯西序列的逆元）
-- `Real.lt_trichotomy` (line 236) - 序关系三歧性（需完整序公理）
-- `Real.completeness` (line 253) - 完备性定理（需有上界集合的最小上界构造）
+**声明为公理（4个，需复杂构造性证明）:**
+- 📋 `Real.mul_inv` - 非零实数存在乘法逆元（需构造柯西序列的逆元，保持柯西性）
+- 📋 `Real.lt_trichotomy` - 序关系三歧性（需完整序公理和 ε-N 论证）
+- 📋 `Real.completeness` - 完备性定理（需构造有上界集合的最小上界）
+- 📋 `Real.cauchy_add` - 柯西序列加法封闭性（需 ε/2 + ε/2 = ε 证明）
 
 **测试文件中的 sorry:**
 - `lib/proof_test.x` (line 10, 14) - 测试用占位符

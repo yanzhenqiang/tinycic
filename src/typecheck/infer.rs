@@ -68,23 +68,19 @@ impl<'env> TypeInference<'env> {
     fn infer_const(&self, name: &Name) -> TcResult<Rc<Term>> {
         // 首先尝试查找常量
         if let Ok(info) = self.env.lookup_constant(name) {
-            eprintln!("DEBUG infer_const: found {} as constant, ty={:?}", name, info.ty);
             return Ok(info.ty.clone());
         }
         // 如果找不到，尝试查找归纳类型
         if let Ok(info) = self.env.lookup_inductive(name) {
-            eprintln!("DEBUG infer_const: found {} as inductive, ty={:?}", name, info.ty);
             return Ok(info.ty.clone());
         }
         // 尝试添加常见命名空间前缀
         for prefix in &["Real.", "Rat.", "Nat.", "Int."] {
             let full_name = format!("{}{}", prefix, name);
             if let Ok(info) = self.env.lookup_constant(&full_name) {
-                eprintln!("DEBUG infer_const: found {} as {}", name, full_name);
                 return Ok(info.ty.clone());
             }
         }
-        eprintln!("DEBUG infer_const: {} NOT FOUND", name);
         Err(TypeError::UnknownConstant(name.clone()))
     }
 

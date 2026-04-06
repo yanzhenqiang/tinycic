@@ -180,6 +180,12 @@ impl<'env> ProofTermGenerator<'env> {
                 // Store rewrite terms for next calc step or have
                 if !terms.is_empty() {
                     self.pending_rewrite = Some(terms.clone());
+                    // If we're in a calc block, add this rewrite to the current step
+                    if let Some(ref mut calc) = self.calc_state {
+                        // Add a placeholder step with this rewrite
+                        // In a full implementation, we'd track the actual expressions
+                        calc.add_step(Term::const_("_"), terms.clone());
+                    }
                 }
                 Ok(())
             }

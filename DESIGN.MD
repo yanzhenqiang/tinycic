@@ -113,12 +113,19 @@ env.add_inductive() / env.add_constant()
 - 新增类型只需创建 .x 文件
 - 核心内核保持最小（仅处理器）
 
-### 2.3 Cauchy 序列
-- [ ] `CauchySeq` - 有理数 Cauchy 序列定义
-  - 序列类型 `Nat -> Rat`
+### 2.3 Cauchy 序列 ✅ 已完成
+- [x] `CauchySeq` - 有理数 Cauchy 序列定义
+  - 序列类型 `Nat -> Rat`（动态加载 lib/cauchy.x）
   - Cauchy 条件：∀ε>0, ∃N, ∀m,n≥N, |a_m - a_n| < ε
-- [ ] 序列等价关系（相同极限）
-- [ ] 等价类构造
+  - 投影函数 `CauchySeq.seq : CauchySeq → (Nat → Rat)`
+- [x] 序列等价关系（相同极限）- `CauchySeq.equiv`
+- [x] 基本定义：`isLimit`, `isCauchy`
+- [ ] 等价类构造（下一步：Real 类型）
+
+**新增文件:**
+- `lib/cauchy.x` - Cauchy 序列定义（structure 类型）
+- `lib/rat.x` - 添加 `abs` 绝对值函数
+- 86 个测试全部通过（含 2 个 Cauchy 序列测试）
 
 ### 2.4 实数构造
 - [ ] `Real` - 作为 CauchySeq / 等价关系 的商

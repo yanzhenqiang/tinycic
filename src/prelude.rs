@@ -231,6 +231,7 @@ pub fn init_prelude(env: &mut Environment) {
 
     // 从 .x 文件加载结构体类型（动态注册）
     let _ = load_structure_from_file(env, "lib/rat.x");
+    let _ = load_structure_from_file(env, "lib/cauchy.x");
 
     // 额外注册 Rat 基本常量（这些可以在 .x 文件中定义，但当前 parser 不支持 def）
     // Rat.zero = Rat.mk (Int.ofNat 0) 0
@@ -712,6 +713,30 @@ mod tests {
         let ty = inference.infer(&Context::new(), &rat_half);
         assert!(ty.is_ok(), "Rat.mk with args should have type Rat: {:?}", ty.err());
         assert_eq!(ty.unwrap(), Term::const_("Rat"));
+    }
+
+    // =========================================================================
+    // Cauchy 序列验证
+    // =========================================================================
+
+    /// 验证 CauchySeq 类型已注册
+    #[test]
+    fn test_cauchy_seq_type_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"CauchySeq".to_string());
+        assert!(result.is_ok(), "CauchySeq type should be registered");
+    }
+
+    /// 验证 CauchySeq.seq 投影函数
+    #[test]
+    fn test_cauchy_seq_proj_exists() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        let result = env.lookup_constant(&"CauchySeq.seq".to_string());
+        assert!(result.is_ok(), "CauchySeq.seq projection should be registered");
     }
 
     // =========================================================================

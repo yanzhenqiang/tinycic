@@ -1006,6 +1006,46 @@ mod tests {
         println!("ProofTest.trivial_nat type: {:?}", ty.unwrap());
     }
 
+    /// 验证 tactic proof builder 工作正常
+    #[test]
+    fn test_tactic_proof_builder() {
+        use crate::tactic::proof_builder::{parse_tactic_script, ProofBuilder, ParsedTactic};
+
+        let script = r#"
+            intro ε hε
+            use Nat.zero
+            intro n hn
+            exact h
+        "#;
+
+        let tactics = parse_tactic_script(script);
+        assert_eq!(tactics.len(), 4, "Should parse 4 tactics");
+
+        // Verify intro parsed correctly
+        match &tactics[0] {
+            ParsedTactic::Intro(names) => {
+                assert_eq!(names.len(), 2);
+                assert_eq!(names[0], "ε");
+                assert_eq!(names[1], "hε");
+            }
+            _ => panic!("Expected Intro tactic"),
+        }
+
+        // Verify use parsed correctly
+        match &tactics[1] {
+            ParsedTactic::Use(_) => {}
+            _ => panic!("Expected Use tactic"),
+        }
+
+        // Build proof (still returns sorry for now)
+        let mut builder = ProofBuilder::new();
+        let goal = crate::term::Term::const_("Prop");
+        let _proof = builder.build_proof(&tactics, &goal);
+
+        // Context should have all introduced variables
+        assert_eq!(builder.context_size(), 4, "Should have 4 variables in context");
+    }
+
     /// 验证 Real.x 中的 def 被正确加载
     #[test]
     fn test_real_x_defs_loaded() {

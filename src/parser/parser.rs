@@ -676,13 +676,31 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // For now, return sorry as the proof
-        // A full implementation would parse the script and generate proof term
-        // let script = script_lines.join("\n");
-        // let tactics = crate::tactic::parser::parse_tactics(&script);
-        // ... generate proof from tactics
+        // Build proof from tactic script
+        if !script_lines.is_empty() {
+            let script = script_lines.join("\n");
+            let tactics = crate::tactic::proof_builder::parse_tactic_script(&script);
 
-        Ok(Term::const_("sorry"))
+            // For now, we still return sorry, but the infrastructure is in place
+            // to generate actual proof terms
+            // TODO: Integrate with ProofBuilder to generate real proof terms
+            let _builder = crate::tactic::proof_builder::ProofBuilder::new();
+
+            // Check if all tactics are "sorry" or trivial
+            let all_sorry = tactics.iter().all(|t| {
+                matches!(t, crate::tactic::proof_builder::ParsedTactic::Sorry)
+            });
+
+            if all_sorry {
+                return Ok(Term::const_("sorry"));
+            }
+
+            // For mixed tactics, still return sorry for now
+            // A full implementation would build the proof term
+            Ok(Term::const_("sorry"))
+        } else {
+            Ok(Term::const_("sorry"))
+        }
     }
 
     /// Collect a tactic line as string

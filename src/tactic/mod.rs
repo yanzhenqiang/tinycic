@@ -14,6 +14,7 @@ use std::rc::Rc;
 pub mod tactics;
 pub mod proofgen;
 pub mod parser;
+pub mod proof_builder;
 
 /// 证明目标
 #[derive(Debug, Clone)]

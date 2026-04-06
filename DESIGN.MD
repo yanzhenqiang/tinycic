@@ -219,23 +219,21 @@ env.add_inductive() / env.add_constant()
    - 添加 `Token::Equal` 用于识别 `=` 符号（calc 块的等号）
    - 支持解析 `expr1 = expr2` 结构
 
-3. **CalcStep 结构**
+3. **Calc 块多行解析** ✅
+   - 重写 `parse_tactic_script` 支持多行 calc 块
+   - 添加 `parse_calc_step` 解析 `lhs = rhs := by rw [...]` 格式
+   - 添加 `is_tactic_line` 检测 calc 块结束
+   - 112 个测试全部通过
+
+4. **CalcStep 结构**
    - 添加 `CalcStep { lhs, rhs, rewrites }` 结构体
    - 更新 `ParsedTactic::Calc(Vec<CalcStep>)` 以携带 calc 步骤信息
-   - 准备支持 calc 块表达式的跟踪
-
-4. **测试验证**
-   - 110 个测试全部通过
-
-**当前挑战:**
-- Parser 目前只收集 tactic 名称，不解析 calc 行中的 `expr = expr := by rw [...]` 结构
-- 需要将 calc 行解析为 `CalcStep` 对象（lhs, rhs, rewrites）
+   - 更新 `CalcState` 跟踪 lhs/rhs 表达式
 
 **下一步工作:**
-1. **扩展 tactic 解析器**：解析 calc 行的 `lhs = rhs := by rw [...]` 为 `CalcStep`
-2. **实现表达式跟踪**：在 `CalcState` 中记录每步的左右表达式
-3. **构建完整证明**：将 calc 步骤转换为 `Eq.trans` 链
-4. **验证 Real 定理**：测试 `Real.add_comm` 等定理的完整证明生成
+1. **构建完整证明**：将 calc 步骤转换为 `Eq.trans` 链
+2. **验证 Real 定理**：测试 `Real.add_comm` 等定理的完整证明生成
+3. **处理 underscore**：在 calc 步骤中 `_` 应引用前一个 rhs
 
 **下一阶段目标:**
 1. 实现真正的 tactic proof term 生成（intro/exact/apply/rw/calc）

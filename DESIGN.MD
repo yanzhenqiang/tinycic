@@ -233,18 +233,24 @@ env.add_inductive() / env.add_constant()
    - ✅ Underscore `_` 解析为前一个 rhs
    - ✅ `Eq.symm` 应用重写定理
 
-**当前问题:**
-Parser 的 token-based 逐行收集与多行 calc 块有冲突：
-- `collect_tactic_line` 在遇到 `=`、`:=` 时继续收集，导致 `have` 行与下一行合并
-- 需要重构 parser 以正确处理多行结构，或使用不同的解析策略
+**已修复:** ✅
+Parser 的 calc 块多行收集问题已解决（采用方案2）：
+- 添加 `remaining_input()` 和 `position()` 到 Lexer
+- 重构 `parse_proof` 使用原始输入字符串解析
+- 替换 token-by-token 收集为 `parse_tactic_script` 整段解析
+- `have` 和 `calc` 现在正确解析为独立 tactic
 
-**解决方案选项:**
-1. 在 `collect_tactic_line` 中添加换行检测（但 lexer 不保留换行信息）
-2. 重构 `parse_proof` 直接操作字符串行而不是 token
-3. 在 lexer 中添加行号信息，用于检测行边界
+**生成的证明结构:**
+```
+Lambda n, hn          -- from intro
+  Let h := sorry      -- from have
+    Eq.symm thm       -- from calc (rw [...])
+```
 
 **下一步:**
-修复 parser 的 calc 块多行收集问题，确保 `parse_theorem` 能正确生成包含 calc 的证明项。
+1. 验证完整 Real 定理（Real.add_comm）的类型检查
+2. 确保生成的 proof term 与定理陈述匹配
+3. 测试更多 Real 域公理定理
 
 **已完成的证明生成:**
 - ✅ `intro` 生成 lambda 绑定：`λr1:Real, λr2:Real, ...`

@@ -184,7 +184,13 @@ pub fn load_theorem_from_file(env: &mut Environment, path: &str, namespace: &str
     let mut pos = 0;
     for line in content.lines() {
         let trimmed = line.trim();
-        if (trimmed.starts_with("theorem ") || trimmed.starts_with("lemma ")) && !trimmed.starts_with("//") {
+        // Skip comments and empty lines
+        if trimmed.starts_with("//") || trimmed.is_empty() {
+            pos += line.len() + 1;
+            continue;
+        }
+        // Match theorem or lemma at line start (ignoring leading whitespace)
+        if (trimmed.starts_with("theorem ") || trimmed.starts_with("lemma ")) {
             let theorem_section = &content[pos..];
 
             match parser::parse_theorem(theorem_section) {
@@ -965,11 +971,6 @@ mod tests {
         let mut env = Environment::new();
         init_prelude(&mut env);
 
-        // Debug: 打印环境状态
-        println!("Environment initialized");
-        let nat_result = env.lookup_constant(&"Nat".to_string());
-        println!("Nat lookup: {:?}", nat_result.is_ok());
-
         // 从测试文件加载定理
         let result = load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test");
         assert!(result.is_ok(), "Should load theorems from test file");
@@ -977,5 +978,25 @@ mod tests {
         // 检查简单定理是否被注册
         let result = env.lookup_constant(&"Test.simple_true".to_string());
         assert!(result.is_ok(), "Theorem Test.simple_true should be registered");
+    }
+
+    /// 验证 Real.x 中的定理被解析（即使验证失败也是因为缺少定义）
+    #[test]
+    fn test_real_x_theorems_parsed() {
+        // 这个测试主要验证 Real.x 的定理能被 parser 正确解析
+        // 验证失败是因为缺少 eq/lt/isCauchy 等定义，不是解析错误
+        let input = r#"theorem add_comm (r1 r2 : Real) : eq (add r1 r2) (add r2 r1) :=
+  by
+    intro ε hε
+    use Nat.zero
+    exact sorry"#;
+
+        let result = crate::parser::parse_theorem(input);
+        assert!(result.is_ok(), "Should parse Real.x style theorem");
+
+        let decl = result.unwrap();
+        assert_eq!(decl.name, "add_comm");
+        // Statement should be Pi type with params
+        println!("Parsed statement: {:?}", decl.statement);
     }
 }

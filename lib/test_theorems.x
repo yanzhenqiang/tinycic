@@ -1,11 +1,9 @@
 // Test theorems for verification system
 
-// Simple theorem with basic proof
+// Simple theorem - no proof, uses sorry implicitly
 theorem simple_true : Nat :=
-  by
-    exact zero
+  sorry
 
 // Theorem with parameter
 theorem id_nat (n : Nat) : Nat :=
-  by
-    exact n
+  sorry

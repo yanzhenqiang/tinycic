@@ -230,19 +230,25 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse a theorem declaration
+    /// Parse a theorem or lemma declaration
     /// Format: theorem name : statement := by tactic_block
+    ///    or:  theorem name (params) : statement := by tactic_block
+    ///    or:  lemma name : statement := by tactic_block
     pub fn parse_theorem(&mut self) -> Result<TheoremDecl, ParseError> {
         use crate::inductive::TheoremDecl;
 
-        // Expect 'theorem' keyword
-        if self.current != Token::Theorem {
-            return Err(ParseError::ExpectedKeyword("theorem".to_string()));
+        // Expect 'theorem' or 'lemma' keyword
+        let is_theorem = self.current == Token::Theorem || self.current == Token::Lemma;
+        if !is_theorem {
+            return Err(ParseError::ExpectedKeyword("theorem or lemma".to_string()));
         }
         self.advance();
 
         // Parse name
         let name = self.expect_ident()?;
+
+        // Parse optional parameters (r1 r2 : Real)
+        let params = self.parse_theorem_params()?;
 
         // Expect ':'
         if self.current != Token::Colon {
@@ -250,8 +256,16 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
-        // Parse statement (simplified: read until we hit ':=')
-        let statement = self.parse_theorem_statement()?;
+        // Parse statement
+        let statement = if params.is_empty() {
+            self.parse_theorem_statement()?
+        } else {
+            // Build Pi type from params and statement
+            let stmt = self.parse_theorem_statement()?;
+            params.iter().rev().fold(stmt, |acc, (name, ty)| {
+                Term::pi(name.clone(), ty.clone(), acc)
+            })
+        };
 
         // Expect ':='
         if self.current != Token::Assign {
@@ -259,17 +273,67 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
-        // Parse proof (simplified: skip 'by' and read the rest as proof term)
+        // Parse proof
         let proof = self.parse_proof()?;
 
         Ok(TheoremDecl::new(name, statement).with_proof(proof))
     }
 
-    fn parse_theorem_statement(&mut self) -> Result<Rc<Term>, ParseError> {
-        // Simplified: build a term from identifiers until we hit ':='
+    /// Parse theorem parameters like (r1 r2 : Real)
+    /// Returns Vec<(param_name, param_type)>
+    fn parse_theorem_params(&mut self) -> Result<Vec<(Name, Rc<Term>)>, ParseError> {
+        let mut params = Vec::new();
+
+        // Parse multiple parameter groups: (r1 r2 : Real) (ε : Rat)
+        while self.current == Token::LParen {
+            self.advance(); // skip '('
+
+            // Collect parameter names
+            let mut names = Vec::new();
+            loop {
+                match &self.current {
+                    Token::Ident(s) => {
+                        names.push(s.clone());
+                        self.advance();
+                    }
+                    Token::Colon => break,
+                    _ => break,
+                }
+            }
+
+            // Expect ':'
+            if self.current != Token::Colon {
+                // No type annotation, skip
+                return Ok(params);
+            }
+            self.advance();
+
+            // Parse type
+            let ty = self.parse_type_expr()?;
+
+            // Add all params with this type
+            for name in names {
+                params.push((name, ty.clone()));
+            }
+
+            // Expect ')'
+            if self.current == Token::RParen {
+                self.advance();
+            }
+        }
+
+        Ok(params)
+    }
+
+    /// Parse a simple type expression
+    fn parse_type_expr(&mut self) -> Result<Rc<Term>, ParseError> {
         let mut components = Vec::new();
 
-        while self.current != Token::Assign && self.current != Token::Eof {
+        while self.current != Token::RParen
+            && self.current != Token::Colon
+            && self.current != Token::Assign
+            && self.current != Token::Eof
+        {
             match &self.current {
                 Token::Ident(s) => {
                     components.push(s.clone());
@@ -278,29 +342,18 @@ impl<'a> Parser<'a> {
                 Token::Arrow => {
                     self.advance();
                 }
-                Token::LParen => {
-                    self.advance();
-                    // Skip parenthesized content
-                    while self.current != Token::RParen && self.current != Token::Eof {
-                        self.advance();
-                    }
-                    if self.current == Token::RParen {
-                        self.advance();
-                    }
-                }
                 _ => {
                     self.advance();
                 }
             }
         }
 
-        // Build simple type from components
         if components.is_empty() {
             Ok(Term::type0())
         } else if components.len() == 1 {
             Ok(Term::const_(components[0].clone()))
         } else {
-            // Build arrow type: A -> B
+            // Build arrow type
             let mut result = Term::const_(components.pop().unwrap());
             for comp in components.into_iter().rev() {
                 result = Term::arrow(Term::const_(comp), result);
@@ -309,18 +362,171 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_proof(&mut self) -> Result<Rc<Term>, ParseError> {
-        // Simplified: skip 'by' keyword and parse the proof term
-        if let Token::Ident(s) = &self.current {
-            if s == "by" {
-                self.advance();
+    fn parse_theorem_statement(&mut self) -> Result<Rc<Term>, ParseError> {
+        // Parse the statement type, handling function applications like 'eq (add r1 r2) (add r2 r1)'
+        self.parse_complex_type()
+    }
+
+    /// Parse a complex type expression with function applications
+    fn parse_complex_type(&mut self) -> Result<Rc<Term>, ParseError> {
+        let mut terms = Vec::new();
+
+        while self.current != Token::Assign && self.current != Token::Eof {
+            match &self.current {
+                Token::Ident(s) => {
+                    terms.push(Term::const_(s.clone()));
+                    self.advance();
+                }
+                Token::Arrow => {
+                    self.advance();
+                }
+                Token::LParen => {
+                    self.advance();
+                    // Parse parenthesized sub-expression
+                    let inner = self.parse_complex_type()?;
+                    terms.push(inner);
+                    // Expect ')'
+                    if self.current == Token::RParen {
+                        self.advance();
+                    }
+                }
+                Token::RParen => {
+                    // End of parenthesized expression
+                    break;
+                }
+                _ => {
+                    self.advance();
+                }
             }
         }
 
-        // For now, just return 'sorry' as the proof
-        // In a full implementation, this would parse the tactic block
-        // and generate a proof term
+        if terms.is_empty() {
+            Ok(Term::type0())
+        } else if terms.len() == 1 {
+            Ok(terms.remove(0))
+        } else {
+            // Build application chain: f a b c -> ((f a) b) c
+            let mut result = terms.remove(0);
+            for arg in terms {
+                result = Term::app(result, arg);
+            }
+            Ok(result)
+        }
+    }
+
+    fn parse_proof(&mut self) -> Result<Rc<Term>, ParseError> {
+        // Expect 'by' keyword
+        match &self.current {
+            Token::Ident(s) if s == "by" => {
+                self.advance();
+            }
+            _ => {
+                // No 'by' block, try to parse a simple term
+                return self.parse_simple_term();
+            }
+        }
+
+        // Parse tactic block until we hit a keyword that ends it
+        // (namespace, end, theorem, lemma, def, structure, inductive, or EOF)
+        let mut had_content = false;
+        loop {
+            match &self.current {
+                Token::Eof |
+                Token::Namespace |
+                Token::End |
+                Token::Theorem |
+                Token::Lemma |
+                Token::Def |
+                Token::Structure |
+                Token::Inductive => {
+                    break;
+                }
+                // Skip tactic keywords and their arguments
+                Token::Ident(s) => {
+                    had_content = true;
+                    let tactic = s.clone();
+                    match tactic.as_str() {
+                        "intro" | "use" | "exact" | "apply" | "rw" | "calc" |
+                        "have" | "obtain" | "by" => {
+                            self.advance();
+                            // Check if this is 'exact sorry' - if so, we have our proof
+                            if tactic == "exact" {
+                                if let Token::Ident(arg) = &self.current {
+                                    if arg == "sorry" {
+                                        return Ok(Term::const_("sorry"));
+                                    }
+                                }
+                            }
+                            // Skip arguments until newline or end of tactic
+                            self.skip_tactic_args();
+                        }
+                        _ => {
+                            self.advance();
+                        }
+                    }
+                }
+                // Skip symbols
+                Token::LParen | Token::LBrace | Token::LBracket => {
+                    had_content = true;
+                    self.skip_balanced();
+                }
+                _ => {
+                    had_content = true;
+                    self.advance();
+                }
+            }
+        }
+
+        // For now, return sorry as the proof
+        // A full implementation would build a proof term from the tactics
         Ok(Term::const_("sorry"))
+    }
+
+    /// Skip arguments of a tactic until we reach the end of the tactic
+    fn skip_tactic_args(&mut self) {
+        loop {
+            match &self.current {
+                Token::Eof |
+                Token::Namespace |
+                Token::End |
+                Token::Theorem |
+                Token::Lemma |
+                Token::Def |
+                Token::Structure |
+                Token::Inductive => break,
+                Token::Ident(s) if s == "intro" || s == "use" || s == "exact" ||
+                                    s == "apply" || s == "rw" || s == "calc" ||
+                                    s == "have" || s == "obtain" => break,
+                Token::LParen | Token::LBrace | Token::LBracket => {
+                    self.skip_balanced();
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+    }
+
+    /// Skip a balanced pair of brackets/parentheses/braces
+    fn skip_balanced(&mut self) {
+        let (open, close) = match &self.current {
+            Token::LParen => (Token::LParen, Token::RParen),
+            Token::LBrace => (Token::LBrace, Token::RBrace),
+            Token::LBracket => (Token::LBracket, Token::RBracket),
+            _ => return,
+        };
+
+        self.advance(); // skip opening
+
+        let mut depth = 1;
+        while depth > 0 && self.current != Token::Eof {
+            if std::mem::discriminant(&self.current) == std::mem::discriminant(&open) {
+                depth += 1;
+            } else if std::mem::discriminant(&self.current) == std::mem::discriminant(&close) {
+                depth -= 1;
+            }
+            self.advance();
+        }
     }
 
     fn parse_field(&mut self) -> Result<(Name, Rc<Term>), ParseError> {

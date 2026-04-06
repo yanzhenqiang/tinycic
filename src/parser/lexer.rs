@@ -10,12 +10,17 @@ pub enum Token {
     End,
     Def,
     Theorem,
+    Lemma,
     Match,
     With,
     By,
     Exact,
     Have,
     Assume,
+    Intro,
+    Use,
+    Apply,
+    Calc,
 
     // Identifiers
     Ident(String),
@@ -25,6 +30,8 @@ pub enum Token {
     RParen,      // )
     LBrace,      // {
     RBrace,      // }
+    LBracket,    // [
+    RBracket,    // ]
     Colon,       // :
     Assign,      // :=
     Arrow,       // => or →
@@ -67,6 +74,8 @@ impl<'a> Lexer<'a> {
             ')' => { self.advance(); Token::RParen }
             '{' => { self.advance(); Token::LBrace }
             '}' => { self.advance(); Token::RBrace }
+            '[' => { self.advance(); Token::LBracket }
+            ']' => { self.advance(); Token::RBracket }
             ':' => {
                 self.advance();
                 if self.current_char() == '=' {
@@ -160,12 +169,17 @@ impl<'a> Lexer<'a> {
             "end" => Token::End,
             "def" => Token::Def,
             "theorem" => Token::Theorem,
+            "lemma" => Token::Lemma,
             "match" => Token::Match,
             "with" => Token::With,
             "by" => Token::By,
             "exact" => Token::Exact,
             "have" => Token::Have,
             "assume" => Token::Assume,
+            "intro" => Token::Intro,
+            "use" => Token::Use,
+            "apply" => Token::Apply,
+            "calc" => Token::Calc,
             _ => Token::Ident(s.to_string()),
         }
     }

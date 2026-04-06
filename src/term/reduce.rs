@@ -113,6 +113,12 @@ impl Reducer {
                 self.whnf_with_steps(&reduced, steps + 1)
             }
 
+            // have 归约（与 let 相同）
+            Term::Have { proof, body, .. } => {
+                let reduced = body.subst_zero(proof);
+                self.whnf_with_steps(&reduced, steps + 1)
+            }
+
             // 消去式归约（inductive 的递归）
             Term::Elim {
                 inductive_name: _,
@@ -147,7 +153,8 @@ impl Reducer {
             Term::Pi { .. } |
             Term::Lambda { .. } |
             Term::Inductive { .. } |
-            Term::Constructor { .. } => Whnf::Term(term.clone()),
+            Term::Constructor { .. } |
+            Term::Have { .. } => Whnf::Term(term.clone()),
         }
     }
 
@@ -218,6 +225,12 @@ impl Reducer {
                 let body_nf = self.nf_no_cache(body);
                 Term::let_(name.clone(), ty_nf, value_nf, body_nf)
             }
+            Term::Have { name, ty, proof, body } => {
+                let ty_nf = self.nf_no_cache(ty);
+                let proof_nf = self.nf_no_cache(proof);
+                let body_nf = self.nf_no_cache(body);
+                Term::have(name.clone(), ty_nf, proof_nf, body_nf)
+            }
             _ => term.clone(),
         }
     }
@@ -244,6 +257,12 @@ impl Reducer {
                 let value_nf = self.nf(value);
                 let body_nf = self.nf(body);
                 Term::let_(name.clone(), ty_nf, value_nf, body_nf)
+            }
+            Term::Have { name, ty, proof, body } => {
+                let ty_nf = self.nf(ty);
+                let proof_nf = self.nf(proof);
+                let body_nf = self.nf(body);
+                Term::have(name.clone(), ty_nf, proof_nf, body_nf)
             }
             // 其他形式不需要递归归约
             _ => term.clone(),

@@ -89,6 +89,15 @@ pub enum Term {
         body: Rc<Term>,
     },
 
+    /// have 绑定: have h : T := proof in body
+    /// 用于证明中的中间引理
+    Have {
+        name: Name,
+        ty: Rc<Term>,
+        proof: Rc<Term>,
+        body: Rc<Term>,
+    },
+
     // ===== 归纳类型相关 =====
     /// 归纳类型引用
     Inductive {
@@ -201,6 +210,21 @@ impl Term {
         })
     }
 
+    /// 创建 have
+    pub fn have(
+        name: impl Into<Name>,
+        ty: Rc<Term>,
+        proof: Rc<Term>,
+        body: Rc<Term>,
+    ) -> Rc<Self> {
+        Rc::new(Term::Have {
+            name: name.into(),
+            ty,
+            proof,
+            body,
+        })
+    }
+
     // ===== 便捷构造函数 =====
 
     /// 创建箭头类型 A -> B (非依赖 Pi)
@@ -255,6 +279,9 @@ impl fmt::Display for Term {
             }
             Term::Let { name, ty, value, body } => {
                 write!(f, "let {} : {} := {} in {}", name, ty, value, body)
+            }
+            Term::Have { name, ty, proof, body } => {
+                write!(f, "have {} : {} := {} in {}", name, ty, proof, body)
             }
             Term::Inductive { name, levels, params } => {
                 write!(f, "{}", name)?;

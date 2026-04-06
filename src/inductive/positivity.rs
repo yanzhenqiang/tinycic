@@ -100,6 +100,13 @@ impl PositivityChecker {
                 self.check_term(body, pos)
             }
 
+            // have：与 let 相同处理
+            Term::Have { ty, proof, body, .. } => {
+                self.check_term(ty, Position::Positive)?;
+                self.check_term(proof, Position::Positive)?;
+                self.check_term(body, pos)
+            }
+
             // 归纳类型引用
             Term::Inductive { name, params, .. } => {
                 if name == &self.inductive_name {
@@ -181,6 +188,13 @@ impl PositivityChecker {
                 self.check_strict_positivity(arg)
             }
 
+            // have
+            Term::Have { ty, proof, body, .. } => {
+                self.check_strict_positivity(ty)?;
+                self.check_strict_positivity(proof)?;
+                self.check_strict_positivity(body)
+            }
+
             // 其他形式
             _ => Ok(()),
         }
@@ -199,6 +213,11 @@ impl PositivityChecker {
             Term::App { func, arg } => {
                 self.check_no_occurrence(func)?;
                 self.check_no_occurrence(arg)
+            }
+            Term::Have { ty, proof, body, .. } => {
+                self.check_no_occurrence(ty)?;
+                self.check_no_occurrence(proof)?;
+                self.check_no_occurrence(body)
             }
             _ => Ok(()),
         }

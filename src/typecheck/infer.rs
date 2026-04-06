@@ -31,6 +31,9 @@ impl<'env> TypeInference<'env> {
             Term::Let { name, ty, value, body } => {
                 self.infer_let(ctx, name, ty, value, body)
             }
+            Term::Have { name, ty, proof, body } => {
+                self.infer_have(ctx, name, ty, proof, body)
+            }
             Term::Inductive { name, levels, params } => {
                 self.infer_inductive(name, levels, params)
             }
@@ -144,6 +147,27 @@ impl<'env> TypeInference<'env> {
 
         // 返回 body_ty[value/0]
         Ok(body_ty.subst_zero(value))
+    }
+
+    /// 推导 have 类型
+    fn infer_have(
+        &self,
+        ctx: &Context,
+        _name: &Name,
+        ty: &Rc<Term>,
+        proof: &Rc<Term>,
+        body: &Rc<Term>,
+    ) -> TcResult<Rc<Term>> {
+        // 检查 proof 是否具有 ty 类型（验证引理）
+        self.check(ctx, proof, ty)?;
+
+        // 在扩展上下文中推导 body 的类型
+        let mut new_ctx = ctx.clone();
+        new_ctx.push(LocalDecl::with_value("_", ty.clone(), proof.clone()));
+        let body_ty = self.infer(&new_ctx, body)?;
+
+        // 返回 body_ty[proof/0]
+        Ok(body_ty.subst_zero(proof))
     }
 
     /// 推导归纳类型
@@ -312,7 +336,60 @@ impl<'env> TypeInference<'env> {
                 Term::App { func: f1, arg: a1 },
                 Term::App { func: f2, arg: a2 },
             ) => self.alpha_eq(f1, f2) && self.alpha_eq(a1, a2),
+            (
+                Term::Have { ty: t1, proof: p1, body: b1, .. },
+                Term::Have { ty: t2, proof: p2, body: b2, .. },
+            ) => self.alpha_eq(t1, t2) && self.alpha_eq(p1, p2) && self.alpha_eq(b1, b2),
             _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 测试 have 关键字的基本功能
+    #[test]
+    fn test_have_basic() {
+        // 在环境中定义 P : Prop
+        let mut env = Environment::new();
+        env.add_constant("P", Term::prop(), None);
+
+        // 定义 p : P (常量 p 作为证明)
+        env.add_constant("p", Term::const_("P"), None);
+
+        let inference = TypeInference::new(&env);
+
+        // have h : P := p in P
+        let ty = Term::const_("P");     // P : Prop
+        let proof = Term::const_("p");  // p : P
+        let body = Term::const_("P");   // P
+
+        let have_expr = Term::have("h", ty, proof.clone(), body);
+
+        // 推导类型
+        let result = inference.infer(&Context::new(), &have_expr);
+        assert!(result.is_ok(), "Have expression should type check: {:?}", result.err());
+    }
+
+    /// 测试 have 归约行为
+    #[test]
+    fn test_have_reduction() {
+        use crate::term::reduce::whnf;
+
+        // have h : Type := Type in h 应该归约为 Type
+        let ty = Term::type0();
+        let proof = Term::type0();
+        let body = Term::var(0);
+
+        let have_expr = Term::have("h", ty, proof, body);
+
+        match whnf(&have_expr) {
+            crate::term::reduce::Whnf::Term(t) => {
+                assert_eq!(t, Term::type0(), "Have should reduce to body[proof/h]");
+            }
+            _ => panic!("Have should reduce to a term"),
         }
     }
 }

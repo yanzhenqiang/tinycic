@@ -375,8 +375,12 @@ load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test")?;
 | Real.mul_mul | intro + have + calc + rw | ✅ 已验证 |
 | Real.add_zero | intro + have + calc + rw | ✅ 已验证 |
 | Real.add_neg | intro + have + calc + rw | ✅ 已验证 |
+| Real.add_comm | intro + use + calc + rw | ✅ 已验证 |
 
 **TODO（待证明）:**
+- `Real.add_assoc` - 证明生成 Lambda 但类型检查失败
+- `Real.mul_comm` - 证明生成 Lambda 但类型检查失败
+- `Real.mul_assoc` - 证明生成 Lambda 但类型检查失败
 - `Real.cauchy_add` (line 282) - 最后一步需 `Rat.add_lt_add`
 - `Real.mul_inv` (line 210) - 声明为 axiom
 - `Real.lt_trichotomy` (line 236) - 声明为 axiom

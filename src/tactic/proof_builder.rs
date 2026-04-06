@@ -6,7 +6,17 @@ use crate::term::{Name, Term};
 use crate::typecheck::{Context, Environment, LocalDecl, TypeInference};
 use std::rc::Rc;
 
-/// A parsed tactic
+/// A step in a calc block: lhs = rhs := by rw [theorems]
+#[derive(Debug, Clone)]
+pub struct CalcStep {
+    /// Left-hand side expression
+    pub lhs: Rc<Term>,
+    /// Right-hand side expression
+    pub rhs: Rc<Term>,
+    /// Rewrite theorems used for this step
+    pub rewrites: Vec<Rc<Term>>,
+}
+
 #[derive(Debug, Clone)]
 pub enum ParsedTactic {
     /// intro x y z - introduce variables
@@ -17,8 +27,8 @@ pub enum ParsedTactic {
     Exact(Rc<Term>),
     /// have name : ty := proof
     Have(Name, Rc<Term>, Rc<Term>),
-    /// calc - calculation block (simplified)
-    Calc,
+    /// calc - calculation block with optional steps
+    Calc(Vec<CalcStep>),
     /// rw [rules] - rewrite (simplified)
     Rw(Vec<Rc<Term>>),
     /// sorry - placeholder
@@ -157,7 +167,7 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
                 None
             }
         }
-        "calc" => Some(ParsedTactic::Calc),
+        "calc" => Some(ParsedTactic::Calc(vec![])),
         "rw" => {
             // Parse rw [term1, term2, ...] format
             // The line looks like: rw [Rat.add_comm, Rat.add_zero]

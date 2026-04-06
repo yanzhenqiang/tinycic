@@ -34,6 +34,7 @@ pub enum Token {
     RBracket,    // ]
     Colon,       // :
     Assign,      // :=
+    Equal,       // =
     Arrow,       // => or →
     Pipe,        // |
     Comma,       // ,
@@ -95,8 +96,8 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     Token::Arrow
                 } else {
-                    // Just =, treat as part of identifier or error
-                    self.read_identifier()
+                    // Just =, return Equal token
+                    Token::Equal
                 }
             }
             '-' => {

@@ -171,7 +171,7 @@ impl<'env> ProofTermGenerator<'env> {
                 self.ctx.push(LocalDecl::with_value(name.clone(), ty.clone(), proof.clone()));
                 Ok(())
             }
-            ParsedTactic::Calc => {
+            ParsedTactic::Calc(_steps) => {
                 // Start a new calc block
                 self.calc_state = Some(CalcState::new());
                 Ok(())

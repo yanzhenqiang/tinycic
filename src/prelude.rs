@@ -231,6 +231,10 @@ pub fn load_inductive_from_file(env: &mut Environment, path: &str) -> Result<(),
 fn add_namespace_prefix(term: &Rc<Term>, namespace: &str, env: &Environment) -> Rc<Term> {
     match term.as_ref() {
         Term::Const(name) => {
+            // 跳过占位符和特殊常量
+            if name == "_" || name == "Eq" || name == "LE" || name == "GE" || name == "Prop" || name == "sorry" {
+                return term.clone();
+            }
             // 如果已经是限定名（包含.），则不添加前缀
             if name.contains('.') {
                 return term.clone();
@@ -441,18 +445,14 @@ pub fn init_prelude(env: &mut Environment) {
     env.add_constant("Prop", Term::sort(0), None);
 
     // 注册 Eq 类型（必须在 theorem 加载之前）
-    // Eq : {A : Type} → A → A → Prop
+    // Eq : Int → Int → Prop （简化版本，专门用于 Int）
     let eq_ty = Term::pi(
-        "A",
-        Term::type0(),
+        "a",
+        Term::const_("Int"),
         Term::pi(
-            "a",
-            Term::var(0),
-            Term::pi(
-                "b",
-                Term::var(1),
-                Term::sort(0), // Prop
-            ),
+            "b",
+            Term::const_("Int"),
+            Term::sort(0), // Prop
         ),
     );
     env.add_constant("Eq", eq_ty, None);
@@ -509,14 +509,13 @@ pub fn init_prelude(env: &mut Environment) {
          // 使用新的 import 机制加载模块
     // 这会处理模块依赖，确保先加载导入的模块
     let mut loaded = std::collections::HashSet::new();
+    // 注册 sorry 作为不完整证明的占位符（必须在 theorem 加载之前）
+    let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
+    env.add_constant("sorry", sorry_ty, None);
+
     let _ = load_module_with_imports(env, "lib/rat.x", "Rat", &mut loaded);
     let _ = load_module_with_imports(env, "lib/cauchy.x", "CauchySeq", &mut loaded);
     let _ = load_module_with_imports(env, "lib/real.x", "Real", &mut loaded);
-
-    // 注册 sorry 作为不完整证明的占位符（必须在 theorem 加载之前）
-    // sorry : {A : Type} → A
-    let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
-    env.add_constant("sorry", sorry_ty, None);
 
     // 注册 Int 辅助常量（用于 Rat 证明）
     env.add_constant("Int.abs_zero", Term::const_("Prop"), None);

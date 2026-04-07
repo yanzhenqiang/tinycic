@@ -66,6 +66,12 @@ impl<'env> TypeInference<'env> {
 
         /// 推导常量类型
     fn infer_const(&self, name: &Name) -> TcResult<Rc<Term>> {
+        // 处理类型占位符 "_" - 返回一个待推断的类型变量
+        if name == "_" {
+            // 使用 Type 0 作为默认类型（会被后续统一）
+            return Ok(Term::type0());
+        }
+
         // 首先尝试查找常量
         if let Ok(info) = self.env.lookup_constant(name) {
             return Ok(info.ty.clone());

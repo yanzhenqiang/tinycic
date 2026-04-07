@@ -489,10 +489,20 @@ lemma lt_half_add (a b ε : Rat) (hε : ε > zero) (h : lt (add a ε) b) :
     lt (add a (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))))
        (div (add a b) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
   by
-    -- 证明：a + ε/2 < (a + b)/2
-    -- 两边乘2：2a + ε < a + b
-    -- 即 a + ε < b，这正是假设 h
-    sorry
+    -- 核心思路：证明 a + ε/2 < (a + b)/2
+    -- 两边乘以2（保持不等式方向，因为2>0）：
+    -- 2(a + ε/2) < 2((a + b)/2)
+    -- 即 2a + ε < a + b
+    -- 即 a + ε < b
+    -- 这正是假设 h
+    --
+    -- 展开定义：
+    -- a + ε/2 = (a*2 + ε) / 2（当用通分表示时）
+    -- (a + b)/2 = (a + b) / 2
+    -- 需要证明 (2a + ε)/2 < (a + b)/2
+    -- 即 2a + ε < a + b（当分母相同时，比较分子）
+    -- 即 a + ε < b
+    exact h
 
 // 对称版本：如果 a + ε < b，则 (a + b)/2 < b - ε/2
 -- 实际使用：如果 a < b（即 a + ε < b），则 (a + b)/2 < b
@@ -501,15 +511,24 @@ lemma lt_half_add_right (a b ε : Rat) (hε : ε > zero) (h : lt (add a ε) b) :
        (sub b (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) :=
   by
     -- 证明：(a + b)/2 < b - ε/2
-    -- 两边乘2：a + b < 2b - ε
-    -- 即 a + ε < b，这正是假设 h
+    -- 等价于证明 (a + b)/2 + ε/2 < b
+    -- 左边 = (a + b + ε)/2 = (a + ε + b)/2
+    -- 由 h: a + ε < b，所以 (a + ε + b)/2 < (b + b)/2 = b
+    -- 因此结论成立
+    -- 实际上，这可以通过代数变换从 h 直接得到
     sorry
 
 // 引理：如果 a = b，则 (a + b)/2 = b
 lemma half_add_eq_right (a b : Rat) (h : eq a b) :
     eq (div (add a b) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) b :=
   by
-    -- 由 h: a = b，(a + b)/2 = (b + b)/2 = (2b)/2 = b
+    -- 由 h: a = b，替换 a 为 b：
+    -- (a + b)/2 = (b + b)/2 = (2b)/2 = b
+    rw [h]
+    -- 现在需要证明 (b + b)/2 = b，即 2b/2 = b
+    -- 使用 mul_div_cancel'：2 * (b/2) = b
+    -- 但这里是 (b + b)/2 = (2b)/2 = b
+    -- 需要展开定义或使用已有的乘除引理
     sorry
 
 end Rat

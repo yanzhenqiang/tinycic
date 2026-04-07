@@ -552,23 +552,9 @@ def le (r1 r2 : Real) : Prop :=
   lt r1 r2 ∨ eq r1 r2
 
 // 序关系性质：小于关系的传递性
-// theorem lt_trans (r1 r2 r3 : Real) (h1 : lt r1 r2) (h2 : lt r2 r3) : lt r1 r3 :=
-  by
-    -- 从 h1: r1 < r2 得到存在 ε1 > 0 和 N1
-    obtain ⟨ε1, hε1, N1, hN1⟩ := h1
+theorem lt_trans (r1 r2 r3 : Real) (h1 : lt r1 r2) (h2 : lt r2 r3) : lt r1 r3 :=
   by
     sorry
-    constructor
-    · -- 证明 min(ε1, ε2) > 0
-      exact Rat.lt_min hε1 hε2
-    -- 构造 N = max(N1, N2)
-    use Nat.max N1 N2
-    intro n hn
-    -- 证明对于 n ≥ N，有 r1(n) + ε < r3(n)
-    have h1' := hN1 n (Nat.le_trans (Nat.le_max_left N1 N2) hn)
-    have h2' := hN2 n (Nat.le_trans (Nat.le_max_right N1 N2) hn)
-    -- 利用三角不等式和 ε 的构造
-    exact Rat.lt_trans _ _ _ h1' h2'
 
 // 引理：Cauchy 序列要么最终为正、最终为负，或收敛到零
 -- 这是序三歧性的核心
@@ -870,34 +856,9 @@ lemma cauchy_equiv_of_close (s1 s2 : CauchySeq)
     -- 由假设直接得到
     exact h ε hε
 
-// theorem lt_trichotomy (r1 r2 : Real) : lt r1 r2 ∨ eq r1 r2 ∨ lt r2 r1 :=
-  by
-    -- 设 r1 = Real.mk s1，r2 = Real.mk s2
-    let s1 := r1.rep
-  by
-    sorry
-    let s2 := r2.rep
-
-    -- 使用 cauchy_trichotomy 分析 s1 和 s2 的关系
-    obtain (h1 | h2 | h3) := cauchy_trichotomy s1 s2
-
-    · -- 情况1: ∃ε>0, ∃N, ∀n≥N, s1(n) + ε < s2(n)
-      -- 这意味着 r1 < r2
-      left
-      exact h1
-
-    · -- 情况2: ∀ε>0, ∃N, ∀n≥N, |s1(n) - s2(n)| < ε
-      -- 这意味着 s1 和 s2 等价，即 r1 = r2
-      right
-      left
-      -- 证明 r1 = r2，即 s1 ~ s2
-      exact cauchy_equiv_of_close s1 s2 h
-
-    · -- 情况3: ∃ε>0, ∃N, ∀n≥N, s2(n) + ε < s1(n)
-      -- 这意味着 r2 < r1
-      right
-      right
-      exact h3
+// theorem lt_trichotomy (r1 r2 : Real) : (lt r1 r2 ∨ eq r1 r2) ∨ lt r2 r1 :=
+//   by
+//     sorry
 
 // =========================================================================
 // 完备性定理
@@ -1366,49 +1327,9 @@ theorem completeness (S : Set Real) (h_nonempty : ∃ s : Real, s ∈ S) (h_boun
 def addCauchySeq (s1 s2 : CauchySeq) : CauchySeq :=
   CauchySeq.mk (λ (n : Nat) => Rat.add (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n))
 
-// theorem cauchy_add (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchySeq.isCauchy s2) :
+theorem cauchy_add (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchySeq.isCauchy s2) :
   CauchySeq.isCauchy (addCauchySeq s1 s2) :=
   by
     sorry
-    let ε2 := Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
-    have hε2_pos : ε2 > Rat.zero := Rat.half_pos ε hε
-
-    obtain ⟨N1, hN1⟩ := h1 ε2 hε2_pos
-    obtain ⟨N2, hN2⟩ := h2 ε2 hε2_pos
-
-    -- 取 N = max(N1, N2)
-    use Nat.max N1 N2
-
-    intro m n hm hn
-
-    -- 展开定义
-    have hm1 : m ≥ N1 := Nat.le_trans (Nat.le_max_left N1 N2) hm
-    have hn1 : n ≥ N1 := Nat.le_trans (Nat.le_max_left N1 N2) hn
-    have hm2 : m ≥ N2 := Nat.le_trans (Nat.le_max_right N1 N2) hm
-    have hn2 : n ≥ N2 := Nat.le_trans (Nat.le_max_right N1 N2) hn
-
-    -- 从 s1 和 s2 的 Cauchy 条件得到
-    have h1' := hN1 m n hm1 hn1
-    have h2' := hN2 m n hm2 hn2
-
-    -- 三角不等式
-    -- |(s1(m) + s2(m)) - (s1(n) + s2(n))| = |(s1(m) - s1(n)) + (s2(m) - s2(n))|
-    --                                      ≤ |s1(m) - s1(n)| + |s2(m) - s2(n)|
-    --                                      < ε/2 + ε/2 = ε
-    calc
-      Rat.abs (Rat.sub (Rat.add (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s2 m))
-                         (Rat.add (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)))
-          = Rat.abs (Rat.add (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n))
-                             (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n))) := by
-              rw [Rat.sub_add_distrib]
-      _ ≤ Rat.add (Rat.abs (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n)))
-                  (Rat.abs (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n))) := by
-              apply Rat.abs_add
-      _ < Rat.add ε2 ε2 := by
-              apply Rat.add_lt_add
-              · exact h1'
-              · exact h2'
-      _ = ε := by
-              rw [Rat.div_add_self ε (Rat.ne_of_gt hε)]
 
 end Real

@@ -1134,7 +1134,7 @@ lemma bisect_lower_mono (S : Set Real) (s0 u0 : Real)
       -- 使用引理：a ≤ (a + b)/2 当 a ≤ b
       apply le_add_div_two_left a_n b_n
       -- 证明 a_n ≤ b_n（由 bisect_lower_le_upper 保证）
-      sorry
+      apply bisect_lower_le_upper S s0 u0 hs0 hu0 n
 
 -- 引理：上序列单调递减
 lemma bisect_upper_mono (S : Set Real) (s0 u0 : Real)
@@ -1153,7 +1153,7 @@ lemma bisect_upper_mono (S : Set Real) (s0 u0 : Real)
       -- 使用引理：(a + b)/2 ≤ b 当 a ≤ b
       apply le_add_div_two_right a_n b_n
       -- 证明 a_n ≤ b_n（由 bisect_lower_le_upper 保证）
-      sorry
+      apply bisect_lower_le_upper S s0 u0 hs0 hu0 n
 
     · -- 情况2：mid 不是上界
       -- 则 b_{n+1} = b_n，显然 b_{n+1} ≤ b_n

@@ -1133,44 +1133,91 @@ lemma bisect_diff_to_zero (S : Set Real) (s0 u0 : Real)
     calc
       Rat.abs (Rat.sub (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n
                        (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n)
-          ≤ d0 / (Rat.ofNat (Nat.pow 2 n)) := by
+          ≤ Rat.div d0 (Rat.ofNat (Nat.pow (Nat.succ (Nat.succ Nat.zero)) n)) := by
               -- 归纳证明 |b_n - a_n| ≤ d0 / 2^n
+              -- 基本情况 n=0：|b_0 - a_0| = d0 = d0 / 2^0
+              -- 归纳步骤：使用 bisect_diff_halve 引理
+              -- |b_{n+1} - a_{n+1}| ≤ |b_n - a_n| / 2 ≤ (d0 / 2^n) / 2 = d0 / 2^{n+1}
               sorry
       _ < ε := by
-              exact hN
+              -- 由 pow_half_lt：d0 / 2^N < ε（当 d0 / 2^N < ε 时）
+              -- 需要验证 pow_half_lt 的应用正确
+              sorry
+
+-- 引理：二分法序列差值减半
+-- 在每一步，|b_{n+1} - a_{n+1}| ≤ |b_n - a_n| / 2
+lemma bisect_diff_halve (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
+    Rat.abs (Rat.sub (bisect_sequence_lower S s0 u0 hs0 hu0 (Nat.succ n)).rep.seq (Nat.succ n)
+                     (bisect_sequence_upper S s0 u0 hs0 hu0 (Nat.succ n)).rep.seq (Nat.succ n))
+    ≤ Rat.div (Rat.abs (Rat.sub (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n
+                               (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n))
+              (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) :=
+  by
+    -- 情况分析：mid 是否是上界
+    -- 情况1：mid 是上界，则 a_{n+1} = a_n, b_{n+1} = mid = (a_n + b_n)/2
+    --   |b_{n+1} - a_{n+1}| = |(a_n + b_n)/2 - a_n| = |(b_n - a_n)/2| = |b_n - a_n|/2
+    -- 情况2：mid 不是上界，则 a_{n+1} = mid, b_{n+1} = b_n
+    --   |b_{n+1} - a_{n+1}| = |b_n - (a_n + b_n)/2| = |(b_n - a_n)/2| = |b_n - a_n|/2
+    sorry
 
 -- 引理：单调有界序列是 Cauchy 序列（实数完备性的体现）
+-- 证明思路：单调递增有上界的序列必有上确界，因此收敛，从而也是 Cauchy 序列
 lemma mono_bounded_cauchy (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (Nat.succ n)))
     (h_bounded : ∃ M, ∀ n, le (f n) M) :
     CauchySeq.isCauchy (CauchySeq.mk (λ n => (f n).rep.seq n)) :=
   by
-    -- 这是实数完备性的标准结果
-    -- 单调递增有上界的序列收敛，因此是 Cauchy 序列
+    -- 核心思想：
+    -- 1. 单调递增有上界的实数序列收敛到其上确界
+    -- 2. 收敛序列满足 Cauchy 条件
+    --
+    -- 对于给定的 ε > 0，我们需要找到 N 使得对于所有 m,n ≥ N，|f(m) - f(n)| < ε
+    -- 由于序列单调递增，对于 m ≤ n，有 f(m) ≤ f(n)
+    -- 所以 |f(n) - f(m)| = f(n) - f(m)
+    --
+    -- 由收敛性，存在 L = sup{f(n)}，使得 ∀ ε > 0, ∃ N, ∀ n ≥ N, |f(n) - L| < ε
+    -- 所以对于 m,n ≥ N：
+    --   |f(n) - f(m)| ≤ |f(n) - L| + |L - f(m)| < ε/2 + ε/2 = ε
+    intro ε hε
+    sorry
+
+-- 辅助引理：下序列 ≤ 上序列（归纳证明）
+lemma bisect_lower_le_upper_step (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
+    le (bisect_sequence_lower S s0 u0 hs0 hu0 n) (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
+  by
+    -- 由 bisect_lower_le_upper 直接得到
     sorry
 
 -- 引理：下序列是 Cauchy 序列
+-- 证明：下序列单调递增且有上界（被 u0 上界），由 mono_bounded_cauchy 可得
 lemma bisect_lower_cauchy (S : Set Real) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n)) :=
   by
-    -- 下序列单调递增且有上界（被 u0 上界）
     apply mono_bounded_cauchy
-    · -- 证明单调性
+    · -- 证明单调性：使用 bisect_lower_mono
       intro n
       apply bisect_lower_mono S s0 u0 hs0 hu0 n
-    · -- 证明有上界
+    · -- 证明有上界：u0 是上界
       use u0
       intro n
-      -- 下序列 ≤ 上序列 ≤ u0
+      -- 需要证明：bisect_sequence_lower S s0 u0 hs0 hu0 n ≤ u0
+      -- 通过归纳证明：a_n ≤ b_n 且 b_n ≤ u0（由 hu0）
+      -- 所以 a_n ≤ u0
       sorry
 
 -- 引理：上序列是 Cauchy 序列
+-- 证明：上序列单调递减且有下界（被 s0 下界）
 lemma bisect_upper_cauchy (S : Set Real) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n)) :=
   by
-    -- 上序列单调递减且有下界（被 s0 下界）
-    -- 可以类似地应用单调有界原理
+    -- 类似地，上序列单调递减且有下界
+    -- 证明思路：
+    -- 1. 单调递减：使用 bisect_upper_mono
+    -- 2. 有下界：s0 是下界（因为 s0 ∈ S 且 a_n 保持 ≤ b_n ≤ u0）
+    -- 3. 应用 mono_bounded_cauchy（对递减版本需要相应调整）
     sorry
 
 -- 完备性定理：有上界的非空实数集有最小上界
@@ -1200,18 +1247,22 @@ theorem completeness (S : Set Real) (h_nonempty : ∃ s : Real, s ∈ S) (h_boun
     -- 证明 l 是上确界
     constructor
     · -- 证明 l 是上界：对于任意 s ∈ S，需要证明 s ≤ l
+      -- 证明思路：
+      -- 1. 由构造，b_n 始终是 S 的上界
+      -- 2. b_n → l（由 bisect_diff_to_zero 和 b_n - a_n → 0）
+      -- 3. 对于任意 s ∈ S 和 ε > 0，存在 N 使得 |b_N - l| < ε
+      -- 4. 所以 s ≤ b_N < l + ε
+      -- 5. 由于 ε 任意，s ≤ l
       intro s hs
-      -- 利用 b_n 是上界（由构造保证）且 b_n → l
-      -- 对于任意 ε > 0，存在 N 使得对于所有 n ≥ N，|b_n - l| < ε
-      -- 由于 s ≤ b_n（b_n 是上界），所以 s ≤ l + ε
-      -- 由于 ε 任意，s ≤ l
       sorry
     · -- 证明 l 是最小上界：对于任意上界 u，需要证明 l ≤ u
+      -- 证明思路：
+      -- 1. 归纳证明 a_n ≤ u（u 是上界，a_n ∈ S 或 a_n = 之前的 a_k）
+      -- 2. a_n → l
+      -- 3. 对于任意 ε > 0，存在 N 使得 |a_N - l| < ε
+      -- 4. 所以 l < a_N + ε ≤ u + ε
+      -- 5. 由于 ε 任意，l ≤ u
       intro u hu
-      -- 利用 a_n ≤ u（归纳证明）且 a_n → l
-      -- 对于任意 ε > 0，存在 N 使得对于所有 n ≥ N，|a_n - l| < ε
-      -- 所以 l < a_n + ε ≤ u + ε
-      -- 由于 ε 任意，l ≤ u
       sorry
 
 // 辅助定义：两个 Cauchy 序列的和序列

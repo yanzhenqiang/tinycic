@@ -8,6 +8,98 @@ use crate::inductive::{InductiveDecl, StructureDecl, FieldDecl, DefDecl, Theorem
 use crate::term::{Name, Term};
 use std::rc::Rc;
 
+/// Operator precedence levels (higher = tighter binding)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Precedence {
+    Lowest = 0,
+    Relational = 10,  // < > <= >=
+    Additive = 20,    // + -
+    Multiplicative = 30, // * /
+    Prefix = 40,      // unary -, !
+    Atomic = 50,      // literals, identifiers, parentheses
+}
+
+/// Operator information for Pratt Parser
+#[derive(Debug, Clone)]
+pub struct Operator {
+    pub token: Token,
+    pub precedence: Precedence,
+    pub right_assoc: bool,
+    pub name: &'static str,
+}
+
+impl Operator {
+    /// Get operator info for a token, if it is an operator
+    pub fn from_token(token: &Token) -> Option<Self> {
+        match token {
+            // Multiplicative
+            Token::Star => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Multiplicative,
+                right_assoc: false,
+                name: "mul",
+            }),
+            Token::Slash => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Multiplicative,
+                right_assoc: false,
+                name: "div",
+            }),
+            // Additive
+            Token::Plus => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Additive,
+                right_assoc: false,
+                name: "add",
+            }),
+            Token::Minus => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Additive,
+                right_assoc: false,
+                name: "sub",
+            }),
+            // Relational
+            Token::Lt => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Relational,
+                right_assoc: false,
+                name: "lt",
+            }),
+            Token::Gt => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Relational,
+                right_assoc: false,
+                name: "gt",
+            }),
+            Token::Le => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Relational,
+                right_assoc: false,
+                name: "le",
+            }),
+            Token::Ge => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Relational,
+                right_assoc: false,
+                name: "ge",
+            }),
+            Token::Equal => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Relational,
+                right_assoc: false,
+                name: "eq",
+            }),
+            Token::Ne => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Relational,
+                right_assoc: false,
+                name: "ne",
+            }),
+            _ => None,
+        }
+    }
+}
+
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current: Token,
@@ -344,10 +436,71 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse a term expression
-    /// Supports: identifiers, applications, lambda, parentheses
-    fn parse_term(&mut self) -> Result<Rc<Term>, ParseError> {
-        self.parse_app_or_atomic()
+    /// Parse a term expression with operator precedence (Pratt Parser)
+    /// Supports: identifiers, applications, lambda, parentheses, operators
+    pub fn parse_term(&mut self) -> Result<Rc<Term>, ParseError> {
+        self.parse_expression(Precedence::Lowest)
+    }
+
+    /// Pratt Parser: parse expression with given minimum precedence
+    fn parse_expression(&mut self,
+        min_prec: Precedence,
+    ) -> Result<Rc<Term>, ParseError> {
+        // Parse the left-hand side (atomic or prefix)
+        let mut lhs = self.parse_prefix()?;
+
+        // Continue parsing infix operators while they have higher or equal precedence
+        loop {
+            let op = match Operator::from_token(&self.current) {
+                Some(op) => op,
+                None => break, // Not an operator, exit
+            };
+
+            // Check if this operator should be parsed at current level
+            if op.precedence < min_prec {
+                break;
+            }
+
+            // Consume the operator
+            self.advance();
+
+            // Determine next minimum precedence (handle associativity)
+            let next_min = if op.right_assoc {
+                op.precedence // Right associative: same precedence for next
+            } else {
+                // Left associative: higher precedence required for next
+                match op.precedence {
+                    Precedence::Lowest => Precedence::Relational,
+                    Precedence::Relational => Precedence::Additive,
+                    Precedence::Additive => Precedence::Multiplicative,
+                    Precedence::Multiplicative => Precedence::Prefix,
+                    _ => Precedence::Atomic,
+                }
+            };
+
+            // Parse the right-hand side
+            let rhs = self.parse_expression(next_min)?;
+
+            // Combine into binary operation
+            // Create: App(App(Const(op_name), lhs), rhs)
+            let op_const = Term::const_(op.name);
+            lhs = Term::app(Term::app(op_const, lhs), rhs);
+        }
+
+        Ok(lhs)
+    }
+
+    /// Parse a prefix expression (atomic or prefix operator)
+    fn parse_prefix(&mut self) -> Result<Rc<Term>, ParseError> {
+        match &self.current {
+            // Prefix minus (negation)
+            Token::Minus => {
+                self.advance();
+                let operand = self.parse_prefix()?;
+                Ok(Term::app(Term::const_("neg"), operand))
+            }
+            _ => self.parse_app_or_atomic(),
+        }
     }
 
     /// Parse an application or atomic term
@@ -406,20 +559,39 @@ impl<'a> Parser<'a> {
                     return self.parse_lambda();
                 }
 
-                // Check for qualified name: Nat.zero, Rat.add, etc.
-                let mut full_name = name.clone();
-
-                while self.current == Token::Dot {
+                // Check for qualified name or field access
+                // Qualified: Real.add, Nat.zero (starts with uppercase)
+                // Field access: s.seq, r.rep (starts with lowercase)
+                if self.current == Token::Dot {
                     self.advance();
                     if let Token::Ident(field) = &self.current {
-                        full_name = format!("{}.{}", full_name, field);
+                        let field_name = field.clone();
                         self.advance();
-                    } else {
-                        break;
-                    }
-                }
 
-                Ok(Term::const_(full_name))
+                        // Heuristic: if name starts with uppercase, it's qualified
+                        // Otherwise, it's field access: convert s.seq to CauchySeq.seq s
+                        let is_qualified = name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false);
+
+                        if is_qualified {
+                            // Qualified name: Real.add
+                            Ok(Term::const_(format!("{}.{}", name, field_name)))
+                        } else {
+                            // Field access: s.seq -> use projection function
+                            // For CauchySeq.seq, use CauchySeq.getSeq
+                            // For Real.rep, use Real.rep (already a projection function)
+                            let proj_name = if field_name == "seq" {
+                                "CauchySeq.getSeq".to_string()
+                            } else {
+                                format!(".{}", field_name)
+                            };
+                            Ok(Term::app(Term::const_(proj_name), Term::const_(name)))
+                        }
+                    } else {
+                        Ok(Term::const_(name))
+                    }
+                } else {
+                    Ok(Term::const_(name))
+                }
             }
             Token::LParen => {
                 self.advance();
@@ -1278,6 +1450,112 @@ mod tests {
 
     // 注意：parser 测试主要通过 prelude::tests 中的集成测试进行
     // 例如 test_nat_type_exists, test_list_type_exists 等
+
+    #[test]
+    fn test_pratt_parser_simple_add() {
+        let input = "a + b";
+        let mut parser = Parser::new(input);
+        let result = parser.parse_term();
+        assert!(result.is_ok(), "Failed to parse 'a + b': {:?}", result);
+        let term = result.unwrap();
+        // Should be: ((add a) b)
+        let term_str = format!("{:?}", term);
+        assert!(term_str.contains("add"), "Expected 'add' in parsed term: {}", term_str);
+        println!("✓ a + b = {:?}", term);
+    }
+
+    #[test]
+    fn test_pratt_parser_precedence_mul_before_add() {
+        // a + b * c should be: add a (mul b c)
+        let input = "a + b * c";
+        let mut parser = Parser::new(input);
+        let result = parser.parse_term();
+        assert!(result.is_ok(), "Failed to parse 'a + b * c': {:?}", result);
+        let term = result.unwrap();
+        println!("✓ a + b * c = {:?}", term);
+        // The structure should have mul nested inside add
+        let term_str = format!("{:?}", term);
+        assert!(term_str.contains("add"), "Expected 'add' in parsed term");
+        assert!(term_str.contains("mul"), "Expected 'mul' in parsed term");
+    }
+
+    #[test]
+    fn test_pratt_parser_comparison() {
+        // a + b < c should be: lt (add a b) c
+        let input = "a + b < c";
+        let mut parser = Parser::new(input);
+        let result = parser.parse_term();
+        assert!(result.is_ok(), "Failed to parse 'a + b < c': {:?}", result);
+        let term = result.unwrap();
+        println!("✓ a + b < c = {:?}", term);
+        let term_str = format!("{:?}", term);
+        assert!(term_str.contains("lt"), "Expected 'lt' in parsed term");
+        assert!(term_str.contains("add"), "Expected 'add' in parsed term");
+    }
+
+    #[test]
+    fn test_pratt_parser_parentheses() {
+        // (a + b) * c should override precedence
+        let input = "(a + b) * c";
+        let mut parser = Parser::new(input);
+        let result = parser.parse_term();
+        assert!(result.is_ok(), "Failed to parse '(a + b) * c': {:?}", result);
+        let term = result.unwrap();
+        println!("✓ (a + b) * c = {:?}", term);
+    }
+
+    #[test]
+    fn test_pratt_parser_prefix_neg() {
+        // -a should be: neg a
+        let input = "-a";
+        let mut parser = Parser::new(input);
+        let result = parser.parse_term();
+        assert!(result.is_ok(), "Failed to parse '-a': {:?}", result);
+        let term = result.unwrap();
+        println!("✓ -a = {:?}", term);
+        let term_str = format!("{:?}", term);
+        assert!(term_str.contains("neg"), "Expected 'neg' in parsed term");
+    }
+
+    #[test]
+    fn test_qualified_name() {
+        // Real.add should be: Const("Real.add")
+        let input = "Real.add";
+        let mut parser = Parser::new(input);
+        let result = parser.parse_term();
+        assert!(result.is_ok(), "Failed to parse 'Real.add': {:?}", result);
+        let term = result.unwrap();
+        println!("✓ Real.add = {:?}", term);
+        let term_str = format!("{:?}", term);
+        assert!(term_str.contains("Real.add"), "Expected 'Real.add' in parsed term");
+    }
+
+    #[test]
+    fn test_field_access() {
+        // s.seq should be: App(Const("CauchySeq.getSeq"), Const("s"))
+        let input = "s.seq";
+        let mut parser = Parser::new(input);
+        let result = parser.parse_term();
+        assert!(result.is_ok(), "Failed to parse 's.seq': {:?}", result);
+        let term = result.unwrap();
+        println!("✓ s.seq = {:?}", term);
+        let term_str = format!("{:?}", term);
+        assert!(term_str.contains("CauchySeq.getSeq"), "Expected 'CauchySeq.getSeq' in parsed term");
+        assert!(term_str.contains("s"), "Expected 's' in parsed term");
+    }
+
+    #[test]
+    fn test_field_access_with_index() {
+        // s.seq n should be: App(App(Const("CauchySeq.getSeq"), Const("s")), Const("n"))
+        let input = "s.seq n";
+        let mut parser = Parser::new(input);
+        let result = parser.parse_term();
+        assert!(result.is_ok(), "Failed to parse 's.seq n': {:?}", result);
+        let term = result.unwrap();
+        println!("✓ s.seq n = {:?}", term);
+        let term_str = format!("{:?}", term);
+        assert!(term_str.contains("CauchySeq.getSeq"), "Expected 'CauchySeq.getSeq' in parsed term");
+    }
 }
 
 // 注意：希腊字母参数绑定测试暂时跳过

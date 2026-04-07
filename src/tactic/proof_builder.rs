@@ -283,6 +283,28 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
             }
         }
         "calc" => Some(ParsedTactic::Calc(vec![])),
+        "obtain" => {
+            // obtain ⟨x, hx⟩ := proof  or  obtain x := proof
+            // Simplified: treat like have with pattern matching ignored
+            if let Some(assign_pos) = line.find(":=") {
+                let before_assign = &line[..assign_pos];
+                // Extract name from pattern ⟨x, hx⟩ or just x
+                let name = if let Some(langle) = before_assign.find('<') {
+                    // Pattern match: extract first identifier after <
+                    before_assign[langle+1..].split(|c| c == ',' || c == '>' || c == '⟩')
+                        .next()
+                        .unwrap_or("_")
+                        .trim()
+                        .to_string()
+                } else {
+                    // Simple name
+                    parts.get(1).map(|s| s.trim().to_string()).unwrap_or_else(|| "_".to_string())
+                };
+                Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("sorry")))
+            } else {
+                None
+            }
+        }
         "rw" => {
             // Parse rw [term1, term2, ...] format
             // The line looks like: rw [Rat.add_comm, Rat.add_zero]

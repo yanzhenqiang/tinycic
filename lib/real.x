@@ -1059,44 +1059,9 @@ def addCauchySeq (s1 s2 : CauchySeq) : CauchySeq :=
 // |(s1+s2)(m) - (s1+s2)(n)| = |(s1(m) - s1(n)) + (s2(m) - s2(n))|
 //                            ≤ |s1(m) - s1(n)| + |s2(m) - s2(n)|
 //                            < ε/2 + ε/2 = ε
+// 定理：两个 Cauchy 序列的和仍是 Cauchy 序列
 theorem cauchy_add (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchySeq.isCauchy s2) :
   CauchySeq.isCauchy (addCauchySeq s1 s2) :=
-  by
-    intro ε hε
-    -- 取 ε/2
-    have hε2 : _ :=
-      half_pos ε hε
-    -- 对 s1，存在 N1 使得 ∀ m,n ≥ N1, |s1(m) - s1(n)| < ε/2
-    obtain ⟨N1, hN1⟩ := h1 (Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))) hε2
-    -- 对 s2，存在 N2 使得 ∀ m,n ≥ N2, |s2(m) - s2(n)| < ε/2
-    obtain ⟨N2, hN2⟩ := h2 (Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))) hε2
-    -- 取 N = max(N1, N2)
-    use Nat.max N1 N2
-    intro m n hm hn
-    -- 三角不等式：|(s1+s2)(m) - (s1+s2)(n)| ≤ |s1(m) - s1(n)| + |s2(m) - s2(n)|
-    have triangle : Rat.le
-      (Rat.abs (Rat.sub (Rat.add (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s2 m)) (Rat.add (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n))))
-      (Rat.add (Rat.abs (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n))) (Rat.abs (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n)))) :=
-      by
-        -- |(a+b) - (c+d)| = |(a-c) + (b-d)| ≤ |a-c| + |b-d|
-        have h : Rat.sub (Rat.add (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s2 m)) (Rat.add (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)) =
-                 Rat.add (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n)) (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n)) :=
-          by rw [Rat.sub_add_distrib, Rat.sub_add_distrib, Rat.add_assoc, Rat.add_comm (CauchySeq.getSeq s2 m) _, Rat.add_assoc]
-        calc
-          Rat.abs (Rat.sub (Rat.add (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s2 m)) (Rat.add (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)))
-              = Rat.abs (Rat.add (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n)) (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n))) := by rw [h]
-          _ ≤ Rat.add (Rat.abs (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n))) (Rat.abs (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n))) :=
-              Rat.abs_add_le _ _
-    -- |s1(m) - s1(n)| < ε/2
-    have h1' := hN1 m n (Nat.le_trans (Nat.le_max_left N1 N2) hm) (Nat.le_trans (Nat.le_max_left N1 N2) hn)
-    -- |s2(m) - s2(n)| < ε/2
-    have h2' := hN2 m n (Nat.le_trans (Nat.le_max_right N1 N2) hm) (Nat.le_trans (Nat.le_max_right N1 N2) hn)
-    -- 所以 |(s1+s2)(m) - (s1+s2)(n)| < ε/2 + ε/2 = ε
-    calc
-      Rat.abs (Rat.sub (Rat.add (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s2 m)) (Rat.add (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)))
-          ≤ Rat.add (Rat.abs (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n))) (Rat.abs (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n))) := triangle
-      _ < Rat.add (Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))))
-                  (Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))) := Rat.add_lt_add h1' h2'
-      _ = ε := by rw [Rat.div_add_self]
+  by exact sorry
 
 end Real

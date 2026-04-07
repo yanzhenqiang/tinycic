@@ -1289,3 +1289,4 @@ mod lambda_tests {
         println!("✓ Lambda type annotation syntax works!");
     }
 }
+

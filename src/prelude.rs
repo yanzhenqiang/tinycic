@@ -516,24 +516,8 @@ pub fn init_prelude(env: &mut Environment) {
     let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
     env.add_constant("sorry", sorry_ty, None);
 
-    // 注册 Int 辅助常量（用于 Rat 证明）- 必须在加载模块之前注册
-    // 这样当 Rat 证明引用这些引理时，它们已经存在
-    env.add_constant("Int.abs_zero", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_nonneg", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_add", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_mul", Term::const_("Prop"), None);
-    env.add_constant("Int.add_comm", Term::const_("Prop"), None);
-    env.add_constant("Int.add_assoc", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_comm", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_assoc", Term::const_("Prop"), None);
-    env.add_constant("Int.sub_self", Term::const_("Prop"), None);
-    env.add_constant("Int.sub_add_distrib", Term::const_("Prop"), None);
-    env.add_constant("Int.add_zero", Term::const_("Prop"), None);
-    env.add_constant("Int.zero_add", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_one", Term::const_("Prop"), None);
-    env.add_constant("Int.one_mul", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_add", Term::const_("Prop"), None);
-    env.add_constant("Int.add_neg", Term::const_("Prop"), None);
+    // 加载 Int 模块（包含定理定义）
+    let _ = load_module_with_imports(env, "lib/int.x", "Int", &mut loaded);
 
     let _ = load_module_with_imports(env, "lib/rat.x", "Rat", &mut loaded);
     let _ = load_module_with_imports(env, "lib/cauchy.x", "CauchySeq", &mut loaded);
@@ -1565,8 +1549,8 @@ mod debug_tests {
             }
         }
 
-        // Try to parse and check a simple Int theorem
-        let input = "theorem test (a : Int) : Eq a a := by exact sorry";
+        // Try to parse and check abs_zero theorem
+        let input = "theorem abs_zero : Eq (abs zero) zero := by exact sorry";
         match crate::parser::parse_theorem(input) {
             Ok(decl) => {
                 println!("✓ Parsed theorem: {}", decl.name);

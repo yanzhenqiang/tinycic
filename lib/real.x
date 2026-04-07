@@ -1265,12 +1265,24 @@ lemma bisect_diff_halve (S : Set Real) (s0 u0 : Real)
                                (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n))
               (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) :=
   by
-    -- 情况分析：mid 是否是上界
-    -- 情况1：mid 是上界，则 a_{n+1} = a_n, b_{n+1} = mid = (a_n + b_n)/2
-    --   |b_{n+1} - a_{n+1}| = |(a_n + b_n)/2 - a_n| = |(b_n - a_n)/2| = |b_n - a_n|/2
-    -- 情况2：mid 不是上界，则 a_{n+1} = mid, b_{n+1} = b_n
-    --   |b_{n+1} - a_{n+1}| = |b_n - (a_n + b_n)/2| = |(b_n - a_n)/2| = |b_n - a_n|/2
-    sorry
+    let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
+    let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
+    let mid := half (add a_n b_n)
+
+    by_cases h : hasUpperBound S mid
+    · -- 情况1：mid 是上界
+      -- 则 a_{n+1} = a_n, b_{n+1} = mid = (a_n + b_n)/2
+      simp [bisect_sequence_lower, bisect_sequence_upper, h, half, add]
+      -- 需要证明：|mid - a_n| = |(a_n + b_n)/2 - a_n| = |(b_n - a_n)/2| = |b_n - a_n|/2
+      -- 使用 Rat.half_add_sub_left 和 Rat.abs_div_two
+      sorry
+
+    · -- 情况2：mid 不是上界
+      -- 则 a_{n+1} = mid, b_{n+1} = b_n
+      simp [bisect_sequence_lower, bisect_sequence_upper, h, half, add]
+      -- 需要证明：|b_n - mid| = |b_n - (a_n + b_n)/2| = |(b_n - a_n)/2| = |b_n - a_n|/2
+      -- 使用 Rat.sub_half_add_right 和 Rat.abs_div_two
+      sorry
 
 -- 引理：单调有界序列是 Cauchy 序列（实数完备性的体现）
 -- 证明思路：单调递增有上界的序列必有上确界，因此收敛，从而也是 Cauchy 序列

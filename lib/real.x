@@ -233,9 +233,29 @@ lemma half_add_eq_self (a b : Real) (h : eq a b) : eq (half (add a b)) a :=
     obtain ⟨N, hN⟩ := h ε hε
     use N
     intro n hn
-    -- 由 h: a = b，|a(n) - b(n)| < ε
-    -- |(a+b)/2 - a| = |(b-a)/2| = |b-a|/2 < ε/2 < ε
-    sorry
+    -- 由 h: a = b，我们有 |a(n) - b(n)| < ε
+    have h_abs : Rat.abs (Rat.sub (CauchySeq.getSeq a.rep n) (CauchySeq.getSeq b.rep n)) < ε :=
+      hN n hn
+    -- 计算 |(a(n) + b(n))/2 - a(n)|
+    -- = |(a(n) + b(n) - 2*a(n))/2| = |(b(n) - a(n))/2| = |b(n) - a(n)|/2
+    -- 由 |a(n) - b(n)| = |b(n) - a(n)|，且 |a(n) - b(n)| < ε
+    -- 所以 |b(n) - a(n)|/2 < ε/2 < ε
+    -- 简化的直接证明（使用 Rat 的 abs 性质）
+    calc
+      Rat.abs (Rat.sub (Rat.div (Rat.add (CauchySeq.getSeq a.rep n) (CauchySeq.getSeq b.rep n))
+                                 (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))))
+                        (CauchySeq.getSeq a.rep n))
+          = Rat.abs (Rat.div (Rat.sub (CauchySeq.getSeq b.rep n) (CauchySeq.getSeq a.rep n))
+                            (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))) := by
+              -- 代数变换：(a+b)/2 - a = (b-a)/2
+              sorry
+      _ = Rat.div (Rat.abs (Rat.sub (CauchySeq.getSeq b.rep n) (CauchySeq.getSeq a.rep n)))
+                  (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) := by
+              -- |x/2| = |x|/2
+              sorry
+      _ < ε := by
+              -- |b-a|/2 < ε/2 < ε
+              sorry
 
 -- 对称版本：如果 a = b，则 (a + b)/2 = b
 lemma half_add_eq_self_right (a b : Real) (h : eq a b) : eq (half (add a b)) b :=

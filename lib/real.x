@@ -273,7 +273,7 @@ lemma half_add_eq_self_right (a b : Real) (h : eq a b) : eq (half (add a b)) b :
     -- 再由 h: a = b，得 (a + b)/2 = b
     have h1 : eq (half (add a b)) a := half_add_eq_self a b h
     -- 由 h1: (a+b)/2 = a 和 h: a = b，传递得 (a+b)/2 = b
-    sorry
+    exact eq_trans h1 h
 
 -- 辅助引理：a ≤ (a + b)/2 当 a ≤ b
 -- 即：如果 a ≤ b，则 a ≤ half(a + b)

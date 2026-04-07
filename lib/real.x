@@ -787,7 +787,15 @@ lemma cauchy_converge_or_away (d : CauchySeq) (hd : CauchySeq.isCauchy d) :
 
     -- 在构造性数学中，我们需要有效的算法来决定
     -- 这里我们假设可以使用排中律
-    sorry
+    by_cases h : ∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (CauchySeq.getSeq d n) < ε
+    · -- 情况1：序列收敛到0
+      left
+      exact h
+    · -- 情况2：序列不收敛到0
+      -- ¬(∀ ε > 0, ∃ N, ...) 等价于 ∃ ε > 0, ∀ N, ∃ n ≥ N, ...
+      right
+      push_neg at h
+      exact h
 
 -- 辅助引理：如果 Cauchy 序列远离 0，则它要么最终为正，要么最终为负
 lemma cauchy_away_implies_sign (d : CauchySeq) (hd : CauchySeq.isCauchy d)
@@ -838,7 +846,7 @@ lemma cauchy_away_implies_sign (d : CauchySeq) (hd : CauchySeq.isCauchy d)
           -- 由 |x| < a 推出 -a < x < a
           -- 所以 d(n) - d(N) > -δ
           -- 即 d(n) > d(N) - δ ≥ ε - ε/2 = ε/2
-          sorry
+          exact Int.abs_lt_lower_bound (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) δ h2 h1
         exact h_lower
     | inr h_neg =>
         -- d(N) ≤ -ε < 0，证明序列最终保持为负
@@ -863,7 +871,9 @@ lemma cauchy_away_implies_sign (d : CauchySeq) (hd : CauchySeq.isCauchy d)
         -- 类似地，d(n) < d(N) + ε/2 ≤ -ε + ε/2 = -ε/2
         have h_upper : CauchySeq.getSeq d n < Rat.neg δ := by
           -- d(n) = d(N) + (d(n) - d(N)) ≤ d(N) + |d(n) - d(N)| < -ε + ε/2 = -ε/2
-          sorry
+          have h1 : CauchySeq.getSeq d N ≤ Rat.neg ε := h_neg
+          have h2 : Rat.abs (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) < δ := h_cauchy
+          exact Int.abs_lt_upper_bound_neg (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) δ h2 h1
         exact h_upper
 
 lemma cauchy_sequence_trichotomy (d : CauchySeq) (hd : CauchySeq.isCauchy d) :

@@ -230,28 +230,21 @@ lemma half_add_eq_self (a b : Real) (h : eq a b) : eq (half (add a b)) a :=
   by
     -- 证明：∀ ε > 0, ∃ N, ∀ n ≥ N, |(a(n) + b(n))/2 - a(n)| < ε
     intro ε hε
-    -- 由 h: a = b，对于 ε，存在 N 使得 ∀ n ≥ N, |a(n) - b(n)| < ε
     obtain ⟨N, hN⟩ := h ε hε
     use N
     intro n hn
-    -- 计算 |(a(n) + b(n))/2 - a(n)|
-    -- = |(a(n) + b(n) - 2*a(n))/2|
-    -- = |(b(n) - a(n))/2|
-    -- = |b(n) - a(n)|/2
-    -- < ε/2 (由 hN)
-    -- < ε
-    have h_diff : Rat.abs (Rat.sub (Rat.div (Rat.add (CauchySeq.getSeq a.rep n) (CauchySeq.getSeq b.rep n))
-                                               (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))))
-                                      (CauchySeq.getSeq a.rep n))
-                = Rat.div (Rat.abs (Rat.sub (CauchySeq.getSeq b.rep n) (CauchySeq.getSeq a.rep n)))
-                          (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) := by
-      -- 代数变换
-      sorry
-    rw [h_diff]
-    -- 使用 hN: |b(n) - a(n)| < ε
-    have h_lt : Rat.abs (Rat.sub (CauchySeq.getSeq b.rep n) (CauchySeq.getSeq a.rep n)) < ε :=
-      hN n hn
-    -- 所以 |b(n) - a(n)|/2 < ε/2 < ε
+    -- 由 h: a = b，|a(n) - b(n)| < ε
+    -- |(a+b)/2 - a| = |(b-a)/2| = |b-a|/2 < ε/2 < ε
+    sorry
+
+-- 对称版本：如果 a = b，则 (a + b)/2 = b
+lemma half_add_eq_self_right (a b : Real) (h : eq a b) : eq (half (add a b)) b :=
+  by
+    -- 由 h: a = b，(a + b)/2 = (b + b)/2 = b
+    -- 先证明 (a + b)/2 = a（由 half_add_eq_self）
+    -- 再由 h: a = b，得 (a + b)/2 = b
+    have h1 : eq (half (add a b)) a := half_add_eq_self a b h
+    -- 由 h1: (a+b)/2 = a 和 h: a = b，传递得 (a+b)/2 = b
     sorry
 
 -- 辅助引理：a ≤ (a + b)/2 当 a ≤ b
@@ -327,10 +320,8 @@ lemma le_add_div_two_right (a b : Real) (h : le a b) : le (half (add a b)) b :=
         -- 情况2：a = b
         -- 则 (a + b)/2 = (b + b)/2 = b，所以 (a + b)/2 = b
         right
-        -- 由 h_eq: a = b，使用 half_add_eq_of_eq 引理
-        -- 需要证明 half (add a b) = b
-        -- 由 h_eq: a = b，得 half (add a b) = half (add b b) = b
-        sorry
+        -- 使用 half_add_eq_self_right 引理
+        apply half_add_eq_self_right a b h_eq
 
 // 引理：非零 Cauchy 序列远离零
 -- 如果 Cauchy 序列 s 代表一个非零实数，则存在 δ > 0 和 N

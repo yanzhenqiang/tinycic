@@ -54,6 +54,10 @@ def one : Rat := Rat.mk (Int.ofNat (Nat.succ Nat.zero)) PosInt.one
 def ofInt (z : Int) : Rat :=
   Rat.mk z PosInt.one
 
+// 从自然数构造
+def ofNat (n : Nat) : Rat :=
+  ofInt (Int.ofNat n)
+
 // 负数
  def neg (r : Rat) : Rat :=
   Rat.mk (Int.neg r.num) r.den
@@ -135,6 +139,19 @@ lemma abs_sub_triangle (a b c : Rat) : le (abs (sub a c)) (add (abs (sub a b)) (
     -- |a - c| = |(a - b) + (b - c)| ≤ |a - b| + |b - c|
     exact Int.abs_sub_triangle _ _ _
 
+// 绝对值下界：|x| ≥ |y| - |x - y|
+-- 这是三角不等式的推论：|y| = |x + (y-x)| ≤ |x| + |y-x| = |x| + |x-y|
+-- 所以 |x| ≥ |y| - |x-y|
+lemma abs_sub_abs_le (x y : Rat) : le (sub (abs y) (abs (sub x y))) (abs x) :=
+  by
+    -- |y| ≤ |x| + |y - x| = |x| + |x - y|
+    -- 所以 |y| - |x - y| ≤ |x|
+    exact Int.abs_sub_abs_le _ _
+
+// 绝对值差下界（另一种形式）：|x| ≥ |y| - |x - y|
+lemma abs_ge_sub_abs (x y : Rat) : le (sub (abs y) (abs (sub x y))) (abs x) :=
+  abs_sub_abs_le x y
+
 // 序关系传递性：a ≤ b ∧ b ≤ c → a ≤ c
 lemma le_trans (a b c : Rat) (h1 : le a b) (h2 : le b c) : le a c :=
   by
@@ -181,12 +198,140 @@ lemma ofNat_pos (n : Nat) (h : Nat.succ Nat.zero ≤ n) : lt zero (ofInt (Int.of
     -- n ≥ 1 意味着 ofNat n > 0
     exact Int.ofNat_pos _ h
 
+// 辅助引理：由 PosInt 构造的有理数不为零
+lemma mk_posint_ne_zero (n : PosInt) : mk (Int.ofNat (PosInt.toNat n)) n ≠ zero :=
+  by
+    -- PosInt 表示正整数，n ≥ 1
+    -- 所以分子 Int.ofNat (PosInt.toNat n) ≥ 1，不为零
+    exact Int.pos_int_ne_zero n
+
 // 除法的正性：ε > 0 且 n > 0 → ε/n > 0
 lemma div_pos (ε : Rat) (n : PosInt) (hε : lt zero ε) (hn : Nat.succ Nat.zero ≤ PosInt.toNat n) :
-  lt zero (div ε (mk (Int.ofNat (PosInt.toNat n)) n) sorry) :=
+  lt zero (div ε (mk (Int.ofNat (PosInt.toNat n)) n) (mk_posint_ne_zero n)) :=
   by
     -- ε > 0 且分母 n > 0，所以 ε/n > 0
     exact Int.div_pos _ _ hε hn
+
+// 除法小于自身：对于 ε > 0 和 n > 1，有 ε/n < ε
+lemma div_lt_self (ε : Rat) (hε : lt zero ε) (n : PosInt) (hn : Nat.lt Nat.one (PosInt.toNat n)) :
+  lt (div ε (mk (Int.ofNat (PosInt.toNat n)) n) (mk_posint_ne_zero n)) ε :=
+  by
+    -- ε/n < ε 当 n > 1 时成立
+    exact Int.div_lt_self _ hε _ hn
+
+// 序关系：如果 a ≥ b 且 c ≤ d，则 a - c ≥ b - d
+lemma sub_le_sub_of_le (a b c d : Rat) (h1 : le b a) (h2 : le c d) : le (sub b d) (sub a c) :=
+  by
+    -- (b - d) ≤ (a - c) 当 b ≤ a 且 d ≥ c 时成立
+    exact Int.sub_le_sub_of_le _ _ _ _ h1 h2
+
+// 序关系：如果 a > b 且 c < d，则 a - c > b - d
+lemma sub_lt_sub_of_lt (a b c d : Rat) (h1 : lt b a) (h2 : lt c d) : lt (sub b d) (sub a c) :=
+  by
+    -- (b - d) < (a - c) 当 b < a 且 d > c 时成立
+    exact Int.sub_lt_sub_of_lt _ _ _ _ h1 h2
+
+// 序关系：a - b < c 当且仅当 a < b + c
+lemma sub_lt_iff_lt_add (a b c : Rat) : lt (sub a b) c ↔ lt a (add b c) :=
+  by
+    exact Int.sub_lt_iff_lt_add _ _ _
+
+// 严格小于的传递性
+lemma lt_trans (a b c : Rat) (h1 : lt a b) (h2 : lt b c) : lt a c :=
+  by
+    exact Int.lt_trans _ _ _ h1 h2
+
+// 反对称性：a ≤ b ∧ b ≤ a → a = b
+lemma le_antisymm (a b : Rat) (h1 : le a b) (h2 : le b a) : eq a b :=
+  by
+    exact Int.le_antisymm _ _ h1 h2
+
+// 正数的绝对值：r > 0 → |r| = r
+lemma abs_of_pos (r : Rat) (h : lt zero r) : eq (abs r) r :=
+  by
+    -- r > 0 意味着 r.num > 0，所以 abs r = r
+    exact Int.abs_of_pos _ h
+
+// 负数的绝对值：r < 0 → |r| = -r
+lemma abs_of_neg (r : Rat) (h : lt r zero) : eq (abs r) (neg r) :=
+  by
+    -- r < 0 意味着 r.num < 0，所以 abs r = -r
+    exact Int.abs_of_neg _ h
+
+// 非正数的绝对值：r ≤ 0 → |r| = -r
+lemma abs_of_nonpos (r : Rat) (h : le r zero) : eq (abs r) (neg r) :=
+  by
+    -- r ≤ 0 意味着 r.num ≤ 0，所以 abs r = -r
+    exact Int.abs_of_nonpos _ h
+
+// 从减法小于推导：a - b < c ↔ a < b + c
+lemma lt_of_sub_lt (a b c : Rat) (h : lt (sub a b) c) : lt a (add b c) :=
+  by
+    exact Int.lt_of_sub_lt _ _ _ h
+
+// 从加法小于推导：a < b + c ↔ a - b < c
+lemma sub_lt_of_lt_add (a b c : Rat) (h : lt a (add b c)) : lt (sub a b) c :=
+  by
+    exact Int.sub_lt_of_lt_add _ _ _ h
+
+// 严格小于转小于等于：a < b → a ≤ b
+lemma le_of_lt (a b : Rat) (h : lt a b) : le a b :=
+  by
+    exact Int.le_of_lt _ _ h
+
+// 小于等于加严格小于：a ≤ b ∧ b < c → a < c
+lemma lt_of_le_of_lt (a b c : Rat) (h1 : le a b) (h2 : lt b c) : lt a c :=
+  by
+    exact Int.lt_of_le_of_lt _ _ _ h1 h2
+
+// 严格小于加小于等于：a < b ∧ b ≤ c → a < c
+lemma lt_of_lt_of_le (a b c : Rat) (h1 : lt a b) (h2 : le b c) : lt a c :=
+  by
+    exact Int.lt_of_lt_of_le _ _ _ h1 h2
+
+// 正数减非正数：a > 0 ∧ b ≤ 0 → a - b > 0
+lemma sub_pos_of_pos_nonpos (a b : Rat) (h1 : lt zero a) (h2 : le b zero) : lt zero (sub a b) :=
+  by
+    -- a > 0 且 b ≤ 0，则 -b ≥ 0
+    -- a - b = a + (-b) > 0 + 0 = 0
+    exact Int.sub_pos_of_pos_nonpos _ _ h1 h2
+
+// 如果 a > 0 且 b ≤ 0，则 |a - b| ≥ a
+lemma abs_sub_ge_of_pos_nonpos (a b : Rat) (h1 : lt zero a) (h2 : le b zero) :
+  le a (abs (sub a b)) :=
+  by
+    -- a > 0 且 b ≤ 0，则 a - b ≥ a > 0
+    -- 所以 |a - b| = a - b ≥ a
+    exact Int.abs_sub_ge_of_pos_nonpos _ _ h1 h2
+
+// 四角不等式（广义三角不等式）：|a - d| ≤ |a - b| + |b - c| + |c - d|
+lemma abs_sub_triangle4 (a b c d : Rat) :
+  le (abs (sub a d)) (add (add (abs (sub a b)) (abs (sub b c))) (abs (sub c d))) :=
+  by
+    -- |a - d| = |(a - b) + (b - c) + (c - d)|
+    -- ≤ |a - b| + |b - c| + |c - d|
+    exact Int.abs_sub_triangle4 _ _ _ _
+
+// 用于证明的辅助引理：足够小的正数
+axiom epsilon_small (ε : Rat) (h : ε > zero) : ε > zero
+
+// 子traction 保持非严格不等式右侧的加法形式
+lemma le_sub_right_of_le (a b c : Rat) (h : le c zero) : le a (sub a c) :=
+  by
+    exact Int.le_sub_right_of_le _ _ _ h
+
+// 零小于正数：0 < a 当 a > 0
+lemma zero_lt_pos (a : Rat) (h : lt zero a) : lt zero a := h
+
+// 小于的否定：¬(a < b) ↔ b ≤ a
+lemma not_lt_iff_le (a b : Rat) : ¬(lt a b) ↔ le b a :=
+  by
+    exact Int.not_lt_iff_le _ _
+
+// 小于等于的否定：¬(a ≤ b) ↔ b < a
+lemma not_le_iff_lt (a b : Rat) : ¬(le a b) ↔ lt b a :=
+  by
+    exact Int.not_le_iff_lt _ _
 
 // =========================================================================
 // 基本性质
@@ -239,5 +384,36 @@ theorem mul_add (r1 r2 r3 : Rat) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mul
   by
     -- 展开验证两边相等
     exact Int.mul_add _ _ _
+
+// 1/2 + 1/2 = 1：用于 ε/2 + ε/2 = ε 证明
+lemma half_add_half : eq (add (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))
+                            (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))
+                        one :=
+  by
+    -- (1/2) + (1/2) = (1*2 + 1*2) / (2*2) = 4/4 = 1/1 = 1
+    exact Int.half_add_half
+
+// ε/2 + ε/2 = ε：Cauchy序列加法封闭性证明的关键引理
+lemma div_add_self (ε : Rat) (h : ε ≠ zero) :
+  eq (add (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) h)
+          (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) h))
+      ε :=
+  by
+    -- ε/2 = ε * (1/2)
+    have h1 : eq (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) h)
+                 (mul ε (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
+      by rw [div_def]
+    -- ε/2 + ε/2 = ε * (1/2) + ε * (1/2) = ε * (1/2 + 1/2) = ε * 1 = ε
+    calc
+      add (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) h)
+          (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) h)
+          = add (mul ε (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))
+                (mul ε (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
+            by rw [h1]
+      _ = mul ε (add (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))
+                     (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
+            by rw [mul_add]
+      _ = mul ε one := by rw [half_add_half]
+      _ = ε := by rw [mul_one]
 
 end Rat

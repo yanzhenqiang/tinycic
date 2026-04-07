@@ -41,6 +41,17 @@ pub enum Token {
     Underscore,  // _
     Dot,         // .
 
+    // Operators
+    Plus,        // +
+    Minus,       // -
+    Star,        // *
+    Slash,       // /
+    Lt,          // <
+    Gt,          // >
+    Le,          // <=
+    Ge,          // >=
+    Ne,          // != or ≠
+
     // Special
     Eof,
 }
@@ -106,12 +117,40 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     Token::Arrow
                 } else {
-                    Token::Ident("-".to_string())
+                    Token::Minus
                 }
             }
             '→' => { self.advance(); Token::Arrow }
-            '>' => { self.advance(); Token::Ident(">".to_string()) }
-            '<' => { self.advance(); Token::Ident("<".to_string()) }
+            '>' => {
+                self.advance();
+                if self.current_char() == '=' {
+                    self.advance();
+                    Token::Ge
+                } else {
+                    Token::Gt
+                }
+            }
+            '<' => {
+                self.advance();
+                if self.current_char() == '=' {
+                    self.advance();
+                    Token::Le
+                } else {
+                    Token::Lt
+                }
+            }
+            '+' => { self.advance(); Token::Plus }
+            '*' => { self.advance(); Token::Star }
+            '/' => { self.advance(); Token::Slash }
+            '!' => {
+                self.advance();
+                if self.current_char() == '=' {
+                    self.advance();
+                    Token::Ne
+                } else {
+                    Token::Ident("!".to_string())
+                }
+            }
             _ => {
                 // Skip unknown character
                 self.advance();

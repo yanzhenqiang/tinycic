@@ -441,24 +441,61 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse a lambda expression: λ x => body
+    /// Parse a lambda expression: λ x => body  or  λ (x : T) => body
+    /// Lean 4 style: fun (x : T) => body
     fn parse_lambda(&mut self) -> Result<Rc<Term>, ParseError> {
-        // Parse parameter name
-        let param_name = match &self.current {
-            Token::Ident(s) => {
-                let name = s.clone();
-                self.advance();
-                name
+        // Check for typed parameter: (x : T)
+        let (param_name, param_ty) = if self.current == Token::LParen {
+            // Parse (name : type) format
+            self.advance(); // skip '('
+
+            let name = match &self.current {
+                Token::Ident(s) => {
+                    let n = s.clone();
+                    self.advance();
+                    n
+                }
+                Token::Underscore => {
+                    self.advance();
+                    "_".to_string()
+                }
+                _ => return Err(ParseError::ExpectedIdentifier("parameter name".to_string())),
+            };
+
+            // Expect ':'
+            if self.current != Token::Colon {
+                return Err(ParseError::ExpectedKeyword(":".to_string()));
             }
-            Token::Underscore => {
+            self.advance();
+
+            // Parse type
+            let ty = self.parse_type_expr(&[])?;
+
+            // Expect ')'
+            if self.current == Token::RParen {
                 self.advance();
-                "_".to_string()
             }
-            _ => "_".to_string(),
+
+            (name, ty)
+        } else {
+            // Simple parameter name without type
+            let name = match &self.current {
+                Token::Ident(s) => {
+                    let n = s.clone();
+                    self.advance();
+                    n
+                }
+                Token::Underscore => {
+                    self.advance();
+                    "_".to_string()
+                }
+                _ => "_".to_string(),
+            };
+            // Use placeholder type - will be inferred later
+            (name, Term::const_("_"))
         };
 
-        // Expect '=>' or '=>'
-        // Handle both => and →
+        // Expect '=>' or '→'
         match &self.current {
             Token::Arrow => {
                 self.advance();
@@ -475,10 +512,11 @@ impl<'a> Parser<'a> {
         // Parse body
         let body = self.parse_term()?;
 
-        // Create lambda with inferred type (Type 0 for now)
-        Ok(Term::lambda(param_name, Term::type0(), body))
+        // Create lambda with the parsed (or inferred) type
+        Ok(Term::lambda(param_name, param_ty, body))
     }
 
+    /// Parse a type expression (used in lambda parameter annotation)
     fn parse_simple_type_str(&mut self) -> Result<String, ParseError> {
         // Simplified: just read the next identifier as type
         match &self.current {
@@ -692,21 +730,28 @@ impl<'a> Parser<'a> {
         while self.current != Token::Assign && self.current != Token::Eof {
             match &self.current {
                 Token::Ident(s) => {
-                    // Check for qualified name (e.g., "CauchySeq.isCauchy")
-                    let mut full_name = s.clone();
-                    self.advance();
-                    // Handle dot-separated qualified names
-                    while self.current == Token::Dot {
-                        self.advance(); // skip '.'
-                        if let Token::Ident(field) = &self.current {
-                            full_name.push('.');
-                            full_name.push_str(field);
-                            self.advance();
-                        } else {
-                            break;
+                    // Check for lambda syntax: λ x => body
+                    if s == "λ" || s == "fun" || s == "lambda" {
+                        self.advance();
+                        let lambda_term = self.parse_lambda()?;
+                        terms.push(lambda_term);
+                    } else {
+                        // Check for qualified name (e.g., "CauchySeq.isCauchy")
+                        let mut full_name = s.clone();
+                        self.advance();
+                        // Handle dot-separated qualified names
+                        while self.current == Token::Dot {
+                            self.advance(); // skip '.'
+                            if let Token::Ident(field) = &self.current {
+                                full_name.push('.');
+                                full_name.push_str(field);
+                                self.advance();
+                            } else {
+                                break;
+                            }
                         }
+                        terms.push(Term::const_(full_name));
                     }
-                    terms.push(Term::const_(full_name));
                 }
                 Token::Arrow => {
                     self.advance();

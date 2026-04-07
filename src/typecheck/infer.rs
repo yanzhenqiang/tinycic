@@ -114,16 +114,30 @@ impl<'env> TypeInference<'env> {
         ty: &Rc<Term>,
         body: &Rc<Term>,
     ) -> TcResult<Rc<Term>> {
-        // 检查 ty 是否有效
-        self.infer(ctx, ty)?;
+        // 处理类型占位符 "_" - 尝试推断或跳过验证
+        let actual_ty = if let Term::Const(name) = ty.as_ref() {
+            if name == "_" {
+                // 使用 Sort(0) 作为默认类型（Prop/Type 0）
+                Term::type0()
+            } else {
+                ty.clone()
+            }
+        } else {
+            ty.clone()
+        };
+
+        // 检查 ty 是否有效（如果不是占位符）
+        if !matches!(actual_ty.as_ref(), Term::Const(name) if name == "_") {
+            self.infer(ctx, &actual_ty)?;
+        }
 
         // 在扩展上下文中推导 body 的类型
         let mut new_ctx = ctx.clone();
-        new_ctx.push(LocalDecl::new("_", ty.clone()));
+        new_ctx.push(LocalDecl::new("_", actual_ty.clone()));
         let body_ty = self.infer(&new_ctx, body)?;
 
         // 构造 Pi 类型
-        Ok(Term::pi("_", ty.clone(), body_ty))
+        Ok(Term::pi("_", actual_ty, body_ty))
     }
 
     /// 推导应用类型

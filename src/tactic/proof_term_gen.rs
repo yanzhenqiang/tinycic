@@ -173,8 +173,29 @@ impl<'env> ProofTermGenerator<'env> {
             }
             ParsedTactic::Have(name, ty, proof) => {
                 // Let binding: let name : ty := proof in ...
-                self.let_bindings.push((name.clone(), ty.clone(), proof.clone()));
-                self.ctx.push(LocalDecl::with_value(name.clone(), ty.clone(), proof.clone()));
+                // If ty is "_", use the current goal type or Prop as placeholder
+                let actual_ty = if let Term::Const(ty_name) = ty.as_ref() {
+                    if ty_name == "_" {
+                        // Use Sort(0) (Prop) as placeholder for unknown type
+                        Term::sort(0)
+                    } else {
+                        ty.clone()
+                    }
+                } else {
+                    ty.clone()
+                };
+                // If proof is "sorry", apply it to the type to get the right type
+                let actual_proof = if let Term::Const(proof_name) = proof.as_ref() {
+                    if proof_name == "sorry" {
+                        Term::app(proof.clone(), actual_ty.clone())
+                    } else {
+                        proof.clone()
+                    }
+                } else {
+                    proof.clone()
+                };
+                self.let_bindings.push((name.clone(), actual_ty.clone(), actual_proof.clone()));
+                self.ctx.push(LocalDecl::with_value(name.clone(), actual_ty.clone(), actual_proof));
                 Ok(())
             }
             ParsedTactic::Calc(steps) => {
@@ -213,22 +234,52 @@ impl<'env> ProofTermGenerator<'env> {
             return Term::const_("Eq.refl");
         }
 
-        // Build a proof using the first rewrite theorem
-        // For simplicity, we apply the theorems directly
-        // In a full implementation, we'd use eq.rec for proper rewriting
-        let first_thm = rewrite_terms.first().unwrap();
+        // Resolve names in rewrite terms (convert Const to Var if it's a local variable)
+        let resolved_terms: Vec<Rc<Term>> = rewrite_terms.iter()
+            .map(|term| self.resolve_term(term))
+            .collect();
 
-        if rewrite_terms.len() == 1 {
+        // Build a proof using the first rewrite theorem
+        let first_thm = resolved_terms.first().unwrap();
+
+        if resolved_terms.len() == 1 {
             // Single rewrite: use the theorem directly (with eq.symm if needed)
             Term::app(Term::const_("Eq.symm"), first_thm.clone())
         } else {
             // Multiple rewrites: chain with eq.trans
             let mut proof = Term::app(Term::const_("Eq.symm"), first_thm.clone());
-            for thm in &rewrite_terms[1..] {
+            for thm in &resolved_terms[1..] {
                 let thm_proof = Term::app(Term::const_("Eq.symm"), thm.clone());
                 proof = Term::app(Term::app(Term::const_("Eq.trans"), proof), thm_proof);
             }
             proof
+        }
+    }
+
+    /// Resolve a term, converting Const to Var if the name is in context
+    fn resolve_term(&self, term: &Rc<Term>) -> Rc<Term> {
+        match term.as_ref() {
+            Term::Const(name) => {
+                // Check if this is a local variable (from intro or have)
+                // Check intro_bindings first (they are in inner scope)
+                for (idx, binding) in self.intro_bindings.iter().rev().enumerate() {
+                    if &binding.name == name {
+                        return Term::var(idx as u32);
+                    }
+                }
+                // Check let_bindings (they are in outer scope, after intros)
+                let intro_count = self.intro_bindings.len();
+                for (idx, (let_name, _, _)) in self.let_bindings.iter().rev().enumerate() {
+                    if let_name == name {
+                        // Let bindings are outside lambda abstractions
+                        // So their De Bruijn index is intro_count + idx
+                        return Term::var((intro_count + idx) as u32);
+                    }
+                }
+                // Not a local variable, keep as Const
+                term.clone()
+            }
+            _ => term.clone(),
         }
     }
 

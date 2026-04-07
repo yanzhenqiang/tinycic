@@ -24,6 +24,10 @@ def equiv (s1 s2 : CauchySeq) : Prop :=
   ∀ ε : Rat, ε > Rat.zero → ∃ N : Nat, ∀ n : Nat, n ≥ N →
     Rat.lt (Rat.abs (Rat.sub (s1.seq n) (s2.seq n))) ε
 
+// Projection 函数：获取序列函数（避免字段访问语法 s.seq n 的解析问题）
+def getSeq (s : CauchySeq) : Nat → Rat :=
+  s.seq
+
 // 等价关系的基本性质（声明，后续证明）
 -- theorem equiv_refl (s : CauchySeq) : equiv s s
 -- theorem equiv_symm (s1 s2 : CauchySeq) : equiv s1 s2 → equiv s2 s1

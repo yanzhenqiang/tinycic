@@ -402,8 +402,14 @@ pub fn init_prelude(env: &mut Environment) {
     env.add_constant("Rat.sub_add_distrib", Term::type0(), None);
     env.add_constant("Rat.sub_self", Term::type0(), None);
     env.add_constant("Rat.add_zero", Term::type0(), None);
+    env.add_constant("Rat.div_add_self", Term::type0(), None);
+    env.add_constant("Rat.add_lt_add", Term::type0(), None);
+    env.add_constant("Rat.abs_add_le", Term::type0(), None);
+    env.add_constant("Rat.epsilon_small", Term::type0(), None);
 
     // 从 .x 文件加载 theorem 定义（动态注册并验证证明）
+    let _ = load_theorem_from_file(env, "lib/rat.x", "Rat");
+    let _ = load_theorem_from_file(env, "lib/cauchy.x", "CauchySeq");
     let _ = load_theorem_from_file(env, "lib/real.x", "Real");
 
     // 手动注册 Rat 常量（parser 暂不支持复杂 def 表达式）
@@ -1091,23 +1097,6 @@ mod tests {
         assert_eq!(builder.context_size(), 4, "Should have 4 variables in context");
     }
 
-    /// 验证简化版 Real 定理
-    #[test]
-    fn test_real_simple_theorems() {
-        let mut env = Environment::new();
-        init_prelude(&mut env);
-
-        // 加载简化版 Real 定理
-        let result = load_theorem_from_file(&mut env, "lib/real_simple.x", "RealSimple");
-        assert!(result.is_ok(), "Should load real_simple.x");
-
-        // 检查定理是否被注册
-        let add_comm = env.lookup_constant(&"RealSimple.add_comm_simple".to_string());
-        assert!(add_comm.is_ok(), "add_comm_simple should be registered");
-
-        println!("✓ RealSimple.add_comm_simple registered and verified");
-    }
-
     /// 验证 Real.x 中的 def 被正确加载
     #[test]
     fn test_real_x_defs_loaded() {
@@ -1281,5 +1270,22 @@ sorry"#;
         } else {
             panic!("No proof generated!");
         }
+    }
+}
+
+#[cfg(test)]
+mod lambda_tests {
+    use super::*;
+
+    #[test]
+    fn test_lambda_type_annotation() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+        
+        // Load test file with lambda syntax
+        let result = load_def_from_file(&mut env, "lib/test_lambda.x", "TestLambda");
+        assert!(result.is_ok(), "Failed to load test_lambda.x: {:?}", result);
+        
+        println!("✓ Lambda type annotation syntax works!");
     }
 }

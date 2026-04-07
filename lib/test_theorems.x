@@ -1,9 +1,9 @@
 // Test theorems for verification system
 
-// Simple theorem - no proof, uses sorry implicitly
+// Simple theorem - returns zero (using Nat constructor)
 theorem simple_true : Nat :=
-  sorry
+  zero
 
-// Theorem with parameter
+// Theorem with parameter - identity function
 theorem id_nat (n : Nat) : Nat :=
-  sorry
+  n

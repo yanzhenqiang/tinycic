@@ -218,10 +218,14 @@ env.add_inductive() / env.add_constant()
 - [ ] lib/test_theorems.x (line 5, 9) - 测试定理占位符
 
 **TODO - Parser 改进:**
+- [x] **Lambda 类型注解** - 已实现 Lean 4 风格语法：`λ (x : T) => body`
+  - 修改：`parse_lambda` 支持 `(x : T)` 格式
+  - 类型检查器：处理 `_` 类型占位符
 - [ ] 希腊字母参数绑定 - `ε > Rat.zero` 中的 `ε` 未被替换为 De Bruijn 索引
   - 原因：`parse_complex_type` 将 `ε > Rat.zero` 解析为 Pi 类型而非 App
   - 需要：区分类型表达式（使用 `->`/`→`）和值表达式（使用 `>`/`<` 操作符）
-- [ ] 操作符优先级 - 需要实现完整的操作符解析（`>`, `<`, `=`, `+`, `-`, `*`, `/`）
+- [~] **操作符 Token** - Lexer 已添加：`+`, `-`, `*`, `/`, `<`, `>`, `<=`, `>=`, `!=`
+  - 待完成：Parser 中实现操作符优先级解析（Pratt Parser）
 
 **TODO - 代码架构改进:**
 - [ ] 加载 def 时 Rust 和 .x 没有完全分离 - `load_def_from_file` 仍依赖手动调用，应将 def 加载也改为纯 .x 文件驱动

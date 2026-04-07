@@ -5,10 +5,14 @@
 theorem trivial_nat : Nat :=
   zero
 
-// Theorem with parameter - the parameter name becomes a variable
+// Theorem with parameter - identity function returns the parameter
+// Using tactic form to properly handle the parameter
 theorem identity (n : Nat) : Nat :=
-  sorry
+  by
+    exact n
 
-// Theorem using add - assuming "add" is registered
+// Theorem using add - returns n + 0
+// Using tactic form to properly handle the parameter
 theorem add_zero_simple (n : Nat) : Nat :=
-  sorry
+  by
+    exact add n zero

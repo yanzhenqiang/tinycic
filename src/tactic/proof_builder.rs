@@ -262,12 +262,22 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
             }
         }
         "have" => {
-            // have h : type := proof (simplified)
-            // Use a placeholder type that will be inferred from context
-            if parts.len() > 1 {
-                let name = parts[1].trim_end_matches(':').to_string();
-                // Use a "_" placeholder that will be filled in during type checking
-                Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("sorry")))
+            // Parse have h : type := proof
+            // Extract the type between ':' and ':='
+            if let Some(colon_pos) = line.find(':') {
+                let after_colon = &line[colon_pos + 1..];
+                if let Some(assign_pos) = after_colon.find(":=") {
+                    let name = parts[1].trim_end_matches(':').to_string();
+                    let type_str = after_colon[..assign_pos].trim();
+                    // Parse the type as a term
+                    let ty = parse_simple_term(type_str);
+                    // Proof will be generated from subsequent tactics
+                    Some(ParsedTactic::Have(name, ty, Term::const_("sorry")))
+                } else {
+                    // No := found, use placeholder
+                    let name = parts[1].trim_end_matches(':').to_string();
+                    Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("sorry")))
+                }
             } else {
                 None
             }

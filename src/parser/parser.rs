@@ -95,6 +95,12 @@ impl Operator {
                 right_assoc: false,
                 name: "ne",
             }),
+            Token::Or => Some(Operator {
+                token: token.clone(),
+                precedence: Precedence::Relational,  // Same as other relations
+                right_assoc: false,
+                name: "Or",
+            }),
             _ => None,
         }
     }

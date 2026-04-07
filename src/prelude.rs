@@ -497,6 +497,18 @@ pub fn init_prelude(env: &mut Environment) {
     );
     env.add_constant("GE", ge_ty, None);
 
+    // 注册 Or (∨) 类型: Prop → Prop → Prop
+    let or_ty = Term::pi(
+        "a",
+        Term::const_("Prop"),  // Prop
+        Term::pi(
+            "b",
+            Term::const_("Prop"),  // Prop
+            Term::const_("Prop"),  // Prop
+        ),
+    );
+    env.add_constant("Or", or_ty, None);
+
     // 从 .x 文件加载所有归纳类型（动态注册）
     let _ = load_inductive_from_file(env, "lib/nat.x");
     let _ = load_inductive_from_file(env, "lib/list.x");

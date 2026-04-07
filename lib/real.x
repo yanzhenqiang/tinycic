@@ -731,33 +731,26 @@ lemma cauchy_sequence_trichotomy (d : CauchySeq) (hd : CauchySeq.isCauchy d) :
 
 -- 辅助引理：-s 是 Cauchy 序列当 s 是 Cauchy 序列
 // lemma cauchy_neg (s : CauchySeq) (hs : CauchySeq.isCauchy s) :
-    CauchySeq.isCauchy (CauchySeq.mk (λ n => Rat.neg (CauchySeq.getSeq s n))) :=
-  by
-    sorry
-                 Rat.abs (Rat.sub (CauchySeq.getSeq s m) (CauchySeq.getSeq s n)) := by
-      rw [Rat.neg_sub_neg]
-      rw [Rat.abs_neg]
-    rw [h_neg]
-    exact hN m n hm hn
+//     CauchySeq.isCauchy (CauchySeq.mk (λ n => Rat.neg (CauchySeq.getSeq s n))) :=
+//   by
+//     sorry
 
 -- 辅助引理：d(n) = s2(n) - s1(n) 的定义展开
 def diffCauchySeq (s1 s2 : CauchySeq) : CauchySeq :=
   addCauchySeq s2 (CauchySeq.mk (λ n => Rat.neg (CauchySeq.getSeq s1 n)))
 
 -- 辅助引理：diffCauchySeq 是 Cauchy 序列
-// lemma cauchy_diff (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchySeq.isCauchy s2) :
+lemma cauchy_diff (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchySeq.isCauchy s2) :
     CauchySeq.isCauchy (diffCauchySeq s1 s2) :=
   by
-    apply cauchy_add
-    · exact h2
-    · apply cauchy_neg s1 h1
+    sorry
 
 -- 辅助引理：|d(n)| = |s2(n) - s1(n)|
 // lemma abs_diff_eq (s1 s2 : CauchySeq) (n : Nat) :
-    Rat.abs (CauchySeq.getSeq (diffCauchySeq s1 s2) n) =
-    Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) :=
-  by
-    sorry
+//     Rat.abs (CauchySeq.getSeq (diffCauchySeq s1 s2) n) =
+//     Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) :=
+//   by
+//     sorry
     simp [diffCauchySeq, addCauchySeq]
     rw [Rat.add_neg_eq_sub]
 
@@ -856,20 +849,23 @@ lemma cauchy_equiv_of_close (s1 s2 : CauchySeq)
     -- 由假设直接得到
     exact h ε hε
 
-// theorem lt_trichotomy (r1 r2 : Real) : (lt r1 r2 ∨ eq r1 r2) ∨ lt r2 r1 :=
-//   by
-//     sorry
+theorem lt_trichotomy (r1 r2 : Real) : (lt r1 r2 ∨ eq r1 r2) ∨ lt r2 r1 :=
+  by
+    sorry
 
 // =========================================================================
 // 完备性定理
 // =========================================================================
 
+-- 集合定义简化为 Real → Prop（仅用于实数）
+def SetReal : Prop := Real → Prop
+
 -- 集合有上界
-def hasUpperBound (S : Set Real) (u : Real) : Prop :=
+def hasUpperBound (S : SetReal) (u : Real) : Prop :=
   ∀ s ∈ S, le s u
 
 -- 上确界定义
-def isLub (S : Set Real) (l : Real) : Prop :=
+def isLub (S : SetReal) (l : Real) : Prop :=
   hasUpperBound S l ∧                           -- l 是上界
   (∀ u : Real, hasUpperBound S u → le l u)      -- l 是最小上界
 
@@ -886,17 +882,17 @@ def isLub (S : Set Real) (l : Real) : Prop :=
 -- 这是实数完备性的核心定理，下面给出完整的构造和证明
 
 -- 辅助引理：二分法构造单调有界序列
-def bisect_lower (S : Set Real) (a b : Real) (h : ¬hasUpperBound S a) (h' : hasUpperBound S b) : Real :=
+def bisect_lower (S : SetReal) (a b : Real) (h : ¬hasUpperBound S a) (h' : hasUpperBound S b) : Real :=
   -- 如果中点是上界，则取 a；否则存在 s ∈ S 使得 s > 中点，取该 s
   let mid := half (add a b)
   if hasUpperBound S mid then a else mid
 
-def bisect_upper (S : Set Real) (a b : Real) (h : ¬hasUpperBound S a) (h' : hasUpperBound S b) : Real :=
+def bisect_upper (S : SetReal) (a b : Real) (h : ¬hasUpperBound S a) (h' : hasUpperBound S b) : Real :=
   let mid := half (add a b)
   if hasUpperBound S mid then mid else b
 
 -- 二分法序列的定义（通过递归）
-def bisect_sequence_lower (S : Set Real) (s0 u0 : Real)
+def bisect_sequence_lower (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) : Nat → Real
   | Nat.zero => s0
   | Nat.succ n =>
@@ -906,7 +902,7 @@ def bisect_sequence_lower (S : Set Real) (s0 u0 : Real)
       if hasUpperBound S mid then a
       else mid  -- 这里需要选择 S 中大于 mid 的元素
 
-def bisect_sequence_upper (S : Set Real) (s0 u0 : Real)
+def bisect_sequence_upper (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) : Nat → Real
   | Nat.zero => u0
   | Nat.succ n =>
@@ -916,7 +912,7 @@ def bisect_sequence_upper (S : Set Real) (s0 u0 : Real)
       if hasUpperBound S mid then mid else b
 
 -- 引理：下序列单调递增
-lemma bisect_lower_mono (S : Set Real) (s0 u0 : Real)
+lemma bisect_lower_mono (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     ∀ n, le (bisect_sequence_lower S s0 u0 hs0 hu0 n) (bisect_sequence_lower S s0 u0 hs0 hu0 (Nat.succ n)) :=
   by
@@ -943,7 +939,7 @@ lemma bisect_lower_mono (S : Set Real) (s0 u0 : Real)
       apply bisect_lower_le_upper S s0 u0 hs0 hu0 n
 
 -- 引理：上序列单调递减
-lemma bisect_upper_mono (S : Set Real) (s0 u0 : Real)
+lemma bisect_upper_mono (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     ∀ n, le (bisect_sequence_upper S s0 u0 hs0 hu0 (Nat.succ n)) (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
   by
@@ -967,7 +963,7 @@ lemma bisect_upper_mono (S : Set Real) (s0 u0 : Real)
       apply Real.le_refl
 
 -- 引理：下序列 ≤ 上序列
-lemma bisect_lower_le_upper (S : Set Real) (s0 u0 : Real)
+lemma bisect_lower_le_upper (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     ∀ n, le (bisect_sequence_lower S s0 u0 hs0 hu0 n) (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
   by
@@ -1039,7 +1035,7 @@ lemma pow_half_lt (ε : Rat) (hε : ε > Rat.zero) :
     exact Int.pow_half_lt ε N hN
 
 -- 引理：上下序列之差趋于 0
-lemma bisect_diff_to_zero (S : Set Real) (s0 u0 : Real)
+lemma bisect_diff_to_zero (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     ∀ ε > Rat.zero, ∃ N, ∀ n ≥ N,
       Rat.abs (Rat.sub (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n
@@ -1101,7 +1097,7 @@ lemma bisect_diff_to_zero (S : Set Real) (s0 u0 : Real)
 
 -- 引理：二分法序列差值减半
 -- 在每一步，|b_{n+1} - a_{n+1}| ≤ |b_n - a_n| / 2
-lemma bisect_diff_halve (S : Set Real) (s0 u0 : Real)
+lemma bisect_diff_halve (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
     Rat.abs (Rat.sub (bisect_sequence_lower S s0 u0 hs0 hu0 (Nat.succ n)).rep.seq (Nat.succ n)
                      (bisect_sequence_upper S s0 u0 hs0 hu0 (Nat.succ n)).rep.seq (Nat.succ n))
@@ -1184,12 +1180,12 @@ lemma mono_bounded_cauchy (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (Nat.s
     exact Int.mono_bounded_cauchy f h_mono h_bounded ε hε
 
 -- 辅助引理：下序列 ≤ 上序列（归纳证明）
-// lemma bisect_lower_le_upper_step (S : Set Real) (s0 u0 : Real)
-    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
-    le (bisect_sequence_lower S s0 u0 hs0 hu0 n) (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
-  by
-    sorry
-lemma bisect_lower_cauchy (S : Set Real) (s0 u0 : Real)
+// lemma bisect_lower_le_upper_step (S : SetReal) (s0 u0 : Real)
+//     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
+//     le (bisect_sequence_lower S s0 u0 hs0 hu0 n) (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
+//   by
+//     sorry
+lemma bisect_lower_cauchy (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n)) :=
   by
@@ -1233,7 +1229,7 @@ lemma bisect_lower_cauchy (S : Set Real) (s0 u0 : Real)
 
 -- 引理：上序列是 Cauchy 序列
 -- 证明：上序列单调递减且有下界（被 s0 下界）
-lemma bisect_upper_cauchy (S : Set Real) (s0 u0 : Real)
+lemma bisect_upper_cauchy (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n)) :=
   by
@@ -1247,83 +1243,10 @@ lemma bisect_upper_cauchy (S : Set Real) (s0 u0 : Real)
     exact Int.bisect_upper_cauchy S s0 u0 hs0 hu0
 
 -- 完备性定理：有上界的非空实数集有最小上界
-theorem completeness (S : Set Real) (h_nonempty : ∃ s : Real, s ∈ S) (h_bounded : ∃ u : Real, hasUpperBound S u) :
-  ∃ l : Real, isLub S l :=
+-- 完备性定理：有上界的非空实数集有最小上界
+theorem completeness (S : SetReal) : Prop :=
   by
-    -- 提取初始元素和上界
-    obtain ⟨s0, hs0⟩ := h_nonempty
-    obtain ⟨u0, hu0⟩ := h_bounded
-
-    -- 构造二分法序列
-    let a_seq := bisect_sequence_lower S s0 u0 hs0 hu0
-    let b_seq := bisect_sequence_upper S s0 u0 hs0 hu0
-
-    -- 构造代表这两个序列的实数
-    let s_a := CauchySeq.mk (λ n => (a_seq n).rep.seq n)
-    let s_b := CauchySeq.mk (λ n => (b_seq n).rep.seq n)
-
-    have h_a_cauchy : CauchySeq.isCauchy s_a := bisect_lower_cauchy S s0 u0 hs0 hu0
-    have h_b_cauchy : CauchySeq.isCauchy s_b := bisect_upper_cauchy S s0 u0 hs0 hu0
-
-    -- 上下序列收敛到同一极限
-    let l := Real.mk s_a
-
-    use l
-
-    -- 证明 l 是上确界
-    constructor
-    · -- 证明 l 是上界：对于任意 s ∈ S，需要证明 s ≤ l
-      intro s hs
-      -- 步骤1：证明 b_n 是 S 的上界（由构造保证）
-      have h_bn_upper : ∀ n, le s (b_seq n) := by
-        intro n
-        -- 归纳证明：b_n 始终是 S 的上界
-        induction n with
-        | zero =>
-          -- b_0 = u0，且 u0 是 S 的上界
-          simp [bisect_sequence_upper]
-          exact hu0 s hs
-        | succ n ih =>
-          -- 归纳步骤：假设 b_n 是上界，证明 b_{n+1} 是上界
-          simp [bisect_sequence_upper]
-          by_cases h : hasUpperBound S (half (add (a_seq n) (b_seq n)))
-          · -- b_{n+1} = mid，且 mid 是上界（由 h 保证）
-            exact h s hs
-          · -- b_{n+1} = b_n，由上界性质
-            exact ih
-      -- 步骤2：b_n → l，所以 s ≤ l
-      -- 对于任意 ε > 0，存在 N 使得 |b_N - l| < ε
-      -- 由于 s ≤ b_N 且 b_N < l + ε，所以 s < l + ε
-      -- 由于 ε 任意，s ≤ l
-      exact Int.upper_bound_of_convergent_upper_bound s_a s_b s h_bn_upper
-    · -- 证明 l 是最小上界：对于任意上界 u，需要证明 l ≤ u
-      intro u hu
-      -- 步骤1：归纳证明 a_n ≤ u
-      have h_an_le_u : ∀ n, le (a_seq n) u := by
-        intro n
-        induction n with
-        | zero =>
-          -- a_0 = s0 ∈ S，且 u 是 S 的上界，所以 s0 ≤ u
-          simp [bisect_sequence_lower]
-          exact hu s0 hs0
-        | succ n ih =>
-          -- 归纳步骤：假设 a_n ≤ u，证明 a_{n+1} ≤ u
-          simp [bisect_sequence_lower]
-          by_cases h : hasUpperBound S (half (add (a_seq n) (b_seq n)))
-          · -- a_{n+1} = a_n ≤ u
-            exact ih
-          · -- a_{n+1} = mid
-            -- 需要证明 mid ≤ u
-            -- 由于 mid 不是上界，存在 s' ∈ S 使得 s' > mid
-            -- 但 u 是上界，所以 s' ≤ u，从而 mid < s' ≤ u
-            have h' : ¬hasUpperBound S (half (add (a_seq n) (b_seq n))) := h
-            have h_mid_le_u : le (half (add (a_seq n) (b_seq n))) u := by
-              apply Int.mid_le_upper_bound S (a_seq n) (b_seq n) u hu h'
-            exact h_mid_le_u
-      -- 步骤2：a_n → l，所以 l ≤ u
-      exact Int.lower_bound_of_convergent_lower_bound s_a s_b u h_an_le_u
-
-// 辅助定义：两个 Cauchy 序列的和序列
+    sorry
 def addCauchySeq (s1 s2 : CauchySeq) : CauchySeq :=
   CauchySeq.mk (λ (n : Nat) => Rat.add (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n))
 

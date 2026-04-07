@@ -55,6 +55,7 @@ pub enum Token {
     Gt,          // >
     Le,          // <=
     Ge,          // >=
+    Or,          // ∨ or /\
     Ne,          // != or ≠
 
     // Special
@@ -171,6 +172,10 @@ impl<'a> Lexer<'a> {
                 } else {
                     Token::Ident("!".to_string())
                 }
+            }
+            '\u{2228}' => {  // ∨ (logical or)
+                self.advance();
+                Token::Or
             }
             _ => {
                 // Skip unknown character

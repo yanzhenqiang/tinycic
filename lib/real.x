@@ -746,11 +746,11 @@ lemma cauchy_diff (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchyS
     sorry
 
 -- 辅助引理：|d(n)| = |s2(n) - s1(n)|
-lemma abs_diff_eq (s1 s2 : CauchySeq) (n : Nat) :
-    Rat.abs (CauchySeq.getSeq (diffCauchySeq s1 s2) n) =
-    Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) :=
-  by
-    sorry
+-- lemma abs_diff_eq (s1 s2 : CauchySeq) (n : Nat) :
+--     Rat.abs (CauchySeq.getSeq (diffCauchySeq s1 s2) n) =
+--     Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) :=
+--   by
+--     sorry
 
 -- 辅助引理：d(n) > ε 当且仅当 s2(n) - s1(n) > ε
 def diff_pos_iff (s1 s2 : CauchySeq) (ε : Rat) (n : Nat) :

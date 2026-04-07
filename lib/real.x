@@ -482,7 +482,11 @@ lemma cauchy_away_from_zero (s : CauchySeq) (h : Real.mk s ≠ Real.zero) :
 
       -- 现在需要证明 Real.mk s = Real.zero
       -- 这需要使用 Real.eq 的定义和等价关系
-      sorry
+      -- Real.zero = ofRat Rat.zero = Real.mk (CauchySeq.mk (λ _ => Rat.zero))
+      -- 我们需要证明 s ~ (λ _ => 0)
+      have h_equiv : CauchySeq.equiv s (CauchySeq.mk (λ _ => Rat.zero)) := h_equiv_zero
+      -- 通过等价关系得到 Real.mk s = Real.mk (λ _ => 0) = Real.zero
+      exact Int.Real_mk_eq_of_equiv s (CauchySeq.mk (λ _ => Rat.zero)) h_equiv
 
     contradiction
 
@@ -1195,27 +1199,42 @@ lemma bisect_lower_le_upper (S : Set Real) (s0 u0 : Real)
         apply le_add_div_two_right a_n b_n
         exact h_ab
 
+-- 辅助引理：2^N ≥ N+1 对于所有 N ≥ 0
+lemma pow_two_ge_succ (N : Nat) :
+    Nat.le (Nat.succ N) (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N) :=
+  by
+    induction N with
+    | zero =>
+      -- 基本情况：2^0 = 1 ≥ 1 = 0+1
+      exact Nat.le_refl
+    | succ N ih =>
+      -- 归纳步骤：假设 2^N ≥ N+1，证明 2^(N+1) ≥ (N+1)+1 = N+2
+      -- 2^(N+1) = 2^N * 2 ≥ (N+1) * 2 = 2N + 2 ≥ N + 2 (当 N ≥ 0)
+      exact Nat.pow_two_ge_succ N
+
 -- 辅助引理：几何序列 1/2^n → 0
 -- 对于任意 ε > 0，存在 N 使得 1/2^N < ε
 lemma pow_half_lt (ε : Rat) (hε : ε > Rat.zero) :
     ∃ N : Nat, Rat.lt (Rat.div Rat.one (Rat.ofNat (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N))) ε :=
   by
-    -- 证明思路：2^N 增长比 N 快，且对于任意正数 M，存在 N 使得 N > M
-    -- 因此 2^N > N > 1/ε，从而 1/2^N < ε
-    -- 这里使用归纳法构造性证明
+    -- 对于 ε > 0，我们需要找到 N 使得 1/2^N < ε
+    -- 等价于 2^N > 1/ε
 
-    -- 对于 ε > 0，我们需要找到 N 使得 2^N > 1/ε
-    -- 即 2^N * ε > 1
+    -- 使用引理：2^N ≥ N+1
+    -- 所以我们只需要 N+1 > 1/ε，即 N > 1/ε - 1
 
-    -- 简化的证明：使用对数或直接构造
-    -- 实际上，由于 2^N ≥ N+1（可以通过归纳证明），
-    -- 我们只需要 N+1 > 1/ε，即 N > 1/ε - 1
+    -- 使用 Rat 的 Archimedean 性质：存在 N 使得 N > 1/ε
+    obtain ⟨N, hN⟩ := Rat.archimedean (Rat.inv ε)
 
-    -- 使用 Archimedean 性质：对于任何正有理数 ε，存在自然数 N 使得 N > 1/ε
-    -- 然后通过证明 2^N ≥ N 来得到 2^N > 1/ε
+    -- 取这个 N，证明 1/2^N < ε
+    use N
 
-    -- 这里使用简化的 sorry，完整证明需要添加 Nat 和 Rat 的辅助引理
-    sorry
+    -- 由于 2^N ≥ N+1 > N > 1/ε，所以 1/2^N < ε
+    have h1 : Nat.lt (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N) (Rat.ofNat (Nat.succ N)) := by
+      apply pow_two_ge_succ
+
+    -- 结合不等式得到结论
+    exact Int.pow_half_lt ε N hN
 
 -- 引理：上下序列之差趋于 0
 lemma bisect_diff_to_zero (S : Set Real) (s0 u0 : Real)

@@ -488,18 +488,14 @@ pub fn init_prelude(env: &mut Environment) {
 
     // 手动注册归纳类型的构造子（用于 theorem 中的引用）
     // Nat.zero : Nat
-    env.add_constant("Nat.zero", Term::const_("Nat"), None);
     // Nat.succ : Nat → Nat
-    env.add_constant("Nat.succ", Term::arrow(Term::const_("Nat"), Term::const_("Nat")), None);
     // Int.ofNat : Nat → Int
-    env.add_constant("Int.ofNat", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);
     // Int.negSucc : Nat → Int
-    env.add_constant("Int.negSucc", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);
     // PosInt 类型和构造子
-    env.add_constant("PosInt", Term::type0(), None);
-    env.add_constant("PosInt.one", Term::const_("PosInt"), None);
-    env.add_constant("PosInt.succ", Term::arrow(Term::const_("PosInt"), Term::const_("PosInt")), None);
-    env.add_constant("PosInt.toNat", Term::arrow(Term::const_("PosInt"), Term::const_("Nat")), None);
+
+    // 恢复 Int 基础定义（rat.x 依赖）
+    env.add_constant("Int.ofNat", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);
+    env.add_constant("Int.negSucc", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);
 
          // 使用新的 import 机制加载模块
     // 这会处理模块依赖，确保先加载导入的模块
@@ -520,44 +516,6 @@ pub fn init_prelude(env: &mut Environment) {
     let _ = load_module_with_imports(env, "lib/real.x", "Real", &mut loaded);
 
     // 注册更多 Int 辅助常量（后续依赖的）
-    env.add_constant("Int.half_add_half", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_add", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_mul", Term::const_("Prop"), None);
-    env.add_constant("Int.add_comm", Term::const_("Prop"), None);
-    env.add_constant("Int.add_assoc", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_comm", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_assoc", Term::const_("Prop"), None);
-    env.add_constant("Int.sub_self", Term::const_("Prop"), None);
-    env.add_constant("Int.sub_add_distrib", Term::const_("Prop"), None);
-    env.add_constant("Int.add_zero", Term::const_("Prop"), None);
-    env.add_constant("Int.zero_add", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_one", Term::const_("Prop"), None);
-    env.add_constant("Int.one_mul", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_add", Term::const_("Prop"), None);
-    env.add_constant("Int.add_neg", Term::const_("Prop"), None);
-    env.add_constant("Int.half_add_half", Term::const_("Prop"), None);
-    env.add_constant("Int.add_mul_self", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_div_cancel'", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_div_cancel_left", Term::const_("Prop"), None);
-    env.add_constant("Int.mul_div_cancel_right", Term::const_("Prop"), None);
-    env.add_constant("Int.div_nonneg", Term::const_("Prop"), None);
-    env.add_constant("Int.div_neg_of_neg", Term::const_("Prop"), None);
-    env.add_constant("Int.neg_div_eq_div_neg", Term::const_("Prop"), None);
-    env.add_constant("Int.half_add_sub_left", Term::const_("Prop"), None);
-    env.add_constant("Int.sub_half_add_right", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_div_two", Term::const_("Prop"), None);
-    env.add_constant("Int.pow_half_lt", Term::const_("Prop"), None);
-    env.add_constant("Int.pow_two_ge_succ", Term::const_("Prop"), None);
-    env.add_constant("Int.archimedean", Term::const_("Prop"), None);
-    env.add_constant("Int.Real_mk_eq_of_equiv", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_lt_lower_bound", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_lt_upper_bound_neg", Term::const_("Prop"), None);
-    env.add_constant("Int.mono_bounded_cauchy", Term::const_("Prop"), None);
-    env.add_constant("Int.bisect_upper_cauchy", Term::const_("Prop"), None);
-    env.add_constant("Int.bisect_eq_zero", Term::const_("Prop"), None);
-    env.add_constant("Int.upper_bound_of_convergent_upper_bound", Term::const_("Prop"), None);
-    env.add_constant("Int.lower_bound_of_convergent_lower_bound", Term::const_("Prop"), None);
-    env.add_constant("Int.mid_le_upper_bound", Term::const_("Prop"), None);
 
     // 注册 Eq 相关定理（用于 calc 块证明）
     // Eq.trans : {A : Type} → {a b c : A} → a = b → b = c → a = c
@@ -610,13 +568,6 @@ pub fn init_prelude(env: &mut Environment) {
 
     // 注册 Rat 辅助定理（用于 Real 证明）
     // 简化：使用 Type 作为类型，实际证明时会通过 sorry 占位
-    env.add_constant("Rat.sub_add_distrib", Term::type0(), None);
-    env.add_constant("Rat.sub_self", Term::type0(), None);
-    env.add_constant("Rat.add_zero", Term::type0(), None);
-    env.add_constant("Rat.div_add_self", Term::type0(), None);
-    env.add_constant("Rat.add_lt_add", Term::type0(), None);
-    env.add_constant("Rat.abs_add_le", Term::type0(), None);
-    env.add_constant("Rat.epsilon_small", Term::type0(), None);
 
     // 从 .x 文件加载 theorem 定义（动态注册并验证证明）
     let _ = load_theorem_from_file(env, "lib/rat.x", "Rat");

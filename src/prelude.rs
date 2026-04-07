@@ -457,34 +457,26 @@ pub fn init_prelude(env: &mut Environment) {
     );
     env.add_constant("Eq", eq_ty, None);
 
-    // 注册 LE (≤) 类型
+    // 注册 LE (≤) 类型: Int → Int → Prop
     let le_ty = Term::pi(
-        "A",
-        Term::type0(),
+        "a",
+        Term::const_("Int"),
         Term::pi(
-            "a",
-            Term::var(0),
-            Term::pi(
-                "b",
-                Term::var(1),
-                Term::sort(0),
-            ),
+            "b",
+            Term::const_("Int"),
+            Term::sort(0),
         ),
     );
     env.add_constant("LE", le_ty, None);
 
-    // 注册 GE (≥) 类型
+    // 注册 GE (≥) 类型: Int → Int → Prop
     let ge_ty = Term::pi(
-        "A",
-        Term::type0(),
+        "a",
+        Term::const_("Int"),
         Term::pi(
-            "a",
-            Term::var(0),
-            Term::pi(
-                "b",
-                Term::var(1),
-                Term::sort(0),
-            ),
+            "b",
+            Term::const_("Int"),
+            Term::sort(0),
         ),
     );
     env.add_constant("GE", ge_ty, None);

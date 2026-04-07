@@ -42,6 +42,9 @@ pub enum Token {
     Underscore,  // _
     Dot,         // .
 
+    // Literals
+    Number(u64), // Numeric literal: 0, 1, 2, ...
+
     // Operators
     Plus,        // +
     Minus,       // -
@@ -122,6 +125,8 @@ impl<'a> Lexer<'a> {
                 }
             }
             '→' => { self.advance(); Token::Arrow }
+            '≥' => { self.advance(); Token::Ge }
+            '≤' => { self.advance(); Token::Le }
             '>' => {
                 self.advance();
                 if self.current_char() == '=' {
@@ -143,6 +148,20 @@ impl<'a> Lexer<'a> {
             '+' => { self.advance(); Token::Plus }
             '*' => { self.advance(); Token::Star }
             '/' => { self.advance(); Token::Slash }
+            c if c.is_ascii_digit() => {
+                // Parse number literal
+                let mut num = 0u64;
+                while self.pos < self.input.len() {
+                    let c = self.current_char();
+                    if c.is_ascii_digit() {
+                        num = num * 10 + (c as u64 - '0' as u64);
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                Token::Number(num)
+            }
             '!' => {
                 self.advance();
                 if self.current_char() == '=' {

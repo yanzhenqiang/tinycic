@@ -75,13 +75,13 @@ impl Operator {
                 token: token.clone(),
                 precedence: Precedence::Relational,
                 right_assoc: false,
-                name: "le",
+                name: "LE",
             }),
             Token::Ge => Some(Operator {
                 token: token.clone(),
                 precedence: Precedence::Relational,
                 right_assoc: false,
-                name: "ge",
+                name: "GE",
             }),
             Token::Equal => Some(Operator {
                 token: token.clone(),
@@ -639,6 +639,24 @@ impl<'a> Parser<'a> {
             Token::Underscore => {
                 self.advance();
                 Ok(Term::var(0)) // Use var(0) for wildcard
+            }
+            Token::Number(n) => {
+                let num = *n;
+                self.advance();
+                // Convert number to Int expression via ofNat
+                // 0 -> ofNat Nat.zero
+                // 1 -> ofNat (Nat.succ Nat.zero)
+                // 2 -> ofNat (Nat.succ (Nat.succ Nat.zero))
+                let nat_val = if num == 0 {
+                    Term::const_("Nat.zero")
+                } else {
+                    let mut result = Term::const_("Nat.zero");
+                    for _ in 0..num {
+                        result = Term::app(Term::const_("Nat.succ"), result);
+                    }
+                    result
+                };
+                Ok(Term::app(Term::const_("ofNat"), nat_val))
             }
             _ => {
                 // Unexpected token, return a placeholder

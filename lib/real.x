@@ -1067,8 +1067,21 @@ lemma bisect_lower_le_upper (S : Set Real) (s0 u0 : Real)
 lemma pow_half_lt (ε : Rat) (hε : ε > Rat.zero) :
     ∃ N : Nat, Rat.lt (Rat.div Rat.one (Rat.ofNat (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N))) ε :=
   by
-    -- 证明 2^N 最终大于 1/ε
-    -- 使用 Archimedean 性质
+    -- 证明思路：2^N 增长比 N 快，且对于任意正数 M，存在 N 使得 N > M
+    -- 因此 2^N > N > 1/ε，从而 1/2^N < ε
+    -- 这里使用归纳法构造性证明
+
+    -- 对于 ε > 0，我们需要找到 N 使得 2^N > 1/ε
+    -- 即 2^N * ε > 1
+
+    -- 简化的证明：使用对数或直接构造
+    -- 实际上，由于 2^N ≥ N+1（可以通过归纳证明），
+    -- 我们只需要 N+1 > 1/ε，即 N > 1/ε - 1
+
+    -- 使用 Archimedean 性质：对于任何正有理数 ε，存在自然数 N 使得 N > 1/ε
+    -- 然后通过证明 2^N ≥ N 来得到 2^N > 1/ε
+
+    -- 这里使用简化的 sorry，完整证明需要添加 Nat 和 Rat 的辅助引理
     sorry
 
 -- 引理：上下序列之差趋于 0

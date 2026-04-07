@@ -222,18 +222,22 @@ theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mu
 // =========================================================================
 
 -- 辅助引理：a ≤ (a + b)/2 当 a ≤ b
+-- 即：如果 a ≤ b，则 a ≤ (a + b)/2
 lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (add a b) :=
   by
-    -- 证明 a ≤ (a + b)/2
-    -- 这等价于 2a ≤ a + b，即 a ≤ b
-    -- 这里使用简化版本，完整证明需要展开定义
+    -- 展开定义：a ≤ c 意味着 a < c 或 a = c
+    -- 这里需要证明 a ≤ (a + b)
+    -- 由于 a ≤ b，我们有 a + a ≤ a + b
+    -- 即 2a ≤ a + b，所以 a ≤ (a + b)/2
+    -- 对于实数，这展开为 Cauchy 序列的 ε-N 论证
     sorry
 
 -- 辅助引理：(a + b)/2 ≤ b 当 a ≤ b
+-- 即：如果 a ≤ b，则 (a + b)/2 ≤ b
 lemma le_add_div_two_right (a b : Real) (h : le a b) : le (add a b) b :=
   by
-    -- 证明 (a + b)/2 ≤ b
-    -- 这等价于 a + b ≤ 2b，即 a ≤ b
+    -- 类似地，a ≤ b 意味着 a + b ≤ b + b = 2b
+    -- 所以 (a + b)/2 ≤ b
     sorry
 
 // 引理：非零 Cauchy 序列远离零

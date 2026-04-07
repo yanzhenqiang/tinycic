@@ -267,18 +267,27 @@ impl TheoremProcessor {
 
         // 3. 处理证明项
         // 对于 sorry 占位符，直接使用 sorry 应用到结果类型
+        // 根据 statement 的 universe 选择合适的 sorry
         let proof_term = if let Some(ref proof) = decl.proof {
             match proof.as_ref() {
                 Term::Const(name) if name == "sorry" => {
-                    // sorry 的类型是 {A : Type} -> A
-                    // 应用 sorry 到整个陈述类型: sorry (Pi r1 r2, result_ty)
-                    Term::app(Term::const_("sorry"), decl.statement.clone())
+                    // 根据 statement 的 universe 选择 sorry 或 sorryProp
+                    // 如果 statement 是 Prop (Sort 0)，使用 sorryProp
+                    let is_prop = match inference.infer(&Context::new(), &decl.statement) {
+                        Ok(ty) => matches!(ty.as_ref(), Term::Sort(l) if l.0 == 0),
+                        Err(_) => false,
+                    };
+                    if is_prop {
+                        Term::app(Term::const_("sorryProp"), decl.statement.clone())
+                    } else {
+                        Term::app(Term::const_("sorry"), decl.statement.clone())
+                    }
                 }
                 // 处理 sorry 已经应用到部分表达式的情况
                 Term::App { func, arg: _ } => {
                     if let Term::Const(name) = func.as_ref() {
                         if name == "sorry" {
-                            // 重新应用 sorry 到整个陈述
+                            // 重新应用 sorry
                             Term::app(Term::const_("sorry"), decl.statement.clone())
                         } else {
                             proof.clone()

@@ -176,7 +176,12 @@ impl<'a> Lexer<'a> {
             if c.is_whitespace() {
                 self.advance();
             } else if c == '/' && self.peek() == Some('/') {
-                // Skip line comment
+                // Skip // line comment
+                while self.current_char() != '\n' && self.pos < self.input.len() {
+                    self.advance();
+                }
+            } else if c == '-' && self.peek() == Some('-') {
+                // Skip -- line comment (Lean style)
                 while self.current_char() != '\n' && self.pos < self.input.len() {
                     self.advance();
                 }

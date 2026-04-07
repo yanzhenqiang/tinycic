@@ -513,8 +513,12 @@ pub fn init_prelude(env: &mut Environment) {
     // 这会处理模块依赖，确保先加载导入的模块
     let mut loaded = std::collections::HashSet::new();
     // 注册 sorry 作为不完整证明的占位符（必须在 theorem 加载之前）
+    // sorry : (A : Type) -> A  用于 Type 级别
     let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
     env.add_constant("sorry", sorry_ty, None);
+    // sorryProp : (A : Prop) -> A  用于 Prop 级别
+    let sorry_prop_ty = Term::pi("A", Term::sort(0), Term::var(0));
+    env.add_constant("sorryProp", sorry_prop_ty, None);
 
     // 加载 Int 模块（包含定理定义）
     let _ = load_module_with_imports(env, "lib/int.x", "Int", &mut loaded);

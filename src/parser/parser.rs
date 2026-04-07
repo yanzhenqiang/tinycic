@@ -1596,6 +1596,16 @@ impl<'a> Parser<'a> {
         let mut components = Vec::new();
 
         while self.current != Token::Pipe && self.current != Token::Eof {
+            // Check for keywords that end the type
+            match &self.current {
+                Token::Def | Token::Theorem | Token::Lemma |
+                Token::Structure | Token::Inductive | Token::Namespace |
+                Token::End | Token::Where | Token::By => {
+                    break;
+                }
+                _ => {}
+            }
+
             match &self.current {
                 Token::Ident(s) => {
                     components.push(Term::const_(s.clone()));

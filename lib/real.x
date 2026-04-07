@@ -848,32 +848,9 @@ lemma cauchy_equiv_of_close (s1 s2 : CauchySeq)
 theorem lt_trichotomy (r1 r2 : Real) : (lt r1 r2 ∨ eq r1 r2) ∨ lt r2 r1 :=
   by
     -- 序关系三歧性：实数比较只有三种情况
-    -- 使用 cauchy_trichotomy 分析 r1.rep 和 r2.rep
-    obtain (h1 | h2 | h3) := cauchy_trichotomy r1.rep r2.rep
-
-    · -- 情况1: ∃ε>0, ∃N, ∀n≥N, r1.rep(n) + ε < r2.rep(n)
-      -- 这意味着 r1 < r2
-      left
-      left
-      obtain ⟨ε, hε_pos, N, hN⟩ := h1
-      use ε, hε_pos, N
-      intro n hn
-      exact hN n hn
-
-    · -- 情况2: ∀ε>0, ∃N, ∀n≥N, |r1.rep(n) - r2.rep(n)| < ε
-      -- 这意味着 r1 = r2 (作为等价类)
-      left
-      right
-      -- 证明 CauchySeq.equiv r1.rep r2.rep
-      exact h2
-
-    · -- 情况3: ∃ε>0, ∃N, ∀n≥N, r2.rep(n) + ε < r1.rep(n)
-      -- 这意味着 r2 < r1
-      right
-      obtain ⟨ε, hε_pos, N, hN⟩ := h3
-      use ε, hε_pos, N
-      intro n hn
-      exact hN n hn
+    -- 依赖于 cauchy_trichotomy 引理，三种情况必居其一
+    -- TODO: tactic 解析器需要支持 obtain 多分支模式
+    sorry
 
 // =========================================================================
 // 完备性定理

@@ -5,6 +5,7 @@
 1. **单一状态管理** - DESIGN.MD 是项目唯一的状态管理器，所有状态变更必须在此记录
 2. **功能独立提交** - 每个功能必须单独提交，确保变更可追溯
 3. **测试驱动** - 修复提交必须包含测试用例、修复代码、测试通过三部分
+4. **严格验证流程** - 证明修复必须验证生成的 proof term 不是 `sorry`
 
 ## 概述
 
@@ -588,4 +589,78 @@ cargo test test_theorem_verification -- --nocapture 2>&1 | grep "Failed to verif
 - ✅ 14个 Real 定理类型验证通过
 - ✅ 无 "Failed to parse" 错误（除了解析测试本身）
 - ✅ 无 "Failed to verify theorem Real." 错误
+
+
+---
+
+## 定理证明验证流程（强制）
+
+修复任何带有 `sorry` 的定理时，必须执行以下验证步骤：
+
+### Step 1: 编译检查
+```bash
+cargo build --release
+```
+✓ 确保无编译错误
+
+### Step 2: 单元测试
+```bash
+cargo test --release
+```
+✓ 确保所有测试通过
+
+### Step 3: 检查生成的 Proof Term（关键）
+**必须确认生成的 proof term 不包含 `sorry`**
+
+验证方法：
+1. 在 `src/prelude.rs` 的 `load_theorem_from_file` 中添加 debug 输出：
+```rust
+println!("DEBUG: Theorem {} proof term: {:?}", full_name, namespaced_proof);
+```
+
+2. 运行测试并检查输出：
+```bash
+cargo test test_real -- --nocapture 2>&1 | grep -E "DEBUG.*proof term"
+```
+
+3. **必须确认 proof term 不是 `Const("sorry")` 或 `App(Const("sorry"), _)`**
+
+### Step 4: 检查 tactic 支持情况
+在编写证明前，先确认 tactic 解析器支持该语法：
+
+查看 `src/tactic/proof_builder.rs` 中的 `parse_tactic_line` 函数，确认支持的 tactic：
+- `intro` ✓
+- `use` ✓  
+- `exact` ✓
+- `have` ✓
+- `obtain` ✓（但**不支持**多分支模式 `(h1 | h2 | h3)`）
+- `calc` ✓
+- `rw` ✓
+- `sorry` ✓
+
+**注意**: `obtain (h1 | h2 | h3)` 多分支语法**不支持**，会被解析为简单的 `have` 并 fallback 到 `sorry`。
+
+### Step 5: 提交前最终确认
+```bash
+# 1. 确认文件中没有剩余的 sorry（除了 TODO 标记的）
+grep -n "sorry" lib/*.x | grep -v "TODO\|//.*sorry"
+
+# 2. 运行完整测试套件
+cargo test --release
+
+# 3. 确认 git diff
+git diff --stat
+```
+
+---
+
+## 已知限制
+
+### Tactic 解析器限制
+1. **不支持 `obtain` 多分支模式**：`obtain (h1 | h2 | h3) := proof` 会被错误解析
+2. **不支持 `cases`/`match` tactic**
+3. **不支持结构化证明块**（`·` bullet points）
+
+### 解决方案
+对于需要多分支的情况，暂时使用 `sorry` 占位，并添加 TODO 注释说明依赖的引理。
 

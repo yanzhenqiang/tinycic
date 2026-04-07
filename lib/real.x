@@ -229,16 +229,37 @@ theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mu
 -- 即：如果 a ≤ b，则 a ≤ half(a + b)
 lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (half (add a b)) :=
   by
-    -- 证明思路：
-    -- 需要证明 a ≤ (a + b)/2
-    -- 这等价于 2a ≤ a + b，即 a ≤ b（这正是假设 h）
-    -- 展开为 Cauchy 序列的 ε-N 论证：
-    -- 对于足够大的 n，a(n) + ε < (a(n) + b(n))/2
-    -- 即 2a(n) + 2ε < a(n) + b(n)
-    -- 即 a(n) + 2ε < b(n)
-    -- 由 h: a ≤ b，存在 ε' > 0 使得 a(n) + ε' < b(n)
-    -- 取 ε = ε'/2 即可
-    sorry
+    -- 展开 le 定义：需要证明 lt a (half (add a b)) ∨ eq a (half (add a b))
+    -- 由 h: le a b，我们有 lt a b ∨ eq a b
+    cases h with
+    | inl h_lt =>
+        -- 情况1：a < b
+        -- 需要证明 a < (a + b)/2
+        -- 展开 lt 定义：∃ ε > 0, ∃ N, ∀ n ≥ N, a(n) + ε < (a(n) + b(n))/2
+        -- 即 2a(n) + 2ε < a(n) + b(n)
+        -- 即 a(n) + 2ε < b(n)
+        -- 由 a < b，存在 ε' > 0, N, ∀ n ≥ N, a(n) + ε' < b(n)
+        -- 取 ε = ε'/2 即可
+        obtain ⟨ε, hε_pos, N, hN⟩ := h_lt
+        use Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+        constructor
+        · -- 证明 ε/2 > 0
+          apply Rat.div_pos hε_pos
+          exact Nat.le_succ _
+        use N
+        intro n hn
+        -- 需要证明 a(n) + ε/2 < (a(n) + b(n))/2
+        -- 即 2a(n) + ε < a(n) + b(n)
+        -- 即 a(n) + ε < b(n)
+        have h_lt' := hN n hn
+        -- 由 h_lt': a(n) + ε < b(n)，我们可以得到 a(n) + ε/2 < (a(n) + b(n))/2
+        -- 因为 (a(n) + b(n))/2 = a(n) + (b(n) - a(n))/2 > a(n) + ε/2
+        sorry
+    | inr h_eq =>
+        -- 情况2：a = b
+        -- 则 (a + b)/2 = (a + a)/2 = a，所以 a ≤ (a + b)/2 成立
+        -- 实际上 a = (a + b)/2
+        sorry
 
 -- 辅助引理：(a + b)/2 ≤ b 当 a ≤ b
 -- 即：如果 a ≤ b，则 half(a + b) ≤ b

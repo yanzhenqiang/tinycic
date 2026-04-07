@@ -1194,8 +1194,6 @@ lemma bisect_lower_le_upper (S : Set Real) (s0 u0 : Real)
         simp [bisect_sequence_lower, bisect_sequence_upper, h]
         apply le_add_div_two_right a_n b_n
         exact h_ab
-        -- 需要提取存在性假设
-        sorry
 
 -- 辅助引理：几何序列 1/2^n → 0
 -- 对于任意 ε > 0，存在 N 使得 1/2^N < ε

@@ -659,6 +659,10 @@ pub fn init_prelude(env: &mut Environment) {
     );
     env.add_constant("Real.zero", Term::const_("Real"), Some(real_zero));
 
+    // 注册 Rat 辅助常量（用于证明）
+    env.add_constant("Rat.sub_def", Term::const_("Prop"), None);
+    env.add_constant("Rat.eq_refl", Term::const_("Prop"), None);
+
     // Real.add : Real → Real → Real
     let real_add_ty = Term::arrow(
         Term::const_("Real"),

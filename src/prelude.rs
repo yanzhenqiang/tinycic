@@ -384,6 +384,18 @@ pub fn init_prelude(env: &mut Environment) {
     let _ = load_inductive_from_file(env, "lib/list.x");
     let _ = load_inductive_from_file(env, "lib/int.x");
 
+    // 手动注册归纳类型的构造子（用于 theorem 中的引用）
+    // Nat.succ : Nat → Nat
+    env.add_constant("Nat.succ", Term::arrow(Term::const_("Nat"), Term::const_("Nat")), None);
+    // Int.ofNat : Nat → Int
+    env.add_constant("Int.ofNat", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);
+    // Int.negSucc : Nat → Int
+    env.add_constant("Int.negSucc", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);
+    // PosInt 类型和构造子
+    env.add_constant("PosInt", Term::type0(), None);
+    env.add_constant("PosInt.one", Term::const_("PosInt"), None);
+    env.add_constant("PosInt.succ", Term::arrow(Term::const_("PosInt"), Term::const_("PosInt")), None);
+
          // 从 .x 文件加载结构体类型（动态注册）
     let _ = load_structure_from_file(env, "lib/rat.x");
     let _ = load_structure_from_file(env, "lib/cauchy.x");
@@ -398,6 +410,47 @@ pub fn init_prelude(env: &mut Environment) {
     // sorry : {A : Type} → A
     let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
     env.add_constant("sorry", sorry_ty, None);
+
+    // 注册 Int 辅助常量（用于 Rat 证明）
+    env.add_constant("Int.abs_zero", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_nonneg", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_add", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_mul", Term::const_("Prop"), None);
+    env.add_constant("Int.add_comm", Term::const_("Prop"), None);
+    env.add_constant("Int.add_assoc", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_comm", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_assoc", Term::const_("Prop"), None);
+    env.add_constant("Int.sub_self", Term::const_("Prop"), None);
+    env.add_constant("Int.sub_add_distrib", Term::const_("Prop"), None);
+    env.add_constant("Int.add_zero", Term::const_("Prop"), None);
+    env.add_constant("Int.zero_add", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_one", Term::const_("Prop"), None);
+    env.add_constant("Int.one_mul", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_add", Term::const_("Prop"), None);
+    env.add_constant("Int.add_neg", Term::const_("Prop"), None);
+    env.add_constant("Int.half_add_half", Term::const_("Prop"), None);
+    env.add_constant("Int.add_mul_self", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_div_cancel'", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_div_cancel_left", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_div_cancel_right", Term::const_("Prop"), None);
+    env.add_constant("Int.div_nonneg", Term::const_("Prop"), None);
+    env.add_constant("Int.div_neg_of_neg", Term::const_("Prop"), None);
+    env.add_constant("Int.neg_div_eq_div_neg", Term::const_("Prop"), None);
+    env.add_constant("Int.half_add_sub_left", Term::const_("Prop"), None);
+    env.add_constant("Int.sub_half_add_right", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_div_two", Term::const_("Prop"), None);
+    env.add_constant("Int.pow_half_lt", Term::const_("Prop"), None);
+    env.add_constant("Int.pow_two_ge_succ", Term::const_("Prop"), None);
+    env.add_constant("Int.archimedean", Term::const_("Prop"), None);
+    env.add_constant("Int.Real_mk_eq_of_equiv", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_lt_lower_bound", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_lt_upper_bound_neg", Term::const_("Prop"), None);
+    env.add_constant("Int.mono_bounded_cauchy", Term::const_("Prop"), None);
+    env.add_constant("Int.bisect_upper_cauchy", Term::const_("Prop"), None);
+    env.add_constant("Int.bisect_eq_zero", Term::const_("Prop"), None);
+    env.add_constant("Int.upper_bound_of_convergent_upper_bound", Term::const_("Prop"), None);
+    env.add_constant("Int.lower_bound_of_convergent_lower_bound", Term::const_("Prop"), None);
+    env.add_constant("Int.mid_le_upper_bound", Term::const_("Prop"), None);
 
     // 注册 Eq 相关定理（用于 calc 块证明）
     // Eq.trans : {A : Type} → {a b c : A} → a = b → b = c → a = c

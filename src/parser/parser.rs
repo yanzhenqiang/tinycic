@@ -192,6 +192,41 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse an import statement
+    /// Format: import Namespace
+    pub fn parse_import(&mut self) -> Result<String, ParseError> {
+        // Expect 'import' keyword
+        if self.current != Token::Import {
+            return Err(ParseError::ExpectedKeyword("import".to_string()));
+        }
+        self.advance();
+
+        // Parse module path (e.g., "Mathlib.Data.Int.Basic" or just "Int")
+        let mut path = String::new();
+        loop {
+            match &self.current {
+                Token::Ident(name) => {
+                    path.push_str(name);
+                    self.advance();
+                }
+                _ => break,
+            }
+            // Handle dot-separated paths
+            if self.current == Token::Dot {
+                path.push('.');
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        if path.is_empty() {
+            return Err(ParseError::ExpectedIdent);
+        }
+
+        Ok(path)
+    }
+
     /// Parse an inductive type definition
     /// Format: inductive Name (params) where | ctor : type | ...
     pub fn parse_inductive(&mut self) -> Result<InductiveDecl, ParseError> {

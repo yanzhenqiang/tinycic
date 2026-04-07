@@ -18,6 +18,7 @@ def abs (z : Int) : Int := z
 def add (a b : Int) : Int := a
 def mul (a b : Int) : Int := a
 def sub (a b : Int) : Int := a
+def neg (a : Int) : Int := a
 
 -- 绝对值引理
 lemma abs_zero : abs zero = zero :=

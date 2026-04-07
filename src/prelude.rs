@@ -495,6 +495,8 @@ pub fn init_prelude(env: &mut Environment) {
     let _ = load_inductive_from_file(env, "lib/int.x");
 
     // 手动注册归纳类型的构造子（用于 theorem 中的引用）
+    // Nat.zero : Nat
+    env.add_constant("Nat.zero", Term::const_("Nat"), None);
     // Nat.succ : Nat → Nat
     env.add_constant("Nat.succ", Term::arrow(Term::const_("Nat"), Term::const_("Nat")), None);
     // Int.ofNat : Nat → Int
@@ -505,6 +507,7 @@ pub fn init_prelude(env: &mut Environment) {
     env.add_constant("PosInt", Term::type0(), None);
     env.add_constant("PosInt.one", Term::const_("PosInt"), None);
     env.add_constant("PosInt.succ", Term::arrow(Term::const_("PosInt"), Term::const_("PosInt")), None);
+    env.add_constant("PosInt.toNat", Term::arrow(Term::const_("PosInt"), Term::const_("Nat")), None);
 
          // 使用新的 import 机制加载模块
     // 这会处理模块依赖，确保先加载导入的模块

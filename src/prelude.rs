@@ -62,6 +62,67 @@ fn type_contains(ty: &Term, target: &Term) -> bool {
     }
 }
 
+/// 提取 .x 文件中的 import 声明
+fn extract_imports(content: &str) -> Vec<String> {
+    let mut imports = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("import ") {
+            let module = trimmed.strip_prefix("import ").unwrap().trim();
+            imports.push(module.to_string());
+        }
+    }
+    imports
+}
+
+/// 模块路径到文件路径的映射
+fn module_to_path(module: &str) -> String {
+    // 简单映射：Int -> lib/int.x, Rat -> lib/rat.x
+    let parts: Vec<&str> = module.split('.').collect();
+    let name = parts.last().unwrap().to_lowercase();
+    format!("lib/{}.x", name)
+}
+
+/// 加载模块及其依赖（处理 import）
+pub fn load_module_with_imports(
+    env: &mut Environment,
+    path: &str,
+    namespace: &str,
+    loaded: &mut std::collections::HashSet<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // 避免循环依赖
+    if loaded.contains(path) {
+        return Ok(());
+    }
+    loaded.insert(path.to_string());
+
+    // 读取文件内容
+    let content = if let Ok(c) = std::fs::read_to_string(path) {
+        c
+    } else if let Ok(c) = std::fs::read_to_string(&format!("../{}", path)) {
+        c
+    } else if let Ok(c) = std::fs::read_to_string(&format!("../../{}", path)) {
+        c
+    } else {
+        return Ok(());
+    };
+
+    // 先处理 import
+    let imports = extract_imports(&content);
+    for module in imports {
+        let dep_path = module_to_path(&module);
+        let dep_namespace = module.split('.').last().unwrap_or(&module);
+        load_module_with_imports(env, &dep_path, dep_namespace, loaded)?;
+    }
+
+    // 然后加载当前模块的定义
+    let _ = load_structure_from_file(env, path);
+    let _ = load_def_from_file(env, path, namespace);
+    let _ = load_theorem_from_file(env, path, namespace);
+
+    Ok(())
+}
+
 /// 从 .x 文件加载 def 定义（带命名空间前缀）
 pub fn load_def_from_file(env: &mut Environment, path: &str, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
     // 尝试多个可能的路径
@@ -396,15 +457,12 @@ pub fn init_prelude(env: &mut Environment) {
     env.add_constant("PosInt.one", Term::const_("PosInt"), None);
     env.add_constant("PosInt.succ", Term::arrow(Term::const_("PosInt"), Term::const_("PosInt")), None);
 
-         // 从 .x 文件加载结构体类型（动态注册）
-    let _ = load_structure_from_file(env, "lib/rat.x");
-    let _ = load_structure_from_file(env, "lib/cauchy.x");
-    let _ = load_structure_from_file(env, "lib/real.x");
-
-    // 从 .x 文件加载 def 定义（动态注册 - 简化版，带命名空间前缀）
-    let _ = load_def_from_file(env, "lib/rat.x", "Rat");
-    let _ = load_def_from_file(env, "lib/cauchy.x", "CauchySeq");
-    let _ = load_def_from_file(env, "lib/real.x", "Real");
+         // 使用新的 import 机制加载模块
+    // 这会处理模块依赖，确保先加载导入的模块
+    let mut loaded = std::collections::HashSet::new();
+    let _ = load_module_with_imports(env, "lib/rat.x", "Rat", &mut loaded);
+    let _ = load_module_with_imports(env, "lib/cauchy.x", "CauchySeq", &mut loaded);
+    let _ = load_module_with_imports(env, "lib/real.x", "Real", &mut loaded);
 
     // 注册 sorry 作为不完整证明的占位符（必须在 theorem 加载之前）
     // sorry : {A : Type} → A

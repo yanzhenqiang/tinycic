@@ -2,6 +2,8 @@
 // 基于整数构造：Rat = (num : Int, den : PosInt) / 等价关系
 // 其中 (a, b) ~ (c, d) 当且仅当 a * d = c * b
 
+import Int
+
 // 首先定义正整数
 inductive PosInt where
   | one : PosInt

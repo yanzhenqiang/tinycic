@@ -221,7 +221,7 @@ impl<'a> Parser<'a> {
         }
 
         if path.is_empty() {
-            return Err(ParseError::ExpectedIdent);
+            return Err(ParseError::ExpectedIdentifier("module path".to_string()));
         }
 
         Ok(path)

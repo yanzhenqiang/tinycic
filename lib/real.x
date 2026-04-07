@@ -252,13 +252,18 @@ lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (half (add a b)) :=
         -- 即 2a(n) + ε < a(n) + b(n)
         -- 即 a(n) + ε < b(n)
         have h_lt' := hN n hn
-        -- 由 h_lt': a(n) + ε < b(n)，我们可以得到 a(n) + ε/2 < (a(n) + b(n))/2
-        -- 因为 (a(n) + b(n))/2 = a(n) + (b(n) - a(n))/2 > a(n) + ε/2
-        sorry
+        -- 由 h_lt': a(n) + ε < b(n)，使用 Rat.lt_half_add 引理
+        -- 得到 a(n) + ε/2 < (a(n) + b(n))/2
+        apply Rat.lt_half_add
+        · exact hε_pos
+        · exact h_lt'
     | inr h_eq =>
         -- 情况2：a = b
-        -- 则 (a + b)/2 = (a + a)/2 = a，所以 a ≤ (a + b)/2 成立
-        -- 实际上 a = (a + b)/2
+        -- 则 (a + b)/2 = (a + a)/2 = a，所以 a = (a + b)/2
+        -- 因此 le a (half (add a b)) 由 eq 得到
+        right
+        -- 需要证明 a = (a + b)/2
+        -- 由 h_eq: a = b，展开 half (add a b) = (a + a)/2 = a
         sorry
 
 -- 辅助引理：(a + b)/2 ≤ b 当 a ≤ b

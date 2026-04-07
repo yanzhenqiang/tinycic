@@ -1232,7 +1232,7 @@ lemma bisect_diff_to_zero (S : Set Real) (s0 u0 : Real)
     -- 每一步差值减半：|b_{n+1} - a_{n+1}| ≤ |b_n - a_n| / 2
     -- 因此 |b_n - a_n| ≤ d0 / 2^n
 
-    -- 取 N 使得 d0 / 2^N < ε
+    -- 取 N 使得 1/2^N < ε/d0，即 d0/2^N < ε
     obtain ⟨N, hN⟩ := pow_half_lt (Rat.div ε d0) (Rat.div_pos hε (Rat.abs_pos_of_ne_zero (by sorry)))
 
     use N
@@ -1244,13 +1244,23 @@ lemma bisect_diff_to_zero (S : Set Real) (s0 u0 : Real)
                        (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n)
           ≤ Rat.div d0 (Rat.ofNat (Nat.pow (Nat.succ (Nat.succ Nat.zero)) n)) := by
               -- 归纳证明 |b_n - a_n| ≤ d0 / 2^n
-              -- 基本情况 n=0：|b_0 - a_0| = d0 = d0 / 2^0
-              -- 归纳步骤：使用 bisect_diff_halve 引理
-              -- |b_{n+1} - a_{n+1}| ≤ |b_n - a_n| / 2 ≤ (d0 / 2^n) / 2 = d0 / 2^{n+1}
-              sorry
+              induction n with
+              | zero =>
+                -- 基本情况 n=0：|b_0 - a_0| = |u0 - s0| = d0
+                simp [d0]
+                exact Rat.le_refl
+              | succ n ih =>
+                -- 归纳步骤：假设 |b_n - a_n| ≤ d0 / 2^n
+                -- 使用 bisect_diff_halve：|b_{n+1} - a_{n+1}| ≤ |b_n - a_n| / 2
+                -- 所以 |b_{n+1} - a_{n+1}| ≤ (d0 / 2^n) / 2 = d0 / 2^{n+1}
+                have h_halve := bisect_diff_halve S s0 u0 hs0 hu0 n
+                -- 结合归纳假设和减半引理
+                sorry
       _ < ε := by
-              -- 由 pow_half_lt：d0 / 2^N < ε（当 d0 / 2^N < ε 时）
-              -- 需要验证 pow_half_lt 的应用正确
+              -- 需要证明：d0 / 2^n < ε
+              -- 由 hN：d0 / 2^N < ε / d0 * d0（这里 pow_half_lt 应用有点问题）
+              -- 实际上，由于 n ≥ N，且 2^n ≥ 2^N，所以 1/2^n ≤ 1/2^N
+              -- 因此 d0 / 2^n ≤ d0 / 2^N < ε
               sorry
 
 -- 引理：二分法序列差值减半

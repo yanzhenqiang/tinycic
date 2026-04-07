@@ -963,6 +963,41 @@ impl<'a> Parser<'a> {
                 Token::Arrow => {
                     self.advance();
                 }
+                Token::Equal => {
+                    // Handle equality: a = b becomes Eq a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of equality".to_string()));
+                    } else {
+                        // Build application from accumulated terms
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("Eq"), lhs), rhs));
+                }
+                Token::Ge => {
+                    // Handle greater than or equal: a ≥ b becomes GE a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of >=".to_string()));
+                    } else {
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("GE"), lhs), rhs));
+                }
                 Token::LParen => {
                     self.advance();
                     // Parse parenthesized sub-expression

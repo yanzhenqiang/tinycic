@@ -440,6 +440,55 @@ pub fn init_prelude(env: &mut Environment) {
     // Prop = Sort(0)
     env.add_constant("Prop", Term::sort(0), None);
 
+    // 注册 Eq 类型（必须在 theorem 加载之前）
+    // Eq : {A : Type} → A → A → Prop
+    let eq_ty = Term::pi(
+        "A",
+        Term::type0(),
+        Term::pi(
+            "a",
+            Term::var(0),
+            Term::pi(
+                "b",
+                Term::var(1),
+                Term::sort(0), // Prop
+            ),
+        ),
+    );
+    env.add_constant("Eq", eq_ty, None);
+
+    // 注册 LE (≤) 类型
+    let le_ty = Term::pi(
+        "A",
+        Term::type0(),
+        Term::pi(
+            "a",
+            Term::var(0),
+            Term::pi(
+                "b",
+                Term::var(1),
+                Term::sort(0),
+            ),
+        ),
+    );
+    env.add_constant("LE", le_ty, None);
+
+    // 注册 GE (≥) 类型
+    let ge_ty = Term::pi(
+        "A",
+        Term::type0(),
+        Term::pi(
+            "a",
+            Term::var(0),
+            Term::pi(
+                "b",
+                Term::var(1),
+                Term::sort(0),
+            ),
+        ),
+    );
+    env.add_constant("GE", ge_ty, None);
+
     // 从 .x 文件加载所有归纳类型（动态注册）
     let _ = load_inductive_from_file(env, "lib/nat.x");
     let _ = load_inductive_from_file(env, "lib/list.x");

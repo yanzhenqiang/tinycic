@@ -225,6 +225,17 @@ theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mu
 // 序关系辅助引理（用于完备性证明）
 // =========================================================================
 
+-- 引理：如果 a = b，则 (a + b)/2 = a
+lemma half_add_eq_self (a b : Real) (h : eq a b) : eq (half (add a b)) a :=
+  by
+    -- 由 h: a = b，展开 half (add a b)
+    -- (a + b)/2 = (a + a)/2 = (2*a)/2 = a
+    -- 这里需要证明：
+    -- ∀ ε > 0, ∃ N, ∀ n ≥ N, |(a(n) + b(n))/2 - a(n)| < ε
+    -- 由 a ~ b，∀ ε > 0, ∃ N, ∀ n ≥ N, |a(n) - b(n)| < ε
+    -- 所以 |(a(n) + b(n))/2 - a(n)| = |(b(n) - a(n))/2| < ε/2 < ε
+    sorry
+
 -- 辅助引理：a ≤ (a + b)/2 当 a ≤ b
 -- 即：如果 a ≤ b，则 a ≤ half(a + b)
 lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (half (add a b)) :=
@@ -262,9 +273,8 @@ lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (half (add a b)) :=
         -- 则 (a + b)/2 = (a + a)/2 = a，所以 a = (a + b)/2
         -- 因此 le a (half (add a b)) 由 eq 得到
         right
-        -- 需要证明 a = (a + b)/2
-        -- 由 h_eq: a = b，展开 half (add a b) = (a + a)/2 = a
-        sorry
+        -- 使用 half_add_eq_self 引理
+        apply half_add_eq_self a b h_eq
 
 -- 辅助引理：(a + b)/2 ≤ b 当 a ≤ b
 -- 即：如果 a ≤ b，则 half(a + b) ≤ b

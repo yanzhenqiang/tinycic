@@ -1282,15 +1282,37 @@ lemma bisect_diff_halve (S : Set Real) (s0 u0 : Real)
       -- 则 a_{n+1} = a_n, b_{n+1} = mid = (a_n + b_n)/2
       simp [bisect_sequence_lower, bisect_sequence_upper, h, half, add]
       -- 需要证明：|mid - a_n| = |(a_n + b_n)/2 - a_n| = |(b_n - a_n)/2| = |b_n - a_n|/2
-      -- 使用 Rat.half_add_sub_left 和 Rat.abs_div_two
-      sorry
+      calc
+        Rat.abs (Rat.sub (Rat.div (Rat.add (CauchySeq.getSeq a_n.rep n) (CauchySeq.getSeq b_n.rep n))
+                                   (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))))
+                          (CauchySeq.getSeq a_n.rep n))
+            = Rat.abs (Rat.div (Rat.sub (CauchySeq.getSeq b_n.rep n) (CauchySeq.getSeq a_n.rep n))
+                              (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))) := by
+                -- 使用 Rat.half_add_sub_left
+                apply Rat.abs_eq
+                apply Rat.half_add_sub_left
+        _ = Rat.div (Rat.abs (Rat.sub (CauchySeq.getSeq b_n.rep n) (CauchySeq.getSeq a_n.rep n)))
+                    (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) := by
+                -- 使用 Rat.abs_div_two
+                apply Rat.abs_div_two
 
     · -- 情况2：mid 不是上界
       -- 则 a_{n+1} = mid, b_{n+1} = b_n
       simp [bisect_sequence_lower, bisect_sequence_upper, h, half, add]
       -- 需要证明：|b_n - mid| = |b_n - (a_n + b_n)/2| = |(b_n - a_n)/2| = |b_n - a_n|/2
-      -- 使用 Rat.sub_half_add_right 和 Rat.abs_div_two
-      sorry
+      calc
+        Rat.abs (Rat.sub (CauchySeq.getSeq b_n.rep n)
+                          (Rat.div (Rat.add (CauchySeq.getSeq a_n.rep n) (CauchySeq.getSeq b_n.rep n))
+                                   (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))))
+            = Rat.abs (Rat.div (Rat.sub (CauchySeq.getSeq b_n.rep n) (CauchySeq.getSeq a_n.rep n))
+                              (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))) := by
+                -- 使用 Rat.sub_half_add_right
+                apply Rat.abs_eq
+                apply Rat.sub_half_add_right
+        _ = Rat.div (Rat.abs (Rat.sub (CauchySeq.getSeq b_n.rep n) (CauchySeq.getSeq a_n.rep n)))
+                    (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) := by
+                -- 使用 Rat.abs_div_two
+                apply Rat.abs_div_two
 
 -- 引理：单调有界序列是 Cauchy 序列（实数完备性的体现）
 -- 证明思路：单调递增有上界的序列必有上确界，因此收敛，从而也是 Cauchy 序列

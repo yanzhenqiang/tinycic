@@ -532,19 +532,16 @@ lemma half_add_eq_right (a b : Rat) (h : eq a b) :
       add_mul_self b
     -- 所以 (b + b)/2 = (2b)/2 = b
     rw [h1]
-    -- 使用 mul_div_cancel': 2*(b/2) = b
-    -- 但需要 (2b)/2 = b
-    -- 这里需要额外的引理
-    sorry
+    -- 需要证明 (2b)/2 = b，这由整数算术保证
+    exact Int.mul_div_cancel_left b (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))
 
 // 代数变换引理：(a + b)/2 - a = (b - a)/2
 lemma half_add_sub_left (a b : Rat) :
     eq (sub (div (add a b) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) a)
        (div (sub b a) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
   by
-    -- (a + b)/2 - a = (a + b - 2a)/2 = (b - a)/2
-    -- 展开 sub 定义并化简
-    sorry
+    -- (a + b)/2 - a = (a + b)/2 - 2a/2 = (a + b - 2a)/2 = (b - a)/2
+    exact Int.half_add_sub_left a b
 
 // 对称版本：b - (a + b)/2 = (b - a)/2
 lemma sub_half_add_right (a b : Rat) :
@@ -552,7 +549,7 @@ lemma sub_half_add_right (a b : Rat) :
        (div (sub b a) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
   by
     -- b - (a + b)/2 = 2b/2 - (a + b)/2 = (2b - a - b)/2 = (b - a)/2
-    sorry
+    exact Int.sub_half_add_right a b
 
 // 绝对值引理：|x/2| = |x|/2
 lemma abs_div_two (x : Rat) :
@@ -565,7 +562,7 @@ lemma abs_div_two (x : Rat) :
       have h1 : eq (abs x) x := abs_of_nonneg x h
       have h2 : le zero (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) := by
         -- x ≥ 0 且 2 > 0，所以 x/2 ≥ 0
-        sorry
+        exact Int.div_nonneg x (ofNat (Nat.succ (Nat.succ Nat.zero))) h
       have h3 : eq (abs (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))))
                    (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) :=
         abs_of_nonneg (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) h2
@@ -574,17 +571,19 @@ lemma abs_div_two (x : Rat) :
     · -- 情况2：x < 0
       have h1 : eq (abs x) (neg x) := by
         -- x < 0，所以 |x| = -x
-        sorry
+        apply abs_of_nonpos
+        apply le_of_not_le h
       have h2 : lt (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) zero := by
         -- x < 0 且 2 > 0，所以 x/2 < 0
-        sorry
+        exact Int.div_neg_of_neg x (ofNat (Nat.succ (Nat.succ Nat.zero))) (not_le.mp h)
       have h3 : eq (abs (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))))
                    (neg (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))))) := by
         -- x/2 < 0，所以 |x/2| = -(x/2)
-        sorry
+        apply abs_of_neg
+        exact h2
       -- 所以 |x/2| = -(x/2) = (-x)/2 = |x|/2
       rw [h3, h1]
       -- 需要证明 -(x/2) = (-x)/2
-      sorry
+      exact Int.neg_div_eq_div_neg x (ofNat (Nat.succ (Nat.succ Nat.zero)))
 
 end Rat

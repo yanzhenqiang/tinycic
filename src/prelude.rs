@@ -303,7 +303,23 @@ pub fn load_theorem_from_file(env: &mut Environment, path: &str, namespace: &str
             continue;
         }
         // Match theorem or lemma at line start (ignoring leading whitespace)
-        if (trimmed.starts_with("theorem ") || trimmed.starts_with("lemma ")) {
+        if trimmed.starts_with("check ") {
+            // 处理 check 命令
+            if let Some(expr_str) = trimmed.strip_prefix("check ") {
+                match parser::parse_term(expr_str) {
+                    Ok(term) => {
+                        use crate::typecheck::TypeInference;
+                        let mut infer = TypeInference::new(env);
+                        let ctx = Context::new();
+                        match infer.infer(&ctx, &term) {
+                            Ok(ty) => println!("check: {} : {}", term, ty),
+                            Err(e) => eprintln!("check error: {:?}", e),
+                        }
+                    }
+                    Err(e) => eprintln!("parse error: {}", e),
+                }
+            }
+        } else if (trimmed.starts_with("theorem ") || trimmed.starts_with("lemma ")) {
             let theorem_section = &content[pos..];
 
             match parser::parse_theorem(theorem_section) {
@@ -591,6 +607,7 @@ pub fn init_prelude(env: &mut Environment) {
     let _ = load_theorem_from_file(env, "lib/rat.x", "Rat");
     let _ = load_theorem_from_file(env, "lib/cauchy.x", "CauchySeq");
     let _ = load_theorem_from_file(env, "lib/real.x", "Real");
+    let _ = load_theorem_from_file(env, "lib/test_check.x", "TestCheck");
 
     // 手动注册 Rat 常量（parser 暂不支持复杂 def 表达式）
     // TODO: 完善 parser 后迁移到 .x 文件

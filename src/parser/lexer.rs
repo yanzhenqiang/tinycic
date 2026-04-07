@@ -22,6 +22,7 @@ pub enum Token {
     Use,
     Apply,
     Calc,
+    Check,
 
     // Identifiers
     Ident(String),
@@ -248,6 +249,7 @@ impl<'a> Lexer<'a> {
             "use" => Token::Use,
             "apply" => Token::Apply,
             "calc" => Token::Calc,
+            "check" => Token::Check,
             _ => Token::Ident(s.to_string()),
         }
     }

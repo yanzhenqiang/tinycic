@@ -7,6 +7,7 @@
 pub mod inductive;
 pub mod parser;
 pub mod prelude;
+pub mod strict_verification;
 pub mod tactic;
 pub mod term;
 pub mod typecheck;

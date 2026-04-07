@@ -266,6 +266,13 @@ impl<'env> ProofTermGenerator<'env> {
                 // Sorry placeholder
                 Ok(())
             }
+            ParsedTactic::Cases(_var_name, _branches) => {
+                // Cases tactic for Or elimination
+                // For now, we treat it as sorry since generating proper Or.elim
+                // requires knowing the type structure
+                // TODO: Implement proper Or.elim code generation
+                Ok(())
+            }
         }
     }
 

@@ -33,6 +33,9 @@ pub enum ParsedTactic {
     Rw(Vec<Rc<Term>>),
     /// sorry - placeholder
     Sorry,
+    /// cases h with | inl h1 => ... | inr h2 => ...
+    /// For Or elimination: cases (name, vec of (constructor_name, tactics))
+    Cases(Name, Vec<(String, Vec<ParsedTactic>)>),
 }
 
 /// Builds proof terms from tactics
@@ -142,6 +145,13 @@ pub fn parse_tactic_script(script: &str) -> Vec<ParsedTactic> {
             }
 
             tactics.push(ParsedTactic::Calc(calc_steps));
+        } else if line.starts_with("cases ") {
+            // Parse cases block: cases h with | inl h1 => ... | inr h2 => ...
+            if let Some(tactic) = parse_cases_block(&lines, &mut i) {
+                tactics.push(tactic);
+            } else {
+                i += 1;
+            }
         } else {
             // Regular tactic line
             if let Some(tactic) = parse_tactic_line(line) {
@@ -162,7 +172,7 @@ fn is_tactic_line(line: &str) -> bool {
     }
 
     matches!(parts[0],
-        "intro" | "use" | "exact" | "apply" | "have" | "obtain" | "sorry" | "calc" | "rw"
+        "intro" | "use" | "exact" | "apply" | "have" | "obtain" | "sorry" | "calc" | "rw" | "cases"
     )
 }
 
@@ -355,6 +365,100 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
         }
         "sorry" => Some(ParsedTactic::Sorry),
         _ => None,
+    }
+}
+
+/// Parse cases block: cases h with | inl h1 => ... | inr h2 => ...
+/// Returns Cases(name, vec of (constructor_name, branch_tactics))
+fn parse_cases_block(lines: &[&str], i: &mut usize) -> Option<ParsedTactic> {
+    let line = lines[*i].trim();
+
+    // Parse: "cases h with" or "cases h"
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() < 2 {
+        return None;
+    }
+
+    let var_name = parts[1].trim().trim_end_matches(':').to_string();
+
+    // Skip "with" if present
+    let mut branch_start = *i + 1;
+    if parts.len() >= 3 && parts[2] == "with" {
+        // Skip the "with" line
+    }
+
+    // Collect branches
+    let mut branches: Vec<(String, Vec<ParsedTactic>)> = Vec::new();
+
+    while branch_start < lines.len() {
+        let branch_line = lines[branch_start].trim();
+
+        // Skip empty lines and comments
+        if branch_line.is_empty() || branch_line.starts_with("--") || branch_line.starts_with("//") {
+            branch_start += 1;
+            continue;
+        }
+
+        // Check if this is a branch line (starts with |)
+        if branch_line.starts_with('|') || branch_line.starts_with("·") {
+            // Parse branch: "| inl h1 =>" or "| inr h2 =>" or "· -- case1"
+            let without_marker = if branch_line.starts_with("| ") {
+                &branch_line[2..]
+            } else if branch_line.starts_with('|') {
+                &branch_line[1..]
+            } else if branch_line.starts_with("· ") {
+                &branch_line["· ".len()..]
+            } else {
+                &branch_line["·".len()..]
+            };
+
+            // Extract constructor name (e.g., "inl h1 =>" or just "inl")
+            let ctor_part = without_marker.split("=>").next().unwrap_or(without_marker).trim();
+            let ctor_name = ctor_part.split_whitespace().next().unwrap_or("_").to_string();
+
+            // Collect tactics for this branch until next branch or end
+            let mut branch_tactics = Vec::new();
+            branch_start += 1;
+
+            while branch_start < lines.len() {
+                let tactic_line = lines[branch_start].trim();
+
+                // Skip empty lines and comments
+                if tactic_line.is_empty() || tactic_line.starts_with("--") || tactic_line.starts_with("//") {
+                    branch_start += 1;
+                    continue;
+                }
+
+                // Check if next branch starts
+                if tactic_line.starts_with('|') || tactic_line.starts_with("·") {
+                    break;
+                }
+
+                // Check if it's a tactic line
+                if is_tactic_line(tactic_line) {
+                    if let Some(tactic) = parse_tactic_line(tactic_line) {
+                        branch_tactics.push(tactic);
+                    }
+                }
+
+                branch_start += 1;
+            }
+
+            branches.push((ctor_name, branch_tactics));
+        } else if is_tactic_line(branch_line) {
+            // This is a new top-level tactic, stop collecting branches
+            break;
+        } else {
+            branch_start += 1;
+        }
+    }
+
+    *i = branch_start;
+
+    if branches.is_empty() {
+        None
+    } else {
+        Some(ParsedTactic::Cases(var_name, branches))
     }
 }
 

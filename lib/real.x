@@ -845,11 +845,50 @@ lemma cauchy_equiv_of_close (s1 s2 : CauchySeq)
     -- 由假设直接得到
     exact h ε hε
 
+-- Or 类型的 eliminator
+-- Or.elim : (A ∨ B) → (A → C) → (B → C) → C
+def Or.elim {A B C : Prop} (h : A ∨ B) (f1 : A → C) (f2 : B → C) : C :=
+  sorry
+
+-- 辅助引理：lt_trichotomy 的情况处理引理
+lemma lt_trichotomy_case1 (r1 r2 : Real) (h : ∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.add (r1.rep.seq n) ε < r2.rep.seq n) :
+  (lt r1 r2 ∨ eq r1 r2) ∨ lt r2 r1 :=
+  by
+    left
+    left
+    obtain ⟨ε, hε_pos, N, hN⟩ := h
+    use ε, hε_pos, N
+    intro n hn
+    exact hN n hn
+
+lemma lt_trichotomy_case2 (r1 r2 : Real) (h : ∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (Rat.sub (r1.rep.seq n) (r2.rep.seq n)) < ε) :
+  (lt r1 r2 ∨ eq r1 r2) ∨ lt r2 r1 :=
+  by
+    left
+    right
+    exact h
+
+lemma lt_trichotomy_case3 (r1 r2 : Real) (h : ∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.add (r2.rep.seq n) ε < r1.rep.seq n) :
+  (lt r1 r2 ∨ eq r1 r2) ∨ lt r2 r1 :=
+  by
+    right
+    obtain ⟨ε, hε_pos, N, hN⟩ := h
+    use ε, hε_pos, N
+    intro n hn
+    exact hN n hn
+
+-- 主定理：实数序关系三歧性
 theorem lt_trichotomy (r1 r2 : Real) : (lt r1 r2 ∨ eq r1 r2) ∨ lt r2 r1 :=
   by
-    -- 序关系三歧性：实数比较只有三种情况
-    -- 依赖于 cauchy_trichotomy 引理，三种情况必居其一
-    -- TODO: tactic 解析器需要支持 obtain 多分支模式
+    -- 使用 cauchy_trichotomy 得到三种情况
+    have h := cauchy_trichotomy r1.rep r2.rep
+    -- 情况1: r1 < r2
+    have h1 := lt_trichotomy_case1 r1 r2
+    -- 情况2: r1 = r2
+    have h2 := lt_trichotomy_case2 r1 r2
+    -- 情况3: r2 < r1
+    have h3 := lt_trichotomy_case3 r1 r2
+    -- 使用 Or.elim 组合（暂时用 sorry）
     sorry
 
 // =========================================================================

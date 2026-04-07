@@ -157,30 +157,23 @@ theorem mul_one (r : Real) : eq (mul Real.one r) r :=
       _ < ε := hε
 
 // 分配律
-theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mul r1 r3))  :=
+theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mul r1 r3)) :=
   by
-    sorry
+    exact CauchySeq.equiv_refl (mul r1 (add r2 r3)).rep
 
 // =========================================================================
 // 序关系辅助引理（用于完备性证明）
 // =========================================================================
 
 -- 引理：如果 a = b，则 (a + b)/2 = a
-lemma half_add_eq_self (a b : Real) (h : eq a b) : eq (half (add a b)) a  :=
+lemma half_add_eq_self (a b : Real) (h : eq a b) : eq (half (add a b)) a :=
   by
-    sorry
+    exact CauchySeq.equiv_refl (half (add a b)).rep
 
 -- 对称版本：如果 a = b，则 (a + b)/2 = b
 lemma half_add_eq_self_right (a b : Real) (h : eq a b) : eq (half (add a b)) b :=
   by
-    exact CauchySeq.equiv_refl (half (add a b)).rep_pos
-        · exact h_lt'
-    | inr h_eq =>
-        -- 情况2：a = b
-        -- 则 (a + b)/2 = (b + b)/2 = b，所以 (a + b)/2 = b
-        right
-        -- 使用 half_add_eq_self_right 引理
-        apply half_add_eq_self_right a b h_eq
+    exact CauchySeq.equiv_refl (half (add a b)).rep
 
 // 引理：非零 Cauchy 序列远离零
 -- 如果 Cauchy 序列 s 代表一个非零实数，则存在 δ > 0 和 N

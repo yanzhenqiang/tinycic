@@ -493,6 +493,9 @@ pub fn init_prelude(env: &mut Environment) {
     // Int.negSucc : Nat → Int
     // PosInt 类型和构造子
 
+    env.add_constant("Nat.zero", Term::const_("Nat"), None);
+    env.add_constant("Nat.succ", Term::arrow(Term::const_("Nat"), Term::const_("Nat")), None);
+
     // 恢复 Int 基础定义（rat.x 依赖）
     env.add_constant("Int.ofNat", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);
     env.add_constant("Int.negSucc", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);

@@ -245,10 +245,14 @@ impl TheoremProcessor {
         let stmt_ty = inference.infer(&Context::new(), &decl.statement)
             .map_err(|e| format!("Theorem statement type inference failed: {:?}", e))?;
 
-        // 简化：允许 Prop 或 Type
-        match stmt_ty.as_ref() {
-            Term::Sort(_) => {}, // Prop 或 Type
-            _ => return Err(format!("Theorem statement must be a proposition, got: {:?}", stmt_ty).into()),
+        // 简化：允许 Prop (Sort 0)、Type (Sort 1+) 或 Const("Prop")
+        let is_valid_prop = match stmt_ty.as_ref() {
+            Term::Sort(_) => true, // Sort(0) = Prop, Sort(1) = Type 0, etc.
+            Term::Const(name) if name == "Prop" => true, // Const("Prop") 也接受
+            _ => false,
+        };
+        if !is_valid_prop {
+            return Err(format!("Theorem statement must be a proposition, got: {:?}", stmt_ty).into());
         }
 
         // 2. 从陈述中提取参数并创建上下文

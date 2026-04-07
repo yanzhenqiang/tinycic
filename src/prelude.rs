@@ -165,6 +165,54 @@ pub fn load_inductive_from_file(env: &mut Environment, path: &str) -> Result<(),
     Ok(())
 }
 
+/// 为 term 中的未限定常量添加命名空间前缀
+/// 例如：le -> Rat.le, zero -> Rat.zero
+fn add_namespace_prefix(term: &Rc<Term>, namespace: &str, env: &Environment) -> Rc<Term> {
+    match term.as_ref() {
+        Term::Const(name) => {
+            // 如果已经是限定名（包含.），则不添加前缀
+            if name.contains('.') {
+                return term.clone();
+            }
+            // 尝试查找带前缀的常量是否存在
+            let prefixed_name = format!("{}.{}", namespace, name);
+            if env.lookup_constant(&prefixed_name).is_ok() {
+                return Term::const_(prefixed_name);
+            }
+            // 否则保持原样
+            term.clone()
+        }
+        Term::App { func, arg } => {
+            let new_func = add_namespace_prefix(func, namespace, env);
+            let new_arg = add_namespace_prefix(arg, namespace, env);
+            if Rc::ptr_eq(&new_func, func) && Rc::ptr_eq(&new_arg, arg) {
+                term.clone()
+            } else {
+                Term::app(new_func, new_arg)
+            }
+        }
+        Term::Pi { name, domain, codomain } => {
+            let new_domain = add_namespace_prefix(domain, namespace, env);
+            let new_codomain = add_namespace_prefix(codomain, namespace, env);
+            if Rc::ptr_eq(&new_domain, domain) && Rc::ptr_eq(&new_codomain, codomain) {
+                term.clone()
+            } else {
+                Term::pi(name.clone(), new_domain, new_codomain)
+            }
+        }
+        Term::Lambda { name, ty, body } => {
+            let new_ty = add_namespace_prefix(ty, namespace, env);
+            let new_body = add_namespace_prefix(body, namespace, env);
+            if Rc::ptr_eq(&new_ty, ty) && Rc::ptr_eq(&new_body, body) {
+                term.clone()
+            } else {
+                Term::lambda(name.clone(), new_ty, new_body)
+            }
+        }
+        _ => term.clone(),
+    }
+}
+
 /// 从 .x 文件加载 theorem 声明（带命名空间前缀和证明验证）
 pub fn load_theorem_from_file(env: &mut Environment, path: &str, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
     use crate::inductive::{TheoremProcessor, TheoremDecl};
@@ -195,16 +243,15 @@ pub fn load_theorem_from_file(env: &mut Environment, path: &str, namespace: &str
 
             match parser::parse_theorem(theorem_section) {
                 Ok(decl) => {
-                    // 添加命名空间前缀
+                    // 添加命名空间前缀到 theorem 名称
                     let full_name = format!("{}.{}", namespace, decl.name);
-                    let full_name_clone = full_name.clone();
-                    let namespaced_decl = TheoremDecl::new(full_name_clone, decl.statement)
-                        .with_proof(decl.proof.unwrap_or_else(|| Term::const_("sorry")));
 
-                    // Debug: print statement for Real.add_assoc
-                    if full_name == "Real.add_assoc" {
-                        eprintln!("DEBUG statement for {}: {:?}", full_name, namespaced_decl.statement);
-                    }
+                    // 为 statement 和 proof 中的常量添加命名空间前缀
+                    let namespaced_statement = add_namespace_prefix(&decl.statement, namespace, env);
+                    let namespaced_proof = decl.proof.as_ref().map(|p| add_namespace_prefix(p, namespace, env));
+
+                    let namespaced_decl = TheoremDecl::new(full_name.clone(), namespaced_statement)
+                        .with_proof(namespaced_proof.unwrap_or_else(|| Term::const_("sorry")));
 
                     // 使用 TheoremProcessor 处理并验证
                     let processor = TheoremProcessor::new();
@@ -328,6 +375,10 @@ pub fn define_int() -> InductiveDecl {
 
 /// 初始化环境，从 .x 文件动态加载标准库
 pub fn init_prelude(env: &mut Environment) {
+    // 注册 Prop 作为 Sort(0) 的别名
+    // Prop = Sort(0)
+    env.add_constant("Prop", Term::sort(0), None);
+
     // 从 .x 文件加载所有归纳类型（动态注册）
     let _ = load_inductive_from_file(env, "lib/nat.x");
     let _ = load_inductive_from_file(env, "lib/list.x");

@@ -483,4 +483,15 @@ lemma lt_of_sub_neg (a b : Rat) (h : lt (sub b a) zero) : lt b a :=
     rw [zero_add] at h2
     exact h2
 
+// 中点序引理：如果 a + ε < b，则 a + ε/2 < (a + b)/2
+// 这是二分法证明的关键引理
+lemma lt_half_add (a b ε : Rat) (hε : ε > zero) (h : lt (add a ε) b) :
+    lt (add a (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))))
+       (div (add a b) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
+  by
+    -- 证明：a + ε/2 < (a + b)/2
+    -- 两边乘2：2a + ε < a + b
+    -- 即 a + ε < b，这正是假设 h
+    sorry
+
 end Rat

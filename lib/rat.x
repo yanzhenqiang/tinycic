@@ -542,8 +542,8 @@ lemma half_add_sub_left (a b : Rat) :
     eq (sub (div (add a b) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) a)
        (div (sub b a) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
   by
-    -- (a + b)/2 - a = (a + b)/2 - 2a/2 = (a + b - 2a)/2 = (b - a)/2
-    -- 展开定义证明
+    -- (a + b)/2 - a = (a + b - 2a)/2 = (b - a)/2
+    -- 展开 sub 定义并化简
     sorry
 
 // 对称版本：b - (a + b)/2 = (b - a)/2
@@ -560,8 +560,31 @@ lemma abs_div_two (x : Rat) :
        (div (abs x) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
   by
     -- 分情况讨论：x ≥ 0 或 x < 0
-    -- 情况1：x ≥ 0，则 x/2 ≥ 0，所以 |x/2| = x/2 = |x|/2
-    -- 情况2：x < 0，则 x/2 < 0，所以 |x/2| = -(x/2) = (-x)/2 = |x|/2
-    sorry
+    by_cases h : le zero x
+    · -- 情况1：x ≥ 0
+      have h1 : eq (abs x) x := abs_of_nonneg x h
+      have h2 : le zero (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) := by
+        -- x ≥ 0 且 2 > 0，所以 x/2 ≥ 0
+        sorry
+      have h3 : eq (abs (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))))
+                   (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) :=
+        abs_of_nonneg (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) h2
+      -- 所以 |x/2| = x/2 = |x|/2
+      rw [h3, h1]
+    · -- 情况2：x < 0
+      have h1 : eq (abs x) (neg x) := by
+        -- x < 0，所以 |x| = -x
+        sorry
+      have h2 : lt (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))) zero := by
+        -- x < 0 且 2 > 0，所以 x/2 < 0
+        sorry
+      have h3 : eq (abs (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))))
+                   (neg (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))))) := by
+        -- x/2 < 0，所以 |x/2| = -(x/2)
+        sorry
+      -- 所以 |x/2| = -(x/2) = (-x)/2 = |x|/2
+      rw [h3, h1]
+      -- 需要证明 -(x/2) = (-x)/2
+      sorry
 
 end Rat

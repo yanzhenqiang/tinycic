@@ -994,13 +994,12 @@ lemma bisect_lower_mono (S : Set Real) (s0 u0 : Real)
       apply Real.le_refl
 
     · -- 情况2：mid 不是上界
-      -- 则存在 s ∈ S 使得 s > mid，取 a_{n+1} = s
-      -- 需要证明 a_n ≤ s
-      -- 我们知道 a_n ≤ mid（因为 mid = (a_n + b_n)/2 且 a_n ≤ b_n）
-      -- 且 mid < s（由 mid 不是上界的定义）
-      -- 所以 a_n < s
+      -- 按照定义 a_{n+1} = mid（简化为中点，实际应从 S 中选择 > mid 的元素）
+      -- 需要证明 a_n ≤ mid
+      -- 由于 mid = (a_n + b_n)/2，且由归纳假设 a_n ≤ b_n
+      -- 所以 a_n ≤ (a_n + b_n)/2 = mid
       simp [bisect_sequence_lower, h]
-      -- 这里需要提取存在性假设并证明序关系
+      -- 需要辅助引理：a ≤ (a + b)/2 当 a ≤ b
       sorry
 
 -- 引理：上序列单调递减
@@ -1017,7 +1016,7 @@ lemma bisect_upper_mono (S : Set Real) (s0 u0 : Real)
     · -- 情况1：mid 是上界
       -- 则 b_{n+1} = mid ≤ b_n（因为 mid = (a_n + b_n)/2 ≤ b_n 当 a_n ≤ b_n）
       simp [bisect_sequence_upper, h]
-      -- 需要证明 (a_n + b_n)/2 ≤ b_n
+      -- 需要辅助引理：(a + b)/2 ≤ b 当 a ≤ b
       sorry
 
     · -- 情况2：mid 不是上界
@@ -1055,10 +1054,12 @@ lemma bisect_lower_le_upper (S : Set Real) (s0 u0 : Real)
         sorry
 
       · -- 情况2：mid 不是上界
-        -- 则 a_{n+1} 是 S 中某个大于 mid 的元素，b_{n+1} = b_n
-        -- 需要证明 a_{n+1} ≤ b_n
-        -- 由于 a_{n+1} ∈ S 且 b_n 是 S 的上界（归纳假设），所以 a_{n+1} ≤ b_n
+        -- 则 a_{n+1} = mid，b_{n+1} = b_n
+        -- 需要证明 mid ≤ b_n
+        -- 由于 mid = (a_n + b_n)/2 且 a_n ≤ b_n，我们有 mid ≤ b_n
         simp [bisect_sequence_lower, bisect_sequence_upper, h]
+        -- 需要辅助引理：(a + b)/2 ≤ b 当 a ≤ b
+        sorry
         -- 需要提取存在性假设
         sorry
 

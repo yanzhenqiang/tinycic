@@ -87,7 +87,7 @@ impl Operator {
                 token: token.clone(),
                 precedence: Precedence::Relational,
                 right_assoc: false,
-                name: "eq",
+                name: "Eq",  // Use "Eq" to match the registered constant name
             }),
             Token::Ne => Some(Operator {
                 token: token.clone(),
@@ -926,8 +926,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_theorem_statement(&mut self) -> Result<Rc<Term>, ParseError> {
-        // Parse the statement type, handling function applications like 'eq (add r1 r2) (add r2 r1)'
-        self.parse_complex_type()
+        // Use parse_term which has proper Pratt parsing for operators (+, -, *, /, =, etc.)
+        // This correctly handles expressions like 'a + b = b + a'
+        self.parse_term()
     }
 
     /// Parse a complex type expression with function applications
@@ -997,6 +998,125 @@ impl<'a> Parser<'a> {
                     };
                     let rhs = self.parse_complex_type()?;
                     return Ok(Term::app(Term::app(Term::const_("GE"), lhs), rhs));
+                }
+                Token::Plus => {
+                    // Handle addition: a + b becomes add a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of +".to_string()));
+                    } else {
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("add"), lhs), rhs));
+                }
+                Token::Minus => {
+                    // Handle subtraction: a - b becomes sub a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of -".to_string()));
+                    } else {
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("sub"), lhs), rhs));
+                }
+                Token::Star => {
+                    // Handle multiplication: a * b becomes mul a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of *".to_string()));
+                    } else {
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("mul"), lhs), rhs));
+                }
+                Token::Slash => {
+                    // Handle division: a / b becomes div a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of /".to_string()));
+                    } else {
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("div"), lhs), rhs));
+                }
+                Token::Lt => {
+                    // Handle less than: a < b becomes lt a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of <".to_string()));
+                    } else {
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("lt"), lhs), rhs));
+                }
+                Token::Gt => {
+                    // Handle greater than: a > b becomes gt a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of >".to_string()));
+                    } else {
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("gt"), lhs), rhs));
+                }
+                Token::Le => {
+                    // Handle less than or equal: a ≤ b becomes le a b
+                    self.advance();
+                    let lhs = if terms.len() == 1 {
+                        terms.remove(0)
+                    } else if terms.is_empty() {
+                        return Err(ParseError::InvalidSyntax("Expected left side of <=".to_string()));
+                    } else {
+                        let mut result = terms.remove(0);
+                        for arg in terms {
+                            result = Term::app(result, arg);
+                        }
+                        result
+                    };
+                    let rhs = self.parse_complex_type()?;
+                    return Ok(Term::app(Term::app(Term::const_("le"), lhs), rhs));
                 }
                 Token::LParen => {
                     self.advance();

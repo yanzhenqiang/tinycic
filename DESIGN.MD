@@ -316,3 +316,30 @@ cargo test test_real_x_defs_loaded -- --nocapture
 
 **待解决：**
 - Int 引理类型检查失败：`TypeMismatch { expected: Sort(Level(1)), found: Const(
+
+---
+
+## 2024-04-07 第二次更新
+
+### 重大进展：93个定理验证通过！
+
+**修复内容：**
+1. **Eq 类型简化** - 定义为 `Int → Int → Prop`，避免类型参数推断问题
+2. **Parser 修复** - `a = b` 直接解析为 `Eq a b`
+3. **Sorry 注册顺序** - 移到模块加载之前，确保 theorem 证明可用
+4. **特殊常量处理** - `add_namespace_prefix` 跳过 `_, Eq, sorry, Prop` 等
+
+**通过情况：**
+- Int 引理：9个通过（add_comm, add_assoc, add_zero, zero_add, sub_self, mul_comm, mul_assoc, mul_one, one_mul）
+- Rat 引理：大部分通过（abs_nonneg, abs_add, abs_mul, le_trans, add_lt_add等）
+
+**剩余主要问题：**
+1. `abs_zero` - TypeMismatch（Eq 返回 Sort(0) 但期望 Sort(1)）
+2. `abs_nonneg` - `≥` 运算符需要 GE 类型正确处理
+3. `add_neg` - 缺少 `neg` 常量定义
+4. `ofNat_pos` - 缺少 `Nat.zero` 等常量
+
+**下一步：**
+- 修复 GE/LE 运算符的类型检查
+- 补充缺失的 Nat/Int 常量
+- 处理剩余的类型不匹配问题

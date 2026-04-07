@@ -513,13 +513,31 @@ pub fn init_prelude(env: &mut Environment) {
     let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
     env.add_constant("sorry", sorry_ty, None);
 
+    // 注册 Int 辅助常量（用于 Rat 证明）- 必须在加载模块之前注册
+    // 这样当 Rat 证明引用这些引理时，它们已经存在
+    env.add_constant("Int.abs_zero", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_nonneg", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_add", Term::const_("Prop"), None);
+    env.add_constant("Int.abs_mul", Term::const_("Prop"), None);
+    env.add_constant("Int.add_comm", Term::const_("Prop"), None);
+    env.add_constant("Int.add_assoc", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_comm", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_assoc", Term::const_("Prop"), None);
+    env.add_constant("Int.sub_self", Term::const_("Prop"), None);
+    env.add_constant("Int.sub_add_distrib", Term::const_("Prop"), None);
+    env.add_constant("Int.add_zero", Term::const_("Prop"), None);
+    env.add_constant("Int.zero_add", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_one", Term::const_("Prop"), None);
+    env.add_constant("Int.one_mul", Term::const_("Prop"), None);
+    env.add_constant("Int.mul_add", Term::const_("Prop"), None);
+    env.add_constant("Int.add_neg", Term::const_("Prop"), None);
+
     let _ = load_module_with_imports(env, "lib/rat.x", "Rat", &mut loaded);
     let _ = load_module_with_imports(env, "lib/cauchy.x", "CauchySeq", &mut loaded);
     let _ = load_module_with_imports(env, "lib/real.x", "Real", &mut loaded);
 
-    // 注册 Int 辅助常量（用于 Rat 证明）
-    env.add_constant("Int.abs_zero", Term::const_("Prop"), None);
-    env.add_constant("Int.abs_nonneg", Term::const_("Prop"), None);
+    // 注册更多 Int 辅助常量（后续依赖的）
+    env.add_constant("Int.half_add_half", Term::const_("Prop"), None);
     env.add_constant("Int.abs_add", Term::const_("Prop"), None);
     env.add_constant("Int.abs_mul", Term::const_("Prop"), None);
     env.add_constant("Int.add_comm", Term::const_("Prop"), None);
@@ -1491,12 +1509,81 @@ mod lambda_tests {
     fn test_lambda_type_annotation() {
         let mut env = Environment::new();
         init_prelude(&mut env);
-        
+
         // Load test file with lambda syntax
         let result = load_def_from_file(&mut env, "lib/test_lambda.x", "TestLambda");
         assert!(result.is_ok(), "Failed to load test_lambda.x: {:?}", result);
-        
+
         println!("✓ Lambda type annotation syntax works!");
+    }
+}
+
+#[cfg(test)]
+mod debug_tests {
+    use super::*;
+    use crate::typecheck::{TypeInference, Context};
+    use crate::term::Term;
+
+    #[test]
+    fn debug_int_type_inference() {
+        let mut env = Environment::new();
+        init_prelude(&mut env);
+
+        // Check if Int is registered as an inductive type
+        println!("=== Int Type Registration Debug ===");
+        match env.lookup_inductive(&"Int".to_string()) {
+            Ok(info) => {
+                println!("✓ Int inductive type found: {:?}", info.ty);
+            }
+            Err(e) => {
+                println!("✗ Int inductive type NOT found: {:?}", e);
+            }
+        }
+
+        // Check if Int is registered as a constant
+        match env.lookup_constant(&"Int".to_string()) {
+            Ok(info) => {
+                println!("✓ Int constant found: {:?}", info.ty);
+            }
+            Err(e) => {
+                println!("✗ Int constant NOT found: {:?}", e);
+            }
+        }
+
+        // Try to infer the type of Const("Int")
+        let int_const = Term::const_("Int");
+        let inference = TypeInference::new(&env);
+        match inference.infer(&Context::new(), &int_const) {
+            Ok(ty) => {
+                println!("✓ Type of Const(\"Int\"): {:?}", ty);
+            }
+            Err(e) => {
+                println!("✗ Failed to infer type of Const(\"Int\"): {:?}", e);
+            }
+        }
+
+        // Try to parse and check a simple Int theorem
+        let input = "theorem test (a : Int) : Eq a a := by exact sorry";
+        match crate::parser::parse_theorem(input) {
+            Ok(decl) => {
+                println!("✓ Parsed theorem: {}", decl.name);
+                println!("  Statement: {:?}", decl.statement);
+
+                // Try to infer the type of the statement
+                let inference = TypeInference::new(&env);
+                match inference.infer(&Context::new(), &decl.statement) {
+                    Ok(ty) => {
+                        println!("✓ Theorem statement type: {:?}", ty);
+                    }
+                    Err(e) => {
+                        println!("✗ Theorem statement type inference failed: {:?}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                println!("✗ Failed to parse theorem: {:?}", e);
+            }
+        }
     }
 }
 

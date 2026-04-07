@@ -229,11 +229,21 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
 
     match parts[0] {
         "intro" => {
-            // intro x y z
+            // intro x y z or intro (x : T) y z
             let names: Vec<String> = parts[1..]
                 .iter()
-                .map(|s| s.trim_end_matches(';').to_string())
-                .filter(|s| !s.is_empty() && !s.starts_with('('))
+                .map(|s| {
+                    let s = s.trim_end_matches(';').to_string();
+                    // Strip parentheses and type annotations like "(h1" -> "h1", "h2)" -> "h2"
+                    s.trim_start_matches('(')
+                        .trim_end_matches(')')
+                        .split(':')
+                        .next()
+                        .unwrap_or("")
+                        .trim()
+                        .to_string()
+                })
+                .filter(|s| !s.is_empty())
                 .collect();
             if !names.is_empty() {
                 Some(ParsedTactic::Intro(names))
@@ -267,7 +277,12 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
             if let Some(colon_pos) = line.find(':') {
                 let after_colon = &line[colon_pos + 1..];
                 if let Some(assign_pos) = after_colon.find(":=") {
-                    let name = parts[1].trim_end_matches(':').to_string();
+                    // Strip parentheses from name: "(h1" -> "h1"
+                    let name = parts[1]
+                        .trim_end_matches(':')
+                        .trim_start_matches('(')
+                        .trim_end_matches(')')
+                        .to_string();
                     let type_str = after_colon[..assign_pos].trim();
                     // Parse the type as a term
                     let ty = parse_simple_term(type_str);
@@ -275,7 +290,11 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
                     Some(ParsedTactic::Have(name, ty, Term::const_("sorry")))
                 } else {
                     // No := found, use placeholder
-                    let name = parts[1].trim_end_matches(':').to_string();
+                    let name = parts[1]
+                        .trim_end_matches(':')
+                        .trim_start_matches('(')
+                        .trim_end_matches(')')
+                        .to_string();
                     Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("sorry")))
                 }
             } else {
@@ -289,16 +308,30 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
             if let Some(assign_pos) = line.find(":=") {
                 let before_assign = &line[..assign_pos];
                 // Extract name from pattern ⟨x, hx⟩ or just x
-                let name = if let Some(langle) = before_assign.find('<') {
-                    // Pattern match: extract first identifier after <
-                    before_assign[langle+1..].split(|c| c == ',' || c == '>' || c == '⟩')
+                let name = if let Some(langle) = before_assign.find("⟨") {
+                    // Unicode angle bracket - find the next comma or ⟩
+                    let after_bracket = &before_assign[langle + "⟨".len()..];
+                    after_bracket.split(|c: char| c == ',' || c == '⟩')
+                        .next()
+                        .unwrap_or("_")
+                        .trim()
+                        .to_string()
+                } else if let Some(langle) = before_assign.find('<') {
+                    // ASCII angle bracket
+                    before_assign[langle+1..].split(|c| c == ',' || c == '>')
                         .next()
                         .unwrap_or("_")
                         .trim()
                         .to_string()
                 } else {
-                    // Simple name
-                    parts.get(1).map(|s| s.trim().to_string()).unwrap_or_else(|| "_".to_string())
+                    // Simple name - strip any parentheses
+                    parts.get(1)
+                        .map(|s| s.trim()
+                            .trim_start_matches('(')
+                            .trim_end_matches(')')
+                            .trim_end_matches(':')
+                            .to_string())
+                        .unwrap_or_else(|| "_".to_string())
                 };
                 Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("sorry")))
             } else {

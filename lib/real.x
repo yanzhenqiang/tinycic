@@ -280,10 +280,36 @@ lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (half (add a b)) :=
 -- 即：如果 a ≤ b，则 half(a + b) ≤ b
 lemma le_add_div_two_right (a b : Real) (h : le a b) : le (half (add a b)) b :=
   by
-    -- 证明思路：
-    -- 需要证明 (a + b)/2 ≤ b
-    -- 这等价于 a + b ≤ 2b，即 a ≤ b（这正是假设 h）
-    sorry
+    -- 展开 le 定义：需要证明 lt (half (add a b)) b ∨ eq (half (add a b)) b
+    cases h with
+    | inl h_lt =>
+        -- 情况1：a < b
+        -- 需要证明 (a + b)/2 < b
+        -- 展开：∃ ε > 0, ∃ N, ∀ n ≥ N, (a(n) + b(n))/2 + ε < b(n)
+        -- 即 (a(n) + b(n)) + 2ε < 2b(n)
+        -- 即 a(n) + 2ε < b(n)
+        -- 由 a < b，存在 ε' > 0 使得 a(n) + ε' < b(n)
+        -- 取 ε = ε'/2 即可
+        obtain ⟨ε, hε_pos, N, hN⟩ := h_lt
+        use Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+        constructor
+        · -- 证明 ε/2 > 0
+          apply Rat.div_pos hε_pos
+          exact Nat.le_succ _
+        use N
+        intro n hn
+        -- 需要证明 (a(n) + b(n))/2 + ε/2 < b(n)
+        -- 即 a(n) + ε < b(n)
+        have h_lt' := hN n hn
+        -- 使用对称版本的 Rat.lt_half_add
+        sorry
+    | inr h_eq =>
+        -- 情况2：a = b
+        -- 则 (a + b)/2 = (b + b)/2 = b，所以 (a + b)/2 = b
+        right
+        -- 由 h_eq: a = b，half (add a b) = half (add b b) = b
+        -- 使用 half_add_eq_self 的对称形式
+        sorry
 
 // 引理：非零 Cauchy 序列远离零
 -- 如果 Cauchy 序列 s 代表一个非零实数，则存在 δ > 0 和 N

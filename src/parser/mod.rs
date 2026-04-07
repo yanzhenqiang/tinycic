@@ -32,6 +32,12 @@ pub fn parse_theorem(input: &str) -> Result<crate::inductive::TheoremDecl, Parse
     p.parse_theorem()
 }
 
+/// Parse a term from string (for have/calc expressions)
+pub fn parse_term(input: &str) -> Result<std::rc::Rc<crate::term::Term>, ParseError> {
+    let mut p = parser::Parser::new(input);
+    p.parse_term()
+}
+
 #[derive(Debug, Clone)]
 pub enum ParseError {
     UnexpectedToken(String),

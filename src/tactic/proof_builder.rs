@@ -358,14 +358,27 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
 fn parse_simple_term(s: &str) -> Rc<Term> {
     let s = s.trim().trim_end_matches(';');
 
-    // Handle qualified names
-    if s.contains('.') {
+    // Handle qualified names (single word with dot)
+    if s.contains('.') && !s.contains(' ') {
         return Term::const_(s.to_string());
     }
 
     // Handle numeric literals
     if let Ok(n) = s.parse::<i64>() {
         return Term::const_(format!("{}", n));
+    }
+
+    // If contains spaces or parentheses, try to parse as complex expression
+    if s.contains(' ') || s.contains('(') || s.contains('=') || s.contains('<') || s.contains('>') {
+        // Use the full parser for complex expressions
+        let input = format!("{};", s);  // Add semicolon for parser
+        match crate::parser::parse_term(&input) {
+            Ok(term) => return term,
+            Err(_) => {
+                // Fallback: treat as constant if parsing fails
+                return Term::const_(s.to_string());
+            }
+        }
     }
 
     Term::const_(s.to_string())

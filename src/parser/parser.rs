@@ -613,9 +613,12 @@ impl<'a> Parser<'a> {
                         } else {
                             // Field access: s.seq -> use projection function
                             // For CauchySeq.seq, use CauchySeq.getSeq
-                            // For Real.rep, use Real.rep (already a projection function)
+                            // For Real.rep, use Real.rep
+                            // For r1.rep.seq, need to chain: CauchySeq.getSeq (Real.rep r1)
                             let proj_name = if field_name == "seq" {
                                 "CauchySeq.getSeq".to_string()
+                            } else if field_name == "rep" {
+                                "Real.rep".to_string()
                             } else {
                                 format!(".{}", field_name)
                             };

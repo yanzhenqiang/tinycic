@@ -730,10 +730,10 @@ lemma cauchy_sequence_trichotomy (d : CauchySeq) (hd : CauchySeq.isCauchy d) :
         exact hN n hn
 
 -- 辅助引理：-s 是 Cauchy 序列当 s 是 Cauchy 序列
-// lemma cauchy_neg (s : CauchySeq) (hs : CauchySeq.isCauchy s) :
-//     CauchySeq.isCauchy (CauchySeq.mk (λ n => Rat.neg (CauchySeq.getSeq s n))) :=
-//   by
-//     sorry
+lemma cauchy_neg (s : CauchySeq) (hs : s.isCauchy) :
+    (CauchySeq.mk (λ n => Rat.neg (CauchySeq.getSeq s n))).isCauchy :=
+  by
+    sorry
 
 -- 辅助引理：d(n) = s2(n) - s1(n) 的定义展开
 def diffCauchySeq (s1 s2 : CauchySeq) : CauchySeq :=
@@ -746,13 +746,11 @@ lemma cauchy_diff (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchyS
     sorry
 
 -- 辅助引理：|d(n)| = |s2(n) - s1(n)|
-// lemma abs_diff_eq (s1 s2 : CauchySeq) (n : Nat) :
-//     Rat.abs (CauchySeq.getSeq (diffCauchySeq s1 s2) n) =
-//     Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) :=
-//   by
-//     sorry
-    simp [diffCauchySeq, addCauchySeq]
-    rw [Rat.add_neg_eq_sub]
+lemma abs_diff_eq (s1 s2 : CauchySeq) (n : Nat) :
+    Rat.abs (CauchySeq.getSeq (diffCauchySeq s1 s2) n) =
+    Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) :=
+  by
+    sorry
 
 -- 辅助引理：d(n) > ε 当且仅当 s2(n) - s1(n) > ε
 def diff_pos_iff (s1 s2 : CauchySeq) (ε : Rat) (n : Nat) :
@@ -1180,11 +1178,12 @@ lemma mono_bounded_cauchy (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (Nat.s
     exact Int.mono_bounded_cauchy f h_mono h_bounded ε hε
 
 -- 辅助引理：下序列 ≤ 上序列（归纳证明）
-// lemma bisect_lower_le_upper_step (S : SetReal) (s0 u0 : Real)
-//     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
-//     le (bisect_sequence_lower S s0 u0 hs0 hu0 n) (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
-//   by
-//     sorry
+lemma bisect_lower_le_upper_step (S : SetReal) (s0 u0 : Real)
+    (hs0 : hasUpperBound S s0 → hasUpperBound S s0) (hu0 : hasUpperBound S u0) (n : Nat) :
+    le (bisect_sequence_lower S s0 u0 (hs0 (λ r h, h)) hu0 n)
+       (bisect_sequence_upper S s0 u0 (hs0 (λ r h, h)) hu0 n) :=
+  by
+    sorry
 lemma bisect_lower_cauchy (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
     CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n)) :=

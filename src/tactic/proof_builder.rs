@@ -201,6 +201,9 @@ fn parse_calc_step(line: &str) -> Option<CalcStep> {
     };
     let rhs = parse_simple_term(rhs_str);
 
+    eprintln!("DEBUG parse_calc_step: lhs_str='{}', rhs_str='{}'", lhs_str, rhs_str);
+    eprintln!("DEBUG parse_calc_step: lhs={:?}, rhs={:?}", lhs, rhs);
+
     // Parse rw [...] from proof_part
     let rewrites = if proof_part.contains("rw") {
         // Extract [...] content
@@ -358,8 +361,9 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
 fn parse_simple_term(s: &str) -> Rc<Term> {
     let s = s.trim().trim_end_matches(';');
 
-    // Handle qualified names (single word with dot)
-    if s.contains('.') && !s.contains(' ') {
+    // Handle qualified names (single word with dot, no spaces)
+    // e.g., "Rat.zero", "Real.add" - but not "Rat.zero := by ..."
+    if s.contains('.') && !s.contains(' ') && !s.contains(':') && !s.contains('=') {
         return Term::const_(s.to_string());
     }
 
@@ -368,13 +372,18 @@ fn parse_simple_term(s: &str) -> Rc<Term> {
         return Term::const_(format!("{}", n));
     }
 
-    // If contains spaces or parentheses, try to parse as complex expression
+    // If contains spaces or parentheses or operators, try to parse as complex expression
     if s.contains(' ') || s.contains('(') || s.contains('=') || s.contains('<') || s.contains('>') {
         // Use the full parser for complex expressions
         let input = format!("{};", s);  // Add semicolon for parser
+        eprintln!("DEBUG parse_simple_term: parsing input: '{}'", input);
         match crate::parser::parse_term(&input) {
-            Ok(term) => return term,
-            Err(_) => {
+            Ok(term) => {
+                eprintln!("DEBUG parse_simple_term: parsed successfully: {:?}", term);
+                return term;
+            }
+            Err(e) => {
+                eprintln!("DEBUG parse_simple_term: parse error: {:?}", e);
                 // Fallback: treat as constant if parsing fails
                 return Term::const_(s.to_string());
             }

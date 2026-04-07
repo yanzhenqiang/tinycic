@@ -80,10 +80,42 @@ impl<'env> ProofTermGenerator<'env> {
         }
     }
 
+    /// Create a new generator with initial intro bindings (for theorem parameters)
+    /// bindings should be in order: [(r1, Real), (r2, Real)] means r1 is the outermost parameter
+    /// De Bruijn index: r1=1, r2=0 (from outside in)
+    pub fn new_with_bindings(initial_goal: Rc<Term>, bindings: Vec<(Name, Rc<Term>)>) -> Self {
+        let mut ctx = Context::new();
+        let mut intro_bindings = Vec::new();
+
+        eprintln!("DEBUG new_with_bindings: {:?}", bindings);
+
+        // Add bindings in reverse order for correct De Bruijn indexing
+        // For theorem (r1 : Real) -> (r2 : Real) -> Goal,
+        // r2 has index 0 (inner), r1 has index 1 (outer)
+        for (name, ty) in bindings.iter().rev() {
+            eprintln!("DEBUG: Adding binding {} : {:?}", name, ty);
+            ctx.push(LocalDecl::new(name.clone(), ty.clone()));
+            intro_bindings.push(IntroBinding { name: name.clone(), ty: ty.clone() });
+        }
+
+        eprintln!("DEBUG: intro_bindings count: {}", intro_bindings.len());
+
+        Self {
+            env: None,
+            ctx,
+            goal_stack: vec![initial_goal],
+            intro_bindings,
+            let_bindings: Vec::new(),
+            calc_state: None,
+            pending_rewrite: None,
+        }
+    }
+
     /// Generate proof term from tactics
     pub fn generate(&mut self, tactics: &[ParsedTactic]) -> Result<Rc<Term>, String> {
         // Process each tactic
-        for tactic in tactics {
+        for (i, tactic) in tactics.iter().enumerate() {
+            eprintln!("DEBUG generate step {}: intro_bindings count = {}", i, self.intro_bindings.len());
             if let Err(_e) = self.apply_tactic(tactic) {
                 // Fall back to sorry on error
                 return Ok(Term::app(Term::const_("sorry"),
@@ -118,7 +150,11 @@ impl<'env> ProofTermGenerator<'env> {
 
         // Wrap with lambda abstractions (intro statements) FIRST
         // This ensures De Bruijn indices in the proof body are correct
-        for binding in self.intro_bindings.iter().rev() {
+        // intro_bindings is stored [innermost, ..., outermost]
+        // So we wrap from the end (outermost) to the beginning (innermost)
+        eprintln!("DEBUG generate: intro_bindings count = {} before lambda wrapping", self.intro_bindings.len());
+        for (idx, binding) in self.intro_bindings.iter().rev().enumerate() {
+            eprintln!("DEBUG: Wrapping lambda for {} at index {}", binding.name, idx);
             proof = Term::lambda(binding.name.clone(), binding.ty.clone(), proof);
         }
 
@@ -142,7 +178,8 @@ impl<'env> ProofTermGenerator<'env> {
                     for name in names {
                         if let Term::Pi { domain, codomain, .. } = current_goal.as_ref() {
                             // Record binding for later lambda wrapping
-                            self.intro_bindings.push(IntroBinding {
+                            // Insert at the beginning since this is the innermost binding
+                            self.intro_bindings.insert(0, IntroBinding {
                                 name: name.clone(),
                                 ty: domain.clone(),
                             });
@@ -173,6 +210,10 @@ impl<'env> ProofTermGenerator<'env> {
             }
             ParsedTactic::Have(name, ty, proof) => {
                 // Let binding: let name : ty := proof in ...
+                // Note: ty and proof are evaluated in the current context (outside the let)
+                // So we should NOT resolve them to De Bruijn indices that are only valid inside the let body
+                // For now, keep them as Const (the type checker will handle this)
+
                 // If ty is "_", use the current goal type or Prop as placeholder
                 let actual_ty = if let Term::Const(ty_name) = ty.as_ref() {
                     if ty_name == "_" {
@@ -202,7 +243,14 @@ impl<'env> ProofTermGenerator<'env> {
                 // Start a new calc block with the parsed steps
                 let mut calc_state = CalcState::new();
                 for step in steps {
-                    calc_state.add_step(step.lhs.clone(), step.rhs.clone(), step.rewrites.clone());
+                    // Resolve variable names in lhs and rhs
+                    let resolved_lhs = self.resolve_term(&step.lhs);
+                    let resolved_rhs = self.resolve_term(&step.rhs);
+                    // Also resolve rewrites - expand have-bound names to their values
+                    let resolved_rewrites: Vec<Rc<Term>> = step.rewrites.iter()
+                        .map(|rw| self.resolve_rewrite(rw))
+                        .collect();
+                    calc_state.add_step(resolved_lhs, resolved_rhs, resolved_rewrites);
                 }
                 self.calc_state = Some(calc_state);
                 Ok(())
@@ -256,28 +304,52 @@ impl<'env> ProofTermGenerator<'env> {
         }
     }
 
+    /// Resolve a rewrite term, expanding have-bound names to their values
+    fn resolve_rewrite(&self, term: &Rc<Term>) -> Rc<Term> {
+        match term.as_ref() {
+            Term::Const(name) => {
+                // Check if this is a have-bound name
+                for (let_name, _ty, value) in self.let_bindings.iter().rev() {
+                    if let_name == name {
+                        // Expand to the value
+                        return value.clone();
+                    }
+                }
+                // Not a have-bound name, resolve as normal variable
+                self.resolve_variable(name)
+            }
+            Term::App { func, arg } => {
+                let resolved_func = self.resolve_rewrite(func);
+                let resolved_arg = self.resolve_rewrite(arg);
+                Term::app(resolved_func, resolved_arg)
+            }
+            _ => term.clone(),
+        }
+    }
+
+    /// Resolve a variable name to De Bruijn index if it's in intro context
+    fn resolve_variable(&self, name: &str) -> Rc<Term> {
+        // Check if this is a local variable (from intro)
+        for (idx, binding) in self.intro_bindings.iter().enumerate() {
+            if binding.name == name {
+                return Term::var(idx as u32);
+            }
+        }
+        // Not a local variable, keep as Const
+        Term::const_(name.to_string())
+    }
+
     /// Resolve a term, converting Const to Var if the name is in context
     fn resolve_term(&self, term: &Rc<Term>) -> Rc<Term> {
         match term.as_ref() {
             Term::Const(name) => {
-                // Check if this is a local variable (from intro or have)
-                // Check intro_bindings first (they are in inner scope)
-                for (idx, binding) in self.intro_bindings.iter().rev().enumerate() {
-                    if &binding.name == name {
-                        return Term::var(idx as u32);
-                    }
-                }
-                // Check let_bindings (they are in outer scope, after intros)
-                let intro_count = self.intro_bindings.len();
-                for (idx, (let_name, _, _)) in self.let_bindings.iter().rev().enumerate() {
-                    if let_name == name {
-                        // Let bindings are outside lambda abstractions
-                        // So their De Bruijn index is intro_count + idx
-                        return Term::var((intro_count + idx) as u32);
-                    }
-                }
-                // Not a local variable, keep as Const
-                term.clone()
+                self.resolve_variable(name)
+            }
+            Term::App { func, arg } => {
+                // Recursively resolve function and argument
+                let resolved_func = self.resolve_term(func);
+                let resolved_arg = self.resolve_term(arg);
+                Term::app(resolved_func, resolved_arg)
             }
             _ => term.clone(),
         }
@@ -301,13 +373,17 @@ impl<'env> ProofTermGenerator<'env> {
                     // Underscore refers to previous rhs
                     resolved_rhs.last().unwrap_or(lhs).clone()
                 } else {
-                    lhs.clone()
+                    // Resolve variable names to De Bruijn indices
+                    self.resolve_term(lhs)
                 }
             } else {
-                lhs.clone()
+                // Resolve variable names in complex expressions
+                self.resolve_term(lhs)
             };
+            // Also resolve rhs
+            let resolved_right = self.resolve_term(&calc_state.rhs_exprs[i]);
             resolved_lhs.push(resolved);
-            resolved_rhs.push(calc_state.rhs_exprs[i].clone());
+            resolved_rhs.push(resolved_right);
         }
 
         // Build transitivity chain

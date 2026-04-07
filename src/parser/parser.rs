@@ -587,7 +587,9 @@ impl<'a> Parser<'a> {
         match &self.current {
             Token::Ident(s) => {
                 let name = s.clone();
+                eprintln!("DEBUG parse_atomic_term: Ident('{}'), next token: {:?}", name, self.current);
                 self.advance();
+                eprintln!("DEBUG parse_atomic_term: after advance, current token: {:?}", self.current);
 
                 // Check for lambda syntax: λ x => body  or  fun x => body
                 if name == "λ" || name == "fun" || name == "lambda" {
@@ -597,6 +599,7 @@ impl<'a> Parser<'a> {
                 // Check for qualified name or field access
                 // Qualified: Real.add, Nat.zero (starts with uppercase)
                 // Field access: s.seq, r.rep (starts with lowercase)
+                eprintln!("DEBUG parse_atomic_term: checking for Dot, current: {:?}", self.current);
                 if self.current == Token::Dot {
                     self.advance();
                     if let Token::Ident(field) = &self.current {
@@ -810,8 +813,8 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
-        // Parse proof with the statement as the goal type
-        let proof = self.parse_proof(Some(statement.clone()))?;
+        // Parse proof with the statement as the goal type and params as initial bindings
+        let proof = self.parse_proof(Some(statement.clone()), Some(params))?;
 
         Ok(TheoremDecl::new(name, statement).with_proof(proof))
     }
@@ -1173,7 +1176,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_proof(&mut self, goal_type: Option<Rc<Term>>) -> Result<Rc<Term>, ParseError> {
+    fn parse_proof(&mut self, goal_type: Option<Rc<Term>>, params: Option<Vec<(Name, Rc<Term>)>>) -> Result<Rc<Term>, ParseError> {
         // Expect 'by' keyword
         match &self.current {
             Token::By => {
@@ -1204,7 +1207,12 @@ impl<'a> Parser<'a> {
 
             // Use ProofTermGenerator to generate actual proof term
             if let Some(goal) = goal_type {
-                let mut generator = crate::tactic::proof_term_gen::ProofTermGenerator::new_without_env(goal);
+                // Create generator with initial bindings for theorem parameters
+                let mut generator = if let Some(bindings) = params {
+                    crate::tactic::proof_term_gen::ProofTermGenerator::new_with_bindings(goal, bindings)
+                } else {
+                    crate::tactic::proof_term_gen::ProofTermGenerator::new_without_env(goal)
+                };
                 for (i, t) in tactics.iter().enumerate() {
                     eprintln!("DEBUG: tactic {}: {:?}", i, t);
                 }

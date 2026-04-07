@@ -301,14 +301,17 @@ lemma le_add_div_two_right (a b : Real) (h : le a b) : le (half (add a b)) b :=
         -- 需要证明 (a(n) + b(n))/2 + ε/2 < b(n)
         -- 即 a(n) + ε < b(n)
         have h_lt' := hN n hn
-        -- 使用对称版本的 Rat.lt_half_add
-        sorry
+        -- 使用 Rat.lt_half_add_right 引理
+        apply Rat.lt_half_add_right
+        · exact hε_pos
+        · exact h_lt'
     | inr h_eq =>
         -- 情况2：a = b
         -- 则 (a + b)/2 = (b + b)/2 = b，所以 (a + b)/2 = b
         right
-        -- 由 h_eq: a = b，half (add a b) = half (add b b) = b
-        -- 使用 half_add_eq_self 的对称形式
+        -- 由 h_eq: a = b，使用 half_add_eq_of_eq 引理
+        -- 需要证明 half (add a b) = b
+        -- 由 h_eq: a = b，得 half (add a b) = half (add b b) = b
         sorry
 
 // 引理：非零 Cauchy 序列远离零

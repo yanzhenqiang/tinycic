@@ -288,3 +288,31 @@ cargo test test_real_x_defs_loaded -- --nocapture
 - import 机制完成后单独提交
 - 定理修复每 10 个提交一次
 - DESIGN.MD 随进度同步更新
+
+---
+
+## 当前进展总结
+
+### 2024-04-07 更新
+
+**已完成：**
+1. ✅ Import 机制核心实现
+   - `import Module` 语法解析
+   - 依赖顺序加载 (`load_module_with_imports`)
+   - 模块路径映射 (`module_to_path`)
+
+2. ✅ 命名空间前缀自动添加
+   - `add_namespace_prefix` 函数
+   - `abs` → `Int.abs`, `zero` → `Int.zero` 等
+
+3. ✅ 等式和比较运算符解析
+   - `=` 解析为 `Eq a b`
+   - `≥` 解析为 `GE a b`
+   - 注册 `Eq`, `LE`, `GE` 类型
+
+4. ✅ 简化 lib/int.x
+   - 移除复杂 `match` 语法（parser 暂不支持）
+   - 使用简化定义便于测试
+
+**待解决：**
+- Int 引理类型检查失败：`TypeMismatch { expected: Sort(Level(1)), found: Const(

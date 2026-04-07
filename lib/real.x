@@ -747,10 +747,10 @@ lemma cauchy_diff (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchyS
 
 -- 辅助引理：|d(n)| = |s2(n) - s1(n)|
 -- lemma abs_diff_eq (s1 s2 : CauchySeq) (n : Nat) :
---     Rat.abs (CauchySeq.getSeq (diffCauchySeq s1 s2) n) =
+--     Rat.abs (Rat.add (CauchySeq.getSeq s2 n) (Rat.neg (CauchySeq.getSeq s1 n))) =
 --     Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) :=
 --   by
---     sorry
+--     rfl
 
 -- 辅助引理：d(n) > ε 当且仅当 s2(n) - s1(n) > ε
 def diff_pos_iff (s1 s2 : CauchySeq) (ε : Rat) (n : Nat) :
@@ -815,7 +815,11 @@ theorem cauchy_trichotomy (s1 s2 : CauchySeq) :
       intro n hn
       -- |d(n)| = |s2(n) - s1(n)| = |s1(n) - s2(n)|
       have h_d : Rat.abs (CauchySeq.getSeq d n) = Rat.abs (Rat.sub (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)) := by
-        rw [abs_diff_eq s1 s2 n]
+        -- 使用 abs_diff_eq 并交换参数
+        have h : Rat.abs (CauchySeq.getSeq d n) = Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) := by
+          simp [d, diffCauchySeq, addCauchySeq]
+          rw [Rat.add_neg_eq_sub]
+        rw [h]
         rw [Rat.abs_sub_comm]
       rw [h_d] at hN
       exact hN n hn

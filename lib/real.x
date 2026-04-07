@@ -254,13 +254,16 @@ lemma half_add_eq_self (a b : Real) (h : eq a b) : eq (half (add a b)) a :=
                   (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) := by
               -- 使用 Rat.abs_div_two: |x/2| = |x|/2
               apply Rat.abs_div_two
-      _ < ε := by
+      _ ≤ Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) := by
               -- 使用 h_abs: |b(n) - a(n)| < ε
-              -- 需要证明 |b-a|/2 < ε，而我们有 |b-a| < ε，且 1/2 < 1
-              -- 所以 |b-a|/2 < ε/2 < ε
-              apply Rat.div_lt_of_lt
-              · exact h_abs
-              · exact Rat.half_lt_one
+              -- 由 |b-a| < ε 和除以正数保持不等式，得 |b-a|/2 < ε/2
+              apply Rat.div_le_of_le
+              · exact Rat.le_of_lt h_abs
+              · exact Rat.le_refl
+      _ < ε := by
+              -- ε/2 < ε（因为 ε > 0）
+              apply Rat.half_lt_self
+              exact hε
 
 -- 对称版本：如果 a = b，则 (a + b)/2 = b
 lemma half_add_eq_self_right (a b : Real) (h : eq a b) : eq (half (add a b)) b :=

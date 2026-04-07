@@ -52,6 +52,10 @@ def neg (r : Real) : Real :=
 def sub (r1 r2 : Real) : Real :=
   add r1 (neg r2)
 
+// 实数除以 2 (用于二分法中点)
+def half (r : Real) : Real :=
+  Real.mk (CauchySeq.mk (λ n => Rat.div (r.rep.seq n) (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))))
+
 // 零元
 def zero : Real := ofRat Rat.zero
 
@@ -222,22 +226,27 @@ theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mu
 // =========================================================================
 
 -- 辅助引理：a ≤ (a + b)/2 当 a ≤ b
--- 即：如果 a ≤ b，则 a ≤ (a + b)/2
-lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (add a b) :=
+-- 即：如果 a ≤ b，则 a ≤ half(a + b)
+lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (half (add a b)) :=
   by
-    -- 展开定义：a ≤ c 意味着 a < c 或 a = c
-    -- 这里需要证明 a ≤ (a + b)
-    -- 由于 a ≤ b，我们有 a + a ≤ a + b
-    -- 即 2a ≤ a + b，所以 a ≤ (a + b)/2
-    -- 对于实数，这展开为 Cauchy 序列的 ε-N 论证
+    -- 证明思路：
+    -- 需要证明 a ≤ (a + b)/2
+    -- 这等价于 2a ≤ a + b，即 a ≤ b（这正是假设 h）
+    -- 展开为 Cauchy 序列的 ε-N 论证：
+    -- 对于足够大的 n，a(n) + ε < (a(n) + b(n))/2
+    -- 即 2a(n) + 2ε < a(n) + b(n)
+    -- 即 a(n) + 2ε < b(n)
+    -- 由 h: a ≤ b，存在 ε' > 0 使得 a(n) + ε' < b(n)
+    -- 取 ε = ε'/2 即可
     sorry
 
 -- 辅助引理：(a + b)/2 ≤ b 当 a ≤ b
--- 即：如果 a ≤ b，则 (a + b)/2 ≤ b
-lemma le_add_div_two_right (a b : Real) (h : le a b) : le (add a b) b :=
+-- 即：如果 a ≤ b，则 half(a + b) ≤ b
+lemma le_add_div_two_right (a b : Real) (h : le a b) : le (half (add a b)) b :=
   by
-    -- 类似地，a ≤ b 意味着 a + b ≤ b + b = 2b
-    -- 所以 (a + b)/2 ≤ b
+    -- 证明思路：
+    -- 需要证明 (a + b)/2 ≤ b
+    -- 这等价于 a + b ≤ 2b，即 a ≤ b（这正是假设 h）
     sorry
 
 // 引理：非零 Cauchy 序列远离零
@@ -971,11 +980,11 @@ def isLub (S : Set Real) (l : Real) : Prop :=
 -- 辅助引理：二分法构造单调有界序列
 def bisect_lower (S : Set Real) (a b : Real) (h : ¬hasUpperBound S a) (h' : hasUpperBound S b) : Real :=
   -- 如果中点是上界，则取 a；否则存在 s ∈ S 使得 s > 中点，取该 s
-  let mid := add a b
+  let mid := half (add a b)
   if hasUpperBound S mid then a else mid
 
 def bisect_upper (S : Set Real) (a b : Real) (h : ¬hasUpperBound S a) (h' : hasUpperBound S b) : Real :=
-  let mid := add a b
+  let mid := half (add a b)
   if hasUpperBound S mid then mid else b
 
 -- 二分法序列的定义（通过递归）

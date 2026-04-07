@@ -247,15 +247,20 @@ lemma half_add_eq_self (a b : Real) (h : eq a b) : eq (half (add a b)) a :=
                         (CauchySeq.getSeq a.rep n))
           = Rat.abs (Rat.div (Rat.sub (CauchySeq.getSeq b.rep n) (CauchySeq.getSeq a.rep n))
                             (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))) := by
-              -- 代数变换：(a+b)/2 - a = (b-a)/2
-              sorry
+              -- 使用 Rat.half_add_sub_left: (a+b)/2 - a = (b-a)/2
+              apply Rat.abs_eq
+              apply Rat.half_add_sub_left
       _ = Rat.div (Rat.abs (Rat.sub (CauchySeq.getSeq b.rep n) (CauchySeq.getSeq a.rep n)))
                   (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) := by
-              -- |x/2| = |x|/2
-              sorry
+              -- 使用 Rat.abs_div_two: |x/2| = |x|/2
+              apply Rat.abs_div_two
       _ < ε := by
-              -- |b-a|/2 < ε/2 < ε
-              sorry
+              -- 使用 h_abs: |b(n) - a(n)| < ε
+              -- 需要证明 |b-a|/2 < ε，而我们有 |b-a| < ε，且 1/2 < 1
+              -- 所以 |b-a|/2 < ε/2 < ε
+              apply Rat.div_lt_of_lt
+              · exact h_abs
+              · exact Rat.half_lt_one
 
 -- 对称版本：如果 a = b，则 (a + b)/2 = b
 lemma half_add_eq_self_right (a b : Real) (h : eq a b) : eq (half (add a b)) b :=

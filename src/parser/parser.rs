@@ -649,20 +649,14 @@ impl<'a> Parser<'a> {
             Token::Number(n) => {
                 let num = *n;
                 self.advance();
-                // Convert number to Int expression via ofNat
-                // 0 -> ofNat Nat.zero
-                // 1 -> ofNat (Nat.succ Nat.zero)
-                // 2 -> ofNat (Nat.succ (Nat.succ Nat.zero))
-                let nat_val = if num == 0 {
-                    Term::const_("Nat.zero")
-                } else {
-                    let mut result = Term::const_("Nat.zero");
-                    for _ in 0..num {
-                        result = Term::app(Term::const_("Nat.succ"), result);
-                    }
-                    result
-                };
-                Ok(Term::app(Term::const_("ofNat"), nat_val))
+                // Convert number to Nat via Nat.ofNat
+                // Use Nat.ofNat to avoid deep nesting of Nat.succ
+                // e.g., 134 -> ofNat (Nat.ofNat 134)
+                let nat_lit = Term::app(
+                    Term::const_("Nat.ofNat"),
+                    Term::const_(format!("{}", num))
+                );
+                Ok(Term::app(Term::const_("ofNat"), nat_lit))
             }
             _ => {
                 // Unexpected token, return a placeholder

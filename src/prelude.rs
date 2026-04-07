@@ -495,6 +495,21 @@ pub fn init_prelude(env: &mut Environment) {
 
     env.add_constant("Nat.zero", Term::const_("Nat"), None);
     env.add_constant("Nat.succ", Term::arrow(Term::const_("Nat"), Term::const_("Nat")), None);
+    // Nat.ofNat : Nat → Nat 用于数字字面量
+    env.add_constant("Nat.ofNat", Term::arrow(Term::const_("Nat"), Term::const_("Nat")), None);
+    // 注册常用数字常量（用于 parser 生成的数字字面量）
+    for n in 0..=10u64 {
+        let nat_val = if n == 0 {
+            Term::const_("Nat.zero")
+        } else {
+            let mut result = Term::const_("Nat.zero");
+            for _ in 0..n {
+                result = Term::app(Term::const_("Nat.succ"), result);
+            }
+            result
+        };
+        env.add_constant(&format!("{}", n), Term::const_("Nat"), Some(nat_val));
+    }
 
     // 恢复 Int 基础定义（rat.x 依赖）
     env.add_constant("Int.ofNat", Term::arrow(Term::const_("Nat"), Term::const_("Int")), None);

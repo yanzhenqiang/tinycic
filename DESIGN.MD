@@ -332,20 +332,19 @@ cargo test test_real_x_defs_loaded -- --nocapture
 
 **通过情况：**
 - 总定理数：163个
-- 通过：108个
-- 失败：55个
-- 相比上次：+15个定理通过
+- 通过：110个
+- 失败：53个
+- 相比上次：+17个定理通过
 
 **剩余主要问题：**
 1. `Int.abs_zero` - 证明类型推断失败（Sort Level 不匹配）
 2. `Int.abs_nonneg` - `≥` 运算符需要 GE 类型正确处理
-3. `Int.add_neg` - 缺少 `neg` 常量定义
-4. 部分 `Real` 定理验证失败
+3. 部分 `Real` 定理验证失败（UnknownConstant）
 
 **下一步：**
-- 修复 Sort Level 不匹配问题
-- 补充缺失的 `neg` 常量
+- 修复 sorry 类型与 Prop 的匹配问题
 - 修复 `ge/le` 运算符解析
+- 修复 Real 定理的常量解析
 
 ---
 

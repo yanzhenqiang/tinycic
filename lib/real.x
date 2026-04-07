@@ -228,12 +228,30 @@ theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mu
 -- 引理：如果 a = b，则 (a + b)/2 = a
 lemma half_add_eq_self (a b : Real) (h : eq a b) : eq (half (add a b)) a :=
   by
-    -- 由 h: a = b，展开 half (add a b)
-    -- (a + b)/2 = (a + a)/2 = (2*a)/2 = a
-    -- 这里需要证明：
-    -- ∀ ε > 0, ∃ N, ∀ n ≥ N, |(a(n) + b(n))/2 - a(n)| < ε
-    -- 由 a ~ b，∀ ε > 0, ∃ N, ∀ n ≥ N, |a(n) - b(n)| < ε
-    -- 所以 |(a(n) + b(n))/2 - a(n)| = |(b(n) - a(n))/2| < ε/2 < ε
+    -- 证明：∀ ε > 0, ∃ N, ∀ n ≥ N, |(a(n) + b(n))/2 - a(n)| < ε
+    intro ε hε
+    -- 由 h: a = b，对于 ε，存在 N 使得 ∀ n ≥ N, |a(n) - b(n)| < ε
+    obtain ⟨N, hN⟩ := h ε hε
+    use N
+    intro n hn
+    -- 计算 |(a(n) + b(n))/2 - a(n)|
+    -- = |(a(n) + b(n) - 2*a(n))/2|
+    -- = |(b(n) - a(n))/2|
+    -- = |b(n) - a(n)|/2
+    -- < ε/2 (由 hN)
+    -- < ε
+    have h_diff : Rat.abs (Rat.sub (Rat.div (Rat.add (CauchySeq.getSeq a.rep n) (CauchySeq.getSeq b.rep n))
+                                               (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))))
+                                      (CauchySeq.getSeq a.rep n))
+                = Rat.div (Rat.abs (Rat.sub (CauchySeq.getSeq b.rep n) (CauchySeq.getSeq a.rep n)))
+                          (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) := by
+      -- 代数变换
+      sorry
+    rw [h_diff]
+    -- 使用 hN: |b(n) - a(n)| < ε
+    have h_lt : Rat.abs (Rat.sub (CauchySeq.getSeq b.rep n) (CauchySeq.getSeq a.rep n)) < ε :=
+      hN n hn
+    -- 所以 |b(n) - a(n)|/2 < ε/2 < ε
     sorry
 
 -- 辅助引理：a ≤ (a + b)/2 当 a ≤ b

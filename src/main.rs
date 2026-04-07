@@ -142,8 +142,10 @@ fn repl() {
         stdout.flush().unwrap();
 
         let mut input = String::new();
-        if stdin.read_line(&mut input).is_err() {
-            break;
+        match stdin.read_line(&mut input) {
+            Ok(0) => break, // EOF reached
+            Ok(_) => {},
+            Err(_) => break,
         }
 
         let input = input.trim();

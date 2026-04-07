@@ -430,15 +430,15 @@ load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test")?;
 
 **实数完备性证明任务拆分（14个任务）:**
 
-**路径A：序关系三歧性（6个任务）** - 证明实数比较的三歧性
-| 任务 | 定理/引理 | 描述 | 依赖 |
-|------|----------|------|------|
-| #32 | cauchy_away_from_zero | 非零Cauchy序列远离零 | - |
-| #33 | cauchy_converge_or_away | 序列要么收敛要么远离0 | - |
-| #34 | cauchy_away_implies_sign | 远离0则有确定符号 | #33 |
-| #35 | cauchy_sequence_trichotomy | Cauchy序列三歧性核心 | #32,#34 |
-| #36 | cauchy_trichotomy | Cauchy序列对三歧性 | #35 |
-| #37 | lt_trichotomy | 实数序关系三歧性 | #36 |
+**路径A：序关系三歧性（6个任务）** - ✅ 全部完成
+| 任务 | 定理/引理 | 描述 | 依赖 | 状态 |
+|------|----------|------|------|------|
+| #32 | cauchy_away_from_zero | 非零Cauchy序列远离零 | - | ✅ 完成 |
+| #33 | cauchy_converge_or_away | 序列要么收敛要么远离0 | - | ✅ 完成 |
+| #34 | cauchy_away_implies_sign | 远离0则有确定符号 | #33 | ✅ 完成 |
+| #35 | cauchy_sequence_trichotomy | Cauchy序列三歧性核心 | #32,#34 | ✅ 完成 |
+| #36 | cauchy_trichotomy | Cauchy序列对三歧性 | #35 | ✅ 完成 |
+| #37 | lt_trichotomy | 实数序关系三歧性 | #36 | ✅ 完成 |
 
 **路径B：完备性定理（8个任务）** - 二分法构造上确界
 | 任务 | 定理/引理 | 描述 | 依赖 |

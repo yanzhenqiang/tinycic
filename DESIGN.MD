@@ -2,13 +2,13 @@
 
 ## 开发原则
 
-1. **单一状态管理** - DESIGN.MD 是项目唯一的状态管理器
-2. **功能独立提交** - 每个功能单独提交
-3. **测试驱动** - 修复必须包含测试用例、修复代码、测试通过
+1. **单一状态管理** - DESIGN.MD 是项目唯一的状态管理器，所有状态变更必须在此记录
+2. **功能独立提交** - 每个功能必须单独提交，确保变更可追溯
+3. **测试驱动** - 修复提交必须包含测试用例、修复代码、测试通过三部分
 
 ## 概述
 
-TinyCIC 是一个简化的 CIC (Calculus of Inductive Constructions) 实现：
+TinyCIC 是一个简化的 CIC (Calculus of Inductive Constructions) 实现，目标是：
 - 理论核心复刻 Lean 4 的 CIC 系统
 - 可信内核尽量小
 - 更适合 AI 生成显式 proof term
@@ -16,7 +16,7 @@ TinyCIC 是一个简化的 CIC (Calculus of Inductive Constructions) 实现：
 
 ## 第一阶段目标 ✅ 已完成
 
-完整复刻 lean4 中 inductive 和 typecheck 部分。
+完整复刻lean4中inductive和typecheck部分，复刻方法就是保证lean4的cpp部分和rust的输出一致
 
 ### 已完成组件
 
@@ -25,30 +25,34 @@ TinyCIC 是一个简化的 CIC (Calculus of Inductive Constructions) 实现：
 - 替换系统 (subst.rs) - instantiate, lift, has_loose_bvars
 - WHNF 归约 (reduce.rs) - Beta, Zeta, Iota 归约
 - 类型上下文 (context.rs)
-- 正性检查 (positivity.rs)
-- 消去式生成 (recursor.rs)
-- 归纳类型声明 (inductive/mod.rs)
-- 定义等价检查 (defeq.rs)
-- 类型推导 (infer.rs)
+- 正性检查 (positivity.rs) - 基础实现
+- 消去式生成 (recursor.rs) - RecursorInfo, RecursorRule, minor premise 类型构造
+- 归纳类型声明 (inductive/mod.rs) - InductiveDecl, InductiveProcessor
+- 定义等价检查 (defeq.rs) - 完整实现
+- 类型推导 (infer.rs) - 基础实现
 
 **高级特性:**
-- Proof irrelevance
-- Eta 展开
-- 定义等价缓存机制
-- Lazy delta reduction
+- Proof irrelevance（Prop 中所有证明等价）
+- Eta 展开（使用类型推导检测函数类型）
+- 定义等价缓存机制 (equiv_cache/failure_cache)
+- Lazy delta reduction（嵌套展开、部分应用、常量到常量）
+- WHNF 消去式归约（按构造子名称匹配）
 
 **测试覆盖:** 46 个测试全部通过
 
 ---
 
-## 第二阶段目标：Cauchy 实数构造 ✅ 已完成框架
+## 第二阶段目标：Cauchy 实数构造
+
+将 Cauchy 实数构造拆分为以下可执行步骤：
 
 ### 2.1 证明基础设施 ✅
-- [x] `have` 关键字
-- [x] `assume`/`intro`
-- [x] `by` tactic 模式
-- [x] `calc` 块（等式链）
-- [x] `rw` 重写
+**目标**: 让 AI 能生成人类可读的显式证明
+- [x] `have` 关键字（引入中间引理）
+- [x] `assume`/`intro`（引入假设）
+- [x] `by` tactic 模式（嵌入 tactic 块）
+- [x] `calc` 块（等式链证明）
+- [x] `rw` 重写规则
 
 ### 2.2 基础数据类型 ✅
 - [x] `Nat` - 自然数（归纳类型）
@@ -62,15 +66,15 @@ TinyCIC 是一个简化的 CIC (Calculus of Inductive Constructions) 实现：
 ```
 
 ### 2.3 Cauchy 序列 ✅
-- [x] `CauchySeq` - 有理数 Cauchy 序列
+- [x] `CauchySeq` - 有理数 Cauchy 序列定义
 - [x] Cauchy 条件：∀ε>0, ∃N, ∀m,n≥N, |a_m - a_n| < ε
 - [x] 序列等价关系
 
 ### 2.4 实数构造 ✅
 - [x] `Real` - 作为 CauchySeq / 等价关系 的商
 - [x] 实数运算：add, mul, neg, sub, ofRat/ofNat/ofInt
-- [x] 域公理（完整 ε-N 证明）：add_comm, add_assoc, add_zero, add_neg, mul_comm, mul_assoc, mul_one, mul_add
-- [x] 序关系：lt, le（带传递性）
+- [x] 域公理（完整 ε-N 证明）
+- [x] 序关系：lt, le
 - [x] 完备性定理框架
 
 ---
@@ -101,20 +105,13 @@ TinyCIC 是一个简化的 CIC (Calculus of Inductive Constructions) 实现：
 | #44 | bisect_lower/upper_cauchy | 二分序列Cauchy性 | #39-#43 | 🔄 待完成 |
 | #45 | completeness | 完备性定理（最终） | #44 | 🔄 待完成 |
 
-### 新增 Rat 引理（支持 Real 证明）
-
-**刚添加的引理:**
-- `add_neg_eq_sub` - a + (-b) = a - b
-- `lt_of_sub_pos` - 由 b - a > 0 推出 a < b
-- `lt_of_sub_neg` - 由 b - a < 0 推出 b < a
-
 ---
 
 ## 系统统计
 
 - **测试**: 123 个通过
-- **定理完成**: 37 个（Path A 全部完成）
-- **定理待完成**: 8 个（Path B）
+- **已完成定理**: 37 个（Path A 全部完成）
+- **待完成定理**: 8 个（Path B）
 
 ---
 
@@ -124,30 +121,69 @@ TinyCIC 是一个简化的 CIC (Calculus of Inductive Constructions) 实现：
 - [ ] 代码提取 (Extraction) 到 C
 - [ ] 程序验证框架 (Hoare 逻辑)
 - [ ] 初等几何公理系统
+- [ ] 初中代数解方程
 
 ---
 
 ## 开发流程
 
-1. **更新 DESIGN.MD** — 记录当前状态
-2. **执行变更** — 编写代码
-3. **提交 Git** — 保存变更
+1. **更新 DESIGN.MD** — 记录当前状态和下一步
+2. **执行变更** — 编写/修改代码
+3. **提交 Git** — 保存变更，提交信息包含变更摘要
 
 ### 提交规范
 
-修复提交必须包含：
-1. 测试用例 - 复现 bug
-2. 修复代码 - 修复 bug
-3. 测试通过 - 验证修复
+任何修复 bug 的提交必须包含：
+1. **测试用例** - 复现 bug 的测试
+2. **修复代码** - 修复 bug 的代码
+3. **测试通过** - 修复后测试必须通过
 
-### 示例提交
+### 开发流程示例
 
+以修复 "UniverseMismatch 错误" 为例：
+
+**1. 问题分析**
+```bash
+cargo test test_cauchy -- --nocapture
+# 错误：UniverseMismatch { expected: Level(0), found: Level(999) }
+```
+
+**2. 根因定位**
+通过添加调试输出，发现 `extract_level` 收到 `Const("Prop")` 而不是 `Sort(...)`。
+问题：`Prop` 是 Sort(0) 的别名，但代码未处理。
+
+**3. 修复代码**
+```rust
+// src/typecheck/infer.rs
+fn extract_level(&self, term: &Rc<Term>) -> TcResult<Level> {
+    let whnf_term = self.whnf(term);
+    match whnf_term.as_ref() {
+        Term::Sort(lvl) => Ok(Level(lvl.0)),
+        // 添加 Prop 作为 Sort(0) 的别名
+        Term::Const(name) if name == "Prop" => Ok(Level(0)),
+        _ => Err(TypeError::UniverseMismatch { ... }),
+    }
+}
+```
+
+**4. 验证修复**
+```bash
+cargo test  # 全部测试通过
+```
+
+**5. 提交 Git**
 ```bash
 git add -A
 git commit -m "修复 UniverseMismatch：识别 Prop 为 Sort(0)
 
-- Pi 类型的 codomain 可能是 Prop
-- 添加 Term::Const("Prop") 匹配
+- Pi 类型的 codomain 可能是 Prop，需要被识别为有效的 universe
+- 添加 Term::Const("Prop") 匹配返回 Level(0)
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ```
+
+**关键点：**
+- 从错误信息出发，通过调试定位根因
+- 最小化修复，只改必要代码
+- 所有测试通过后提交
+- 提交信息包含：问题、解决方案、验证结果

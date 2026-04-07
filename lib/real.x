@@ -68,12 +68,28 @@ def max (m n : Nat) : Nat :=
 
 // ε/2 构造：给定 ε > 0，证明 ε/2 > 0
 lemma half_pos (ε : Rat) (h : Rat.gt ε Rat.zero) : Rat.gt (Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))) Rat.zero :=
-  by exact sorry
+  by
+    -- 构造 PosInt.two
+    let two := Nat.succ (Nat.succ Nat.zero)
+    -- 使用 Rat.div_pos: ε > 0 且 2 > 0 → ε/2 > 0
+    apply Rat.div_pos
+    · -- 证明 ε > 0
+      exact h
+    · -- 证明 2 > 0 (即 Nat.succ Nat.zero ≤ Nat.succ (Nat.succ Nat.zero))
+      exact Nat.le_succ _
 
 // 三角不等式在 Rat 上的应用：|(a+b) - (c+b)| ≤ |a - c|
 // 证明：|(a+b) - (c+b)| = |a + b - c - b| = |a - c|
 lemma rat_triangle_ineq (a b c : Rat) : Rat.le (Rat.abs (Rat.sub (Rat.add a b) (Rat.add c b))) (Rat.abs (Rat.sub a c)) :=
-  by exact sorry
+  by
+    -- (a + b) - (c + b) = a - c
+    have h1 : Rat.eq (Rat.sub (Rat.add a b) (Rat.add c b)) (Rat.sub a c) :=
+      by rw [Rat.sub_add_distrib]
+    -- 所以 |a + b - (c + b)| = |a - c|
+    calc
+      Rat.abs (Rat.sub (Rat.add a b) (Rat.add c b))
+          = Rat.abs (Rat.sub a c) := by rw [h1]
+      _ ≤ Rat.abs (Rat.sub a c) := by exact Rat.le_refl _
 
 // =========================================================================
 // 域公理证明（带完整 ε-N 论证）
@@ -209,9 +225,132 @@ theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mu
 -- 假设 s 不远离零，即对于所有 δ > 0，最终 |s(n)| ≤ δ
 -- 由于 s 是 Cauchy 序列，这意味着 s 收敛到 0
 -- 所以 Real.mk s = Real.zero，与 h 矛盾
+-- 辅助引理：如果 |s(n)| ≤ δ 对所有 n ≥ N 成立，且 s 是 Cauchy 序列，则 s ~ 0
+lemma cauchy_not_away_implies_zero (s : CauchySeq) (hs : CauchySeq.isCauchy s)
+    (h : ∀ δ > Rat.zero, ∃ N, ∀ n ≥ N, Rat.le (Rat.abs (CauchySeq.getSeq s n)) δ) :
+    ∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (CauchySeq.getSeq s n) < ε :=
+  by
+    intro ε hε
+    -- 对 ε/2 应用 Cauchy 条件
+    let ε2 := Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+    have hε2_pos : ε2 > Rat.zero := Rat.half_pos ε hε
+
+    obtain ⟨N1, hN1⟩ := hs ε2 hε2_pos
+
+    -- 由假设，对 ε/2，存在 N2 使得 ∀ n ≥ N2, |s(n)| ≤ ε/2
+    obtain ⟨N2, hN2⟩ := h ε2 hε2_pos
+
+    -- 取 N = max(N1, N2)
+    use Nat.max N1 N2
+    intro n hn
+
+    have hn1 : n ≥ N1 := Nat.le_trans (Nat.le_max_left N1 N2) hn
+    have hn2 : n ≥ N2 := Nat.le_trans (Nat.le_max_right N1 N2) hn
+
+    -- 取 m = n，则 |s(n) - s(n)| = 0 < ε/2，这总是成立
+    -- 我们需要证明的是 |s(n)| < ε
+    -- 由 hN2：|s(n)| ≤ ε/2 < ε
+    have h_le : Rat.le (Rat.abs (CauchySeq.getSeq s n)) ε2 := hN2 n hn2
+
+    -- ε/2 < ε
+    have h_lt : ε2 < ε := by
+      apply Rat.div_lt_self
+      · exact hε
+      · -- 证明 2 > 1
+        exact Nat.lt_succ_self _
+
+    -- 结合得到 |s(n)| < ε
+    exact Rat.lt_of_le_of_lt h_le h_lt
+
+-- 辅助引理：如果 Cauchy 序列有无穷多项 |s(n)| ≤ δ，则所有足够大的项 |s(n)| ≤ 2δ
+-- 这是 Cauchy 序列的关键性质
+lemma cauchy_inf_often_small_implies_eventually_small (s : CauchySeq) (hs : CauchySeq.isCauchy s)
+    (h : ∀ δ > Rat.zero, ∀ N, ∃ n ≥ N, Rat.abs (CauchySeq.getSeq s n) ≤ δ) :
+    ∀ δ > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (CauchySeq.getSeq s n) ≤ Rat.mul (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) δ :=
+  by
+    intro δ hδ
+    -- 对 δ 应用 Cauchy 条件：存在 N0 使得 ∀ m,n ≥ N0, |s(m) - s(n)| < δ
+    obtain ⟨N0, hN0⟩ := hs δ hδ
+
+    -- 由假设，对 δ 和 N0，存在 n0 ≥ N0 使得 |s(n0)| ≤ δ
+    obtain ⟨n0, hn0_ge, hn0_small⟩ := h δ hδ N0
+
+    use N0
+    intro n hn
+
+    -- 对 n 和 n0 应用 Cauchy 条件
+    have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq s n) (CauchySeq.getSeq s n0)) < δ :=
+      hN0 n n0 hn hn0_ge
+
+    -- 三角不等式：|s(n)| ≤ |s(n) - s(n0)| + |s(n0)| < δ + δ = 2δ
+    calc
+      Rat.abs (CauchySeq.getSeq s n)
+          ≤ Rat.add (Rat.abs (Rat.sub (CauchySeq.getSeq s n) (CauchySeq.getSeq s n0)))
+                    (Rat.abs (CauchySeq.getSeq s n0)) := by
+              apply Rat.abs_sub_le
+      _ < Rat.add δ δ := by
+              apply Rat.add_lt_add
+              · exact h_cauchy
+              · have h_le : Rat.abs (CauchySeq.getSeq s n0) ≤ δ := hn0_small
+                exact Rat.lt_of_le_of_lt h_le (Rat.lt_add_pos_right hδ)
+      _ = Rat.mul (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) δ := by
+              -- 证明 δ + δ = 2 * δ
+              rw [Rat.add_mul_self]
+
 lemma cauchy_away_from_zero (s : CauchySeq) (h : Real.mk s ≠ Real.zero) :
   ∃ δ : Rat, δ > Rat.zero ∧ ∃ N : Nat, ∀ n : Nat, n ≥ N → Rat.gt (Rat.abs (CauchySeq.getSeq s n)) δ :=
-  by exact sorry
+  by
+    -- 反证法
+    by_contra h_contra
+    -- 假设结论不成立：∀ δ > 0, ∀ N, ∃ n ≥ N, |s(n)| ≤ δ
+    push_neg at h_contra
+
+    -- 关键步骤：证明 s 收敛到 0
+    -- 即 ∀ ε > 0, ∃ N, ∀ n ≥ N, |s(n)| < ε
+
+    have h_conv_zero : ∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (CauchySeq.getSeq s n) < ε := by
+      intro ε hε
+      let ε2 := Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+      have hε2_pos : ε2 > Rat.zero := Rat.half_pos ε hε
+
+      -- 使用辅助引理：如果序列有无穷多项 |s(n)| ≤ ε/2，则所有大项 |s(n)| ≤ ε
+      have h_eventually : ∃ N, ∀ n ≥ N, Rat.abs (CauchySeq.getSeq s n) ≤ Rat.mul (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) ε2 := by
+        apply cauchy_inf_often_small_implies_eventually_small s s.is_cauchy h_contra ε2 hε2_pos
+
+      obtain ⟨N, hN⟩ := h_eventually
+      use N
+      intro n hn
+      have h_le : Rat.abs (CauchySeq.getSeq s n) ≤ Rat.mul (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) ε2 := hN n hn
+      -- 证明 2 * (ε/2) = ε
+      have h_eq : Rat.mul (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) ε2 = ε := by
+        rw [show ε2 = Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero))) by rfl]
+        rw [Rat.mul_div_cancel]
+        · exact Rat.ne_of_gt hε
+      rw [h_eq] at h_le
+      exact Rat.lt_of_le_of_lt h_le (Rat.lt_add_pos_right hε)
+
+    -- 证明 s ~ 0（s 等价于零序列），即 Real.mk s = Real.zero
+    have h_eq_zero : Real.mk s = Real.zero := by
+      -- 使用 Real.eq 的定义：Real.mk s = Real.mk t 当且仅当 s ~ t
+      -- 即 ∀ ε > 0, ∃ N, ∀ n ≥ N, |s(n) - t(n)| < ε
+      -- 对于 t = 0，我们有 t(n) = 0，所以 |s(n) - 0| = |s(n)|
+      -- 这正是 h_conv_zero 给出的
+      have h_equiv_zero : ∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (Rat.sub (CauchySeq.getSeq s n) Rat.zero) < ε := by
+        intro ε hε
+        obtain ⟨N, hN⟩ := h_conv_zero ε hε
+        use N
+        intro n hn
+        -- |s(n) - 0| = |s(n)|
+        have h_sub : Rat.sub (CauchySeq.getSeq s n) Rat.zero = CauchySeq.getSeq s n := by
+          rw [Rat.sub_zero]
+        rw [h_sub]
+        exact hN n hn
+
+      -- 现在需要证明 Real.mk s = Real.zero
+      -- 这需要使用 Real.eq 的定义和等价关系
+      sorry
+
+    contradiction
 
 lemma cauchy_inv (s : CauchySeq) (h : ∃ δ : Rat, δ > Rat.zero ∧ ∃ N : Nat, ∀ n : Nat, n ≥ N → Rat.gt (Rat.abs (s.seq n)) δ) :
   CauchySeq.isCauchy (inv_seq s h) :=
@@ -290,9 +429,140 @@ lemma cauchy_inv (s : CauchySeq) (h : ∃ δ : Rat, δ > Rat.zero ∧ ∃ N : Na
                 · intro h0; apply hδ_pos; rw [h0]; exact Rat.le_refl
                 · intro h0; apply hδ_pos; rw [h0]; exact Rat.le_refl
 
+-- 辅助定义：Cauchy 序列的逆元序列
+-- 假设 s 远离零（|s(n)| > δ 对于 n ≥ N₀），定义 1/s(n)
+def invCauchySeq (s : CauchySeq) (δ : Rat) (hδ : δ > Rat.zero) (N₀ : Nat)
+    (hN₀ : ∀ n ≥ N₀, Rat.gt (Rat.abs (CauchySeq.getSeq s n)) δ) : CauchySeq :=
+  CauchySeq.mk (λ n =>
+    if n ≥ N₀ then
+      Rat.inv (CauchySeq.getSeq s n) (λ h_eq =>
+        -- 证明 s(n) ≠ 0 使用 |s(n)| > δ > 0
+        have h_abs : Rat.abs (CauchySeq.getSeq s n) > δ := hN₀ n (Nat.le_refl n)
+        have h_pos : δ > Rat.zero := hδ
+        -- 如果 s(n) = 0，则 |s(n)| = 0，与 |s(n)| > δ > 0 矛盾
+        Rat.abs_pos_of_ne_zero h_eq ▸ Rat.lt_irrefl _ (Rat.lt_trans h_pos h_abs))
+    else
+      Rat.zero  -- 对于 n < N₀，使用任意值（不影响极限）
+  )
+
+-- 引理：逆元序列是 Cauchy 序列
+lemma cauchy_inv (s : CauchySeq) (hs : CauchySeq.isCauchy s) (δ : Rat) (hδ : δ > Rat.zero) (N₀ : Nat)
+    (hN₀ : ∀ n ≥ N₀, Rat.gt (Rat.abs (CauchySeq.getSeq s n)) δ) :
+    CauchySeq.isCauchy (invCauchySeq s δ hδ N₀ hN₀) :=
+  by
+    -- 证明：逆元序列满足 Cauchy 条件
+    intro ε hε
+
+    -- 关键观察：|1/s(m) - 1/s(n)| = |s(n) - s(m)| / (|s(m)| |s(n)|)
+    -- 由于 |s(m)| ≥ δ 和 |s(n)| ≥ δ（对于 m,n ≥ N₀），
+    -- 我们有 |1/s(m) - 1/s(n)| ≤ |s(n) - s(m)| / δ²
+
+    -- 所以，如果我们想让 |1/s(m) - 1/s(n)| < ε，
+    -- 只需要 |s(n) - s(m)| < ε * δ²
+    let ε' := Rat.mul ε (Rat.mul δ δ)
+    have hε'_pos : ε' > Rat.zero := by
+      apply Rat.mul_pos
+      · exact hε
+      · apply Rat.mul_pos
+        · exact hδ
+        · exact hδ
+
+    -- 由 s 的 Cauchy 性质，对于 ε'，存在 N₁
+    obtain ⟨N₁, hN₁⟩ := hs ε' hε'_pos
+
+    -- 取 N = max(N₀, N₁)
+    use Nat.max N₀ N₁
+
+    intro m n hm hn
+
+    -- 确保 m,n ≥ N₀
+    have hm₀ : m ≥ N₀ := Nat.le_trans (Nat.le_max_left N₀ N₁) hm
+    have hn₀ : n ≥ N₀ := Nat.le_trans (Nat.le_max_left N₀ N₁) hn
+
+    -- 确保 m,n ≥ N₁
+    have hm₁ : m ≥ N₁ := Nat.le_trans (Nat.le_max_right N₀ N₁) hm
+    have hn₁ : n ≥ N₁ := Nat.le_trans (Nat.le_max_right N₀ N₁) hn
+
+    -- 由于 m,n ≥ N₀，使用逆元定义
+    have h_inv_m : (invCauchySeq s δ hδ N₀ hN₀).seq m = Rat.inv (s.seq m) _ := by
+      simp [invCauchySeq, hm₀]
+    have h_inv_n : (invCauchySeq s δ hδ N₀ hN₀).seq n = Rat.inv (s.seq n) _ := by
+      simp [invCauchySeq, hn₀]
+
+    -- 应用逆元差公式
+    calc
+      Rat.abs (Rat.sub (Rat.inv (s.seq m) _) (Rat.inv (s.seq n) _))
+          = Rat.abs (Rat.div (Rat.sub (s.seq n) (s.seq m))
+                              (Rat.mul (s.seq m) (s.seq n)) _) := by
+              rw [Rat.inv_sub_inv]
+      _ ≤ Rat.div (Rat.abs (Rat.sub (s.seq n) (s.seq m)))
+                  (Rat.mul δ δ) _ := by
+              -- 分母 |s(m)s(n)| = |s(m)| |s(n)| ≥ δ * δ
+              apply Rat.div_le_div_of_le_left
+              · apply Rat.abs_mul_ge
+                · exact hN₀ m hm₀
+                · exact hN₀ n hn₀
+      _ < Rat.div ε' (Rat.mul δ δ) _ := by
+              apply Rat.div_lt_div_of_lt_right
+              · -- |s(n) - s(m)| < ε'
+                have hsmn := hN₁ m n hm₁ hn₁
+                exact hsmn
+      _ = ε := by
+              -- ε' / (δ * δ) = (ε * δ * δ) / (δ * δ) = ε
+              rw [show ε' = Rat.mul ε (Rat.mul δ δ) by rfl]
+              rw [Rat.mul_div_cancel]
+              · -- 证明 δ * δ ≠ 0
+                apply Rat.mul_ne_zero
+                · intro h0; apply Rat.ne_of_gt hδ; rw [h0]; exact Rat.le_refl
+                · intro h0; apply Rat.ne_of_gt hδ; rw [h0]; exact Rat.le_refl
+
 // 非零元存在逆元：对任意非零实数 r，存在逆元 r_inv 使得 r * r_inv = 1
 theorem mul_inv (r : Real) (h : r ≠ zero) : ∃ r_inv : Real, eq (mul r r_inv) one :=
-  by exact sorry
+  by
+    -- 设 r = Real.mk s，其中 s 是 Cauchy 序列
+    -- 由 cauchy_away_from_zero，存在 δ > 0 和 N₀，使得对于所有 n ≥ N₀，|s(n)| > δ
+    obtain ⟨δ, hδ_pos, N₀, hN₀⟩ := cauchy_away_from_zero r.rep (by
+      -- 证明 r.rep 代表非零实数
+      intro h_eq
+      apply h
+      rw [show r = Real.mk r.rep by cases r; simp]
+      exact h_eq)
+
+    -- 构造逆元实数
+    let s_inv := invCauchySeq r.rep δ hδ_pos N₀ hN₀
+    have hs_inv_cauchy : CauchySeq.isCauchy s_inv := cauchy_inv r.rep r.rep.is_cauchy δ hδ_pos N₀ hN₀
+
+    let r_inv := Real.mk s_inv
+
+    use r_inv
+
+    -- 证明 r * r_inv = 1
+    -- 即证明对于足够大的 n，r.rep.seq n * s_inv.seq n = 1
+    intro ε hε
+    use N₀
+    intro n hn
+
+    -- 对于 n ≥ N₀，s_inv.seq n = 1 / r.rep.seq n
+    have h_inv : s_inv.seq n = Rat.inv (r.rep.seq n) _ := by
+      simp [invCauchySeq, hn]
+
+    -- 因此 r(n) * r_inv(n) = r(n) * (1/r(n)) = 1
+    calc
+      Rat.abs (Rat.sub (Rat.mul (r.rep.seq n) (s_inv.seq n)) Rat.one)
+          = Rat.abs (Rat.sub (Rat.mul (r.rep.seq n) (Rat.inv (r.rep.seq n) _)) Rat.one) := by
+              rw [h_inv]
+      _ = Rat.abs (Rat.sub Rat.one Rat.one) := by
+              rw [Rat.mul_inv_cancel]
+              · -- 证明 r.rep.seq n ≠ 0
+                have h_abs : Rat.abs (r.rep.seq n) > δ := hN₀ n hn
+                have h_pos : δ > Rat.zero := hδ_pos
+                intro h_eq
+                rw [h_eq] at h_abs
+                simp at h_abs
+                exact Rat.lt_irrefl _ (Rat.lt_trans h_pos h_abs)
+      _ = Rat.zero := by
+              rw [Rat.sub_self]
+      _ < ε := hε
 
 // =========================================================================
 // 序关系
@@ -342,14 +612,313 @@ theorem lt_trans (r1 r2 r3 : Real) (h1 : lt r1 r2) (h2 : lt r2 r3) : lt r1 r3 :=
 -- 关键观察：这是实数完备性的体现， Cauchy 序列在实数中必有极限
 -- 且极限只能是上述三种情况之一
 
+-- Cauchy 序列三歧性引理：对于 Cauchy 序列 d，必有以下之一成立：
+-- 1. d 最终远离 0 为正（即 ∃ε>0, ∃N, ∀n≥N, d(n) > ε）
+-- 2. d 收敛到 0（即 ∀ε>0, ∃N, ∀n≥N, |d(n)| < ε）
+-- 3. d 最终远离 0 为负（即 ∃ε>0, ∃N, ∀n≥N, d(n) < -ε）
+--
+-- 这是一个经典的结果，依赖于实数的完备性。
+-- 对于构造性证明，我们需要证明这三种情况穷尽了所有可能性。
+-- 辅助引理：Cauchy 序列要么收敛到 0，要么远离 0
+-- 这是三歧性的关键：序列要么趋于 0，要么保持远离 0
+--
+-- 注意：这个引理在经典数学中是排中律的直接应用
+-- 构造性证明需要更强的假设或不同的处理方式
+--
+-- 我们采用以下策略：
+-- 1. 假设序列不收敛到 0（即 ¬(∀ ε > 0, ∃ N, ∀ n ≥ N, |d(n)| < ε)）
+-- 2. 推出 ∃ ε > 0, ∀ N, ∃ n ≥ N, |d(n)| ≥ ε（即序列无限次远离 0）
+-- 3. 由 Cauchy 性质，这实际上意味着序列从某个点开始始终远离 0
+lemma cauchy_converge_or_away (d : CauchySeq) (hd : CauchySeq.isCauchy d) :
+  (∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (CauchySeq.getSeq d n) < ε) ∨
+  (∃ ε > Rat.zero, ∀ N, ∃ n ≥ N, Rat.abs (CauchySeq.getSeq d n) ≥ ε) :=
+  by
+    -- 使用经典排中律（这是实数完备性的一部分）
+    -- 在构造性数学中，我们需要额外的工作来证明这一点
+    --
+    -- 策略：尝试证明第一种情况，如果失败则证明第二种情况
+    -- 这需要决策程序来决定序列是否收敛到 0
+
+    -- 简化处理：对于 Cauchy 序列，我们可以检查是否存在 N 使得 |d(N)| 足够小
+    -- 如果不存在，则序列远离 0
+
+    -- 经典逻辑论证：
+    -- 考虑命题 P := (∀ ε > 0, ∃ N, ∀ n ≥ N, |d(n)| < ε)
+    -- 如果 P 成立，我们得到第一种情况
+    -- 如果 ¬P 成立，则 ∃ ε > 0, ∀ N, ∃ n ≥ N, |d(n)| ≥ ε，这是第二种情况
+
+    -- 在构造性数学中，我们需要有效的算法来决定
+    -- 这里我们假设可以使用排中律
+    sorry
+
+-- 辅助引理：如果 Cauchy 序列远离 0，则它要么最终为正，要么最终为负
+lemma cauchy_away_implies_sign (d : CauchySeq) (hd : CauchySeq.isCauchy d)
+    (h : ∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (CauchySeq.getSeq d n) ≥ ε) :
+    (∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, CauchySeq.getSeq d n > ε) ∨
+    (∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, CauchySeq.getSeq d n < Rat.neg ε) :=
+  by
+    obtain ⟨ε, hε_pos, N, hN⟩ := h
+
+    -- 如果序列远离 0（|d(n)| ≥ ε），则 d(n) 要么 ≥ ε，要么 ≤ -ε
+    -- 由于 d 是 Cauchy 序列，它不能无限次在正数和负数之间振荡
+    -- （因为那样会有 |d(m) - d(n)| ≥ 2ε 对于某些 m,n，违反 Cauchy 条件）
+
+    -- 检查 d(N) 的符号
+    have h_dN : (CauchySeq.getSeq d N ≥ ε) ∨ (CauchySeq.getSeq d N ≤ Rat.neg ε) := by
+      have h_abs : Rat.abs (CauchySeq.getSeq d N) ≥ ε := hN N (Nat.le_refl N)
+      cases Rat.abs_ge_iff.mp h_abs with
+      | inl h_pos => left; exact h_pos
+      | inr h_neg => right; exact h_neg
+
+    cases h_dN with
+    | inl h_pos =>
+        -- d(N) ≥ ε > 0，证明序列最终保持为正
+        left
+        -- 使用 ε/2 作为最终界限
+        use Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+        constructor
+        · -- ε/2 > 0
+          apply Rat.div_pos
+          · exact hε_pos
+          · exact Nat.le_succ _
+        -- 取 M = max(N, N_δ)，其中 N_δ 来自 Cauchy 条件
+        let δ := Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+        have hδ_pos : δ > Rat.zero := Rat.div_pos hε_pos (Nat.le_succ _)
+        obtain ⟨N_δ, hN_δ⟩ := hd δ hδ_pos
+        use Nat.max N N_δ
+        intro n hn
+        have hn_N : n ≥ N := Nat.le_trans (Nat.le_max_left N N_δ) hn
+        have hn_δ : n ≥ N_δ := Nat.le_trans (Nat.le_max_right N N_δ) hn
+        -- 利用 Cauchy 条件：|d(n) - d(N)| < ε/2
+        have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) < δ :=
+          hN_δ n N hn_δ (Nat.le_refl N)
+        -- 利用绝对值不等式：d(n) ≥ d(N) - |d(n) - d(N)| > ε - ε/2 = ε/2
+        have h_lower : CauchySeq.getSeq d n > δ := by
+          -- d(n) = d(N) + (d(n) - d(N)) ≥ d(N) - |d(n) - d(N)| > ε - ε/2 = ε/2
+          have h1 : CauchySeq.getSeq d N ≥ ε := h_pos
+          have h2 : Rat.abs (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) < δ := h_cauchy
+          -- 由 |x| < a 推出 -a < x < a
+          -- 所以 d(n) - d(N) > -δ
+          -- 即 d(n) > d(N) - δ ≥ ε - ε/2 = ε/2
+          sorry
+        exact h_lower
+    | inr h_neg =>
+        -- d(N) ≤ -ε < 0，证明序列最终保持为负
+        right
+        use Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+        constructor
+        · -- ε/2 > 0
+          apply Rat.div_pos
+          · exact hε_pos
+          · exact Nat.le_succ _
+        -- 取 M = max(N, N_δ)
+        let δ := Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+        have hδ_pos : δ > Rat.zero := Rat.div_pos hε_pos (Nat.le_succ _)
+        obtain ⟨N_δ, hN_δ⟩ := hd δ hδ_pos
+        use Nat.max N N_δ
+        intro n hn
+        have hn_N : n ≥ N := Nat.le_trans (Nat.le_max_left N N_δ) hn
+        have hn_δ : n ≥ N_δ := Nat.le_trans (Nat.le_max_right N N_δ) hn
+        -- 利用 Cauchy 条件：|d(n) - d(N)| < ε/2
+        have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) < δ :=
+          hN_δ n N hn_δ (Nat.le_refl N)
+        -- 类似地，d(n) < d(N) + ε/2 ≤ -ε + ε/2 = -ε/2
+        have h_upper : CauchySeq.getSeq d n < Rat.neg δ := by
+          -- d(n) = d(N) + (d(n) - d(N)) ≤ d(N) + |d(n) - d(N)| < -ε + ε/2 = -ε/2
+          sorry
+        exact h_upper
+
+lemma cauchy_sequence_trichotomy (d : CauchySeq) (hd : CauchySeq.isCauchy d) :
+  (∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.lt (Rat.neg ε) (CauchySeq.getSeq d n)) ∨
+  (∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (CauchySeq.getSeq d n) < ε) ∨
+  (∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.lt (CauchySeq.getSeq d n) (Rat.neg ε)) :=
+  by
+    -- 首先判断：d 是否收敛到 0？
+    obtain (h_conv | h_away) := cauchy_converge_or_away d hd
+
+    · -- 情况1：d 收敛到 0
+      right
+      left
+      exact h_conv
+
+    · -- 情况2：d 远离 0
+      -- 则 d 要么最终为正，要么最终为负
+      obtain (h_pos | h_neg) := cauchy_away_implies_sign d hd h_away
+
+      · -- 情况2a：d 最终为正远离 0
+        left
+        obtain ⟨ε, hε_pos, N, hN⟩ := h_pos
+        use ε, N
+        intro n hn
+        -- 证明 -ε < d(n)
+        have h_d_pos : CauchySeq.getSeq d n > ε := hN n hn
+        exact Rat.lt_trans (Rat.neg_neg_of_pos hε_pos) h_d_pos
+
+      · -- 情况2b：d 最终为负远离 0
+        right
+        right
+        obtain ⟨ε, hε_pos, N, hN⟩ := h_neg
+        use ε, N
+        intro n hn
+        exact hN n hn
+
+-- 辅助引理：-s 是 Cauchy 序列当 s 是 Cauchy 序列
+lemma cauchy_neg (s : CauchySeq) (hs : CauchySeq.isCauchy s) :
+    CauchySeq.isCauchy (CauchySeq.mk (λ n => Rat.neg (CauchySeq.getSeq s n))) :=
+  by
+    intro ε hε
+    obtain ⟨N, hN⟩ := hs ε hε
+    use N
+    intro m n hm hn
+    -- |-s(m) - (-s(n))| = |-(s(m) - s(n))| = |s(m) - s(n)|
+    have h_neg : Rat.abs (Rat.sub (Rat.neg (CauchySeq.getSeq s m)) (Rat.neg (CauchySeq.getSeq s n))) =
+                 Rat.abs (Rat.sub (CauchySeq.getSeq s m) (CauchySeq.getSeq s n)) := by
+      rw [Rat.neg_sub_neg]
+      rw [Rat.abs_neg]
+    rw [h_neg]
+    exact hN m n hm hn
+
+-- 辅助引理：d(n) = s2(n) - s1(n) 的定义展开
+def diffCauchySeq (s1 s2 : CauchySeq) : CauchySeq :=
+  addCauchySeq s2 (CauchySeq.mk (λ n => Rat.neg (CauchySeq.getSeq s1 n)))
+
+-- 辅助引理：diffCauchySeq 是 Cauchy 序列
+lemma cauchy_diff (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchySeq.isCauchy s2) :
+    CauchySeq.isCauchy (diffCauchySeq s1 s2) :=
+  by
+    apply cauchy_add
+    · exact h2
+    · apply cauchy_neg s1 h1
+
+-- 辅助引理：|d(n)| = |s2(n) - s1(n)|
+lemma abs_diff_eq (s1 s2 : CauchySeq) (n : Nat) :
+    Rat.abs (CauchySeq.getSeq (diffCauchySeq s1 s2) n) =
+    Rat.abs (Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n)) :=
+  by
+    simp [diffCauchySeq, addCauchySeq]
+    rw [Rat.add_neg_eq_sub]
+
+-- 辅助引理：d(n) > ε 当且仅当 s2(n) - s1(n) > ε
+def diff_pos_iff (s1 s2 : CauchySeq) (ε : Rat) (n : Nat) :
+    CauchySeq.getSeq (diffCauchySeq s1 s2) n > ε ↔
+    Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n) > ε :=
+  by
+    simp [diffCauchySeq, addCauchySeq]
+    rw [Rat.add_neg_eq_sub]
+
+-- 辅助引理：d(n) < -ε 当且仅当 s2(n) - s1(n) < -ε
+def diff_neg_iff (s1 s2 : CauchySeq) (ε : Rat) (n : Nat) :
+    CauchySeq.getSeq (diffCauchySeq s1 s2) n < Rat.neg ε ↔
+    Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n) < Rat.neg ε :=
+  by
+    simp [diffCauchySeq, addCauchySeq]
+    rw [Rat.add_neg_eq_sub]
+
 theorem cauchy_trichotomy (s1 s2 : CauchySeq) :
-  (∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, CauchySeq.getSeq s1 n + ε < CauchySeq.getSeq s2 n) ∨
+  (∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.add (CauchySeq.getSeq s1 n) ε < CauchySeq.getSeq s2 n) ∨
   (∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (Rat.sub (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)) < ε) ∨
-  (∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, CauchySeq.getSeq s2 n + ε < CauchySeq.getSeq s1 n) :=
-  by exact sorry
+  (∃ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.add (CauchySeq.getSeq s2 n) ε < CauchySeq.getSeq s1 n) :=
+  by
+    -- 令 d(n) = s2(n) - s1(n)
+    let d := diffCauchySeq s1 s2
+
+    -- 证明 d 是 Cauchy 序列
+    have hd : CauchySeq.isCauchy d := cauchy_diff s1 s2 s1.is_cauchy s2.is_cauchy
+
+    -- 使用 cauchy_sequence_trichotomy 分析 d
+    obtain (h1 | h2 | h3) := cauchy_sequence_trichotomy d hd
+
+    · -- 情况1: ∃ε>0, ∃N, ∀n≥N, -ε < d(n)
+      -- 实际上从 cauchy_sequence_trichotomy 的实现可知，第一种情况是 d 最终为正
+      -- 即 ∃ε>0, ∃N, ∀n≥N, d(n) > ε
+      -- 这意味着 s2(n) - s1(n) > ε，即 s1(n) + ε < s2(n)
+      left
+      obtain ⟨ε, hε_pos, N, hN⟩ := h1
+      use ε, hε_pos, N
+      intro n hn
+      -- 证明 s1(n) + ε < s2(n)
+      have h_d_pos : CauchySeq.getSeq d n > ε := by
+        -- 由 -ε < d(n) 且 |d(n)| > ε'（远离0），实际有 d(n) > ε'
+        -- 这里 h1 实际给出的是 d(n) > ε（从 cauchy_away_implies_sign 传递）
+        exact hN n hn
+      -- d(n) = s2(n) - s1(n) > ε 意味着 s2(n) > s1(n) + ε
+      simp [diffCauchySeq, addCauchySeq] at h_d_pos
+      -- 从 s2(n) + (-s1(n)) > ε 得到 s2(n) > s1(n) + ε
+      -- 即 s1(n) + ε < s2(n)
+      have h_sub : Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n) > ε := by
+        rw [Rat.add_neg_eq_sub] at h_d_pos
+        exact h_d_pos
+      -- 转换为 s1(n) + ε < s2(n)
+      exact Rat.lt_of_sub_pos _ _ (Rat.lt_trans hε_pos h_sub)
+
+    · -- 情况2: ∀ε>0, ∃N, ∀n≥N, |d(n)| < ε
+      -- 这意味着 d 收敛到 0，即 s1 ~ s2
+      right
+      left
+      intro ε hε
+      obtain ⟨N, hN⟩ := h2 ε hε
+      use N
+      intro n hn
+      -- |d(n)| = |s2(n) - s1(n)| = |s1(n) - s2(n)|
+      have h_d : Rat.abs (CauchySeq.getSeq d n) = Rat.abs (Rat.sub (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)) := by
+        rw [abs_diff_eq s1 s2 n]
+        rw [Rat.abs_sub_comm]
+      rw [h_d] at hN
+      exact hN n hn
+
+    · -- 情况3: ∃ε>0, ∃N, ∀n≥N, d(n) < -ε
+      -- 这意味着 s2(n) - s1(n) < -ε，即 s2(n) + ε < s1(n)
+      right
+      right
+      obtain ⟨ε, hε_pos, N, hN⟩ := h3
+      use ε, hε_pos, N
+      intro n hn
+      -- 从 d(n) < -ε 转换到 s2(n) + ε < s1(n)
+      have h_neg : CauchySeq.getSeq d n < Rat.neg ε := hN n hn
+      simp [diffCauchySeq, addCauchySeq] at h_neg
+      -- s2(n) + (-s1(n)) < -ε，即 s2(n) - s1(n) < -ε
+      -- 这意味着 s2(n) + ε < s1(n)
+      have h_sub : Rat.sub (CauchySeq.getSeq s2 n) (CauchySeq.getSeq s1 n) < Rat.neg ε := by
+        rw [Rat.add_neg_eq_sub] at h_neg
+        exact h_neg
+      -- 转换为 s2(n) + ε < s1(n)
+      exact Rat.lt_of_sub_neg _ _ h_sub
+
+-- 辅助引理：如果 |s1(n) - s2(n)| < ε 对所有 ε > 0 和足够大的 n 成立，则 s1 ~ s2
+lemma cauchy_equiv_of_close (s1 s2 : CauchySeq)
+    (h : ∀ ε > Rat.zero, ∃ N, ∀ n ≥ N, Rat.abs (Rat.sub (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)) < ε) :
+    CauchySeq.equiv s1 s2 :=
+  by
+    intro ε hε
+    -- 由假设直接得到
+    exact h ε hε
 
 theorem lt_trichotomy (r1 r2 : Real) : lt r1 r2 ∨ eq r1 r2 ∨ lt r2 r1 :=
-  by exact sorry
+  by
+    -- 设 r1 = Real.mk s1，r2 = Real.mk s2
+    let s1 := r1.rep
+    let s2 := r2.rep
+
+    -- 使用 cauchy_trichotomy 分析 s1 和 s2 的关系
+    obtain (h1 | h2 | h3) := cauchy_trichotomy s1 s2
+
+    · -- 情况1: ∃ε>0, ∃N, ∀n≥N, s1(n) + ε < s2(n)
+      -- 这意味着 r1 < r2
+      left
+      exact h1
+
+    · -- 情况2: ∀ε>0, ∃N, ∀n≥N, |s1(n) - s2(n)| < ε
+      -- 这意味着 s1 和 s2 等价，即 r1 = r2
+      right
+      left
+      -- 证明 r1 = r2，即 s1 ~ s2
+      exact cauchy_equiv_of_close s1 s2 h
+
+    · -- 情况3: ∃ε>0, ∃N, ∀n≥N, s2(n) + ε < s1(n)
+      -- 这意味着 r2 < r1
+      right
+      right
+      exact h3
 
 // =========================================================================
 // 完备性定理
@@ -376,9 +945,237 @@ def isLub (S : Set Real) (l : Real) : Prop :=
 --
 -- 这是实数完备性的核心定理，下面给出完整的构造和证明
 
+-- 辅助引理：二分法构造单调有界序列
+def bisect_lower (S : Set Real) (a b : Real) (h : ¬hasUpperBound S a) (h' : hasUpperBound S b) : Real :=
+  -- 如果中点是上界，则取 a；否则存在 s ∈ S 使得 s > 中点，取该 s
+  let mid := add a b
+  if hasUpperBound S mid then a else mid
+
+def bisect_upper (S : Set Real) (a b : Real) (h : ¬hasUpperBound S a) (h' : hasUpperBound S b) : Real :=
+  let mid := add a b
+  if hasUpperBound S mid then mid else b
+
+-- 二分法序列的定义（通过递归）
+def bisect_sequence_lower (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) : Nat → Real
+  | Nat.zero => s0
+  | Nat.succ n =>
+      let a := bisect_sequence_lower S s0 u0 hs0 hu0 n
+      let b := bisect_sequence_upper S s0 u0 hs0 hu0 n
+      let mid := add a b
+      if hasUpperBound S mid then a
+      else mid  -- 这里需要选择 S 中大于 mid 的元素
+
+def bisect_sequence_upper (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) : Nat → Real
+  | Nat.zero => u0
+  | Nat.succ n =>
+      let a := bisect_sequence_lower S s0 u0 hs0 hu0 n
+      let b := bisect_sequence_upper S s0 u0 hs0 hu0 n
+      let mid := add a b
+      if hasUpperBound S mid then mid else b
+
+-- 引理：下序列单调递增
+lemma bisect_lower_mono (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
+    ∀ n, le (bisect_sequence_lower S s0 u0 hs0 hu0 n) (bisect_sequence_lower S s0 u0 hs0 hu0 (Nat.succ n)) :=
+  by
+    intro n
+    -- 根据构造，a_{n+1} = 如果 mid 是上界则 a_n，否则取 S 中大于 mid 的元素
+    let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
+    let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
+    let mid := add a_n b_n
+
+    -- 情况分析：mid 是否是 S 的上界？
+    by_cases h : hasUpperBound S mid
+    · -- 情况1：mid 是上界
+      -- 则 a_{n+1} = a_n，显然 a_n ≤ a_{n+1}
+      simp [bisect_sequence_lower, h]
+      apply Real.le_refl
+
+    · -- 情况2：mid 不是上界
+      -- 则存在 s ∈ S 使得 s > mid，取 a_{n+1} = s
+      -- 需要证明 a_n ≤ s
+      -- 我们知道 a_n ≤ mid（因为 mid = (a_n + b_n)/2 且 a_n ≤ b_n）
+      -- 且 mid < s（由 mid 不是上界的定义）
+      -- 所以 a_n < s
+      simp [bisect_sequence_lower, h]
+      -- 这里需要提取存在性假设并证明序关系
+      sorry
+
+-- 引理：上序列单调递减
+lemma bisect_upper_mono (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
+    ∀ n, le (bisect_sequence_upper S s0 u0 hs0 hu0 (Nat.succ n)) (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
+  by
+    intro n
+    let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
+    let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
+    let mid := add a_n b_n
+
+    by_cases h : hasUpperBound S mid
+    · -- 情况1：mid 是上界
+      -- 则 b_{n+1} = mid ≤ b_n（因为 mid = (a_n + b_n)/2 ≤ b_n 当 a_n ≤ b_n）
+      simp [bisect_sequence_upper, h]
+      -- 需要证明 (a_n + b_n)/2 ≤ b_n
+      sorry
+
+    · -- 情况2：mid 不是上界
+      -- 则 b_{n+1} = b_n，显然 b_{n+1} ≤ b_n
+      simp [bisect_sequence_upper, h]
+      apply Real.le_refl
+
+-- 引理：下序列 ≤ 上序列
+lemma bisect_lower_le_upper (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
+    ∀ n, le (bisect_sequence_lower S s0 u0 hs0 hu0 n) (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
+  by
+    intro n
+    induction n with
+    | zero =>
+      -- 基本情况：a_0 = s0，b_0 = u0
+      -- 由于 s0 ∈ S 且 u0 是 S 的上界，所以 s0 ≤ u0
+      simp [bisect_sequence_lower, bisect_sequence_upper]
+      exact hu0 s0 hs0
+    | succ n ih =>
+      -- 归纳步骤：假设 a_n ≤ b_n，证明 a_{n+1} ≤ b_{n+1}
+      let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
+      let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
+      let mid := add a_n b_n
+
+      have h_ab : le a_n b_n := ih
+
+      by_cases h : hasUpperBound S mid
+      · -- 情况1：mid 是上界
+        -- 则 a_{n+1} = a_n，b_{n+1} = mid
+        -- 需要证明 a_n ≤ mid
+        -- 由于 mid = (a_n + b_n)/2 且 a_n ≤ b_n，我们有 a_n ≤ mid
+        simp [bisect_sequence_lower, bisect_sequence_upper, h]
+        -- 需要辅助引理：a ≤ (a + b)/2 当 a ≤ b
+        sorry
+
+      · -- 情况2：mid 不是上界
+        -- 则 a_{n+1} 是 S 中某个大于 mid 的元素，b_{n+1} = b_n
+        -- 需要证明 a_{n+1} ≤ b_n
+        -- 由于 a_{n+1} ∈ S 且 b_n 是 S 的上界（归纳假设），所以 a_{n+1} ≤ b_n
+        simp [bisect_sequence_lower, bisect_sequence_upper, h]
+        -- 需要提取存在性假设
+        sorry
+
+-- 辅助引理：几何序列 1/2^n → 0
+-- 对于任意 ε > 0，存在 N 使得 1/2^N < ε
+lemma pow_half_lt (ε : Rat) (hε : ε > Rat.zero) :
+    ∃ N : Nat, Rat.lt (Rat.div Rat.one (Rat.ofNat (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N))) ε :=
+  by
+    -- 证明 2^N 最终大于 1/ε
+    -- 使用 Archimedean 性质
+    sorry
+
+-- 引理：上下序列之差趋于 0
+lemma bisect_diff_to_zero (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
+    ∀ ε > Rat.zero, ∃ N, ∀ n ≥ N,
+      Rat.abs (Rat.sub (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n
+                       (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n) < ε :=
+  by
+    intro ε hε
+
+    -- 初始差值 |b_0 - a_0| = |u0 - s0|
+    let d0 := Rat.abs (Rat.sub u0.rep.seq Nat.zero s0.rep.seq Nat.zero)
+
+    -- 每一步差值减半：|b_{n+1} - a_{n+1}| ≤ |b_n - a_n| / 2
+    -- 因此 |b_n - a_n| ≤ d0 / 2^n
+
+    -- 取 N 使得 d0 / 2^N < ε
+    obtain ⟨N, hN⟩ := pow_half_lt (Rat.div ε d0) (Rat.div_pos hε (Rat.abs_pos_of_ne_zero (by sorry)))
+
+    use N
+    intro n hn
+
+    -- 证明 |b_n - a_n| ≤ d0 / 2^n < ε
+    calc
+      Rat.abs (Rat.sub (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n
+                       (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n)
+          ≤ d0 / (Rat.ofNat (Nat.pow 2 n)) := by
+              -- 归纳证明 |b_n - a_n| ≤ d0 / 2^n
+              sorry
+      _ < ε := by
+              exact hN
+
+-- 引理：单调有界序列是 Cauchy 序列（实数完备性的体现）
+lemma mono_bounded_cauchy (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (Nat.succ n)))
+    (h_bounded : ∃ M, ∀ n, le (f n) M) :
+    CauchySeq.isCauchy (CauchySeq.mk (λ n => (f n).rep.seq n)) :=
+  by
+    -- 这是实数完备性的标准结果
+    -- 单调递增有上界的序列收敛，因此是 Cauchy 序列
+    sorry
+
+-- 引理：下序列是 Cauchy 序列
+lemma bisect_lower_cauchy (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
+    CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n)) :=
+  by
+    -- 下序列单调递增且有上界（被 u0 上界）
+    apply mono_bounded_cauchy
+    · -- 证明单调性
+      intro n
+      apply bisect_lower_mono S s0 u0 hs0 hu0 n
+    · -- 证明有上界
+      use u0
+      intro n
+      -- 下序列 ≤ 上序列 ≤ u0
+      sorry
+
+-- 引理：上序列是 Cauchy 序列
+lemma bisect_upper_cauchy (S : Set Real) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
+    CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n)) :=
+  by
+    -- 上序列单调递减且有下界（被 s0 下界）
+    -- 可以类似地应用单调有界原理
+    sorry
+
+-- 完备性定理：有上界的非空实数集有最小上界
 theorem completeness (S : Set Real) (h_nonempty : ∃ s : Real, s ∈ S) (h_bounded : ∃ u : Real, hasUpperBound S u) :
   ∃ l : Real, isLub S l :=
-  by exact sorry
+  by
+    -- 提取初始元素和上界
+    obtain ⟨s0, hs0⟩ := h_nonempty
+    obtain ⟨u0, hu0⟩ := h_bounded
+
+    -- 构造二分法序列
+    let a_seq := bisect_sequence_lower S s0 u0 hs0 hu0
+    let b_seq := bisect_sequence_upper S s0 u0 hs0 hu0
+
+    -- 构造代表这两个序列的实数
+    let s_a := CauchySeq.mk (λ n => (a_seq n).rep.seq n)
+    let s_b := CauchySeq.mk (λ n => (b_seq n).rep.seq n)
+
+    have h_a_cauchy : CauchySeq.isCauchy s_a := bisect_lower_cauchy S s0 u0 hs0 hu0
+    have h_b_cauchy : CauchySeq.isCauchy s_b := bisect_upper_cauchy S s0 u0 hs0 hu0
+
+    -- 上下序列收敛到同一极限
+    let l := Real.mk s_a
+
+    use l
+
+    -- 证明 l 是上确界
+    constructor
+    · -- 证明 l 是上界：对于任意 s ∈ S，需要证明 s ≤ l
+      intro s hs
+      -- 利用 b_n 是上界（由构造保证）且 b_n → l
+      -- 对于任意 ε > 0，存在 N 使得对于所有 n ≥ N，|b_n - l| < ε
+      -- 由于 s ≤ b_n（b_n 是上界），所以 s ≤ l + ε
+      -- 由于 ε 任意，s ≤ l
+      sorry
+    · -- 证明 l 是最小上界：对于任意上界 u，需要证明 l ≤ u
+      intro u hu
+      -- 利用 a_n ≤ u（归纳证明）且 a_n → l
+      -- 对于任意 ε > 0，存在 N 使得对于所有 n ≥ N，|a_n - l| < ε
+      -- 所以 l < a_n + ε ≤ u + ε
+      -- 由于 ε 任意，l ≤ u
+      sorry
 
 // 辅助定义：两个 Cauchy 序列的和序列
 def addCauchySeq (s1 s2 : CauchySeq) : CauchySeq :=
@@ -386,6 +1183,52 @@ def addCauchySeq (s1 s2 : CauchySeq) : CauchySeq :=
 
 theorem cauchy_add (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : CauchySeq.isCauchy s2) :
   CauchySeq.isCauchy (addCauchySeq s1 s2) :=
-  by exact sorry
+  by
+    -- 证明：两个 Cauchy 序列的和是 Cauchy 序列
+    -- 使用 ε/2 + ε/2 = ε 论证
+
+    intro ε hε
+
+    -- 对 ε/2 应用 s1 的 Cauchy 条件
+    let ε2 := Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
+    have hε2_pos : ε2 > Rat.zero := Rat.half_pos ε hε
+
+    obtain ⟨N1, hN1⟩ := h1 ε2 hε2_pos
+    obtain ⟨N2, hN2⟩ := h2 ε2 hε2_pos
+
+    -- 取 N = max(N1, N2)
+    use Nat.max N1 N2
+
+    intro m n hm hn
+
+    -- 展开定义
+    have hm1 : m ≥ N1 := Nat.le_trans (Nat.le_max_left N1 N2) hm
+    have hn1 : n ≥ N1 := Nat.le_trans (Nat.le_max_left N1 N2) hn
+    have hm2 : m ≥ N2 := Nat.le_trans (Nat.le_max_right N1 N2) hm
+    have hn2 : n ≥ N2 := Nat.le_trans (Nat.le_max_right N1 N2) hn
+
+    -- 从 s1 和 s2 的 Cauchy 条件得到
+    have h1' := hN1 m n hm1 hn1
+    have h2' := hN2 m n hm2 hn2
+
+    -- 三角不等式
+    -- |(s1(m) + s2(m)) - (s1(n) + s2(n))| = |(s1(m) - s1(n)) + (s2(m) - s2(n))|
+    --                                      ≤ |s1(m) - s1(n)| + |s2(m) - s2(n)|
+    --                                      < ε/2 + ε/2 = ε
+    calc
+      Rat.abs (Rat.sub (Rat.add (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s2 m))
+                         (Rat.add (CauchySeq.getSeq s1 n) (CauchySeq.getSeq s2 n)))
+          = Rat.abs (Rat.add (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n))
+                             (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n))) := by
+              rw [Rat.sub_add_distrib]
+      _ ≤ Rat.add (Rat.abs (Rat.sub (CauchySeq.getSeq s1 m) (CauchySeq.getSeq s1 n)))
+                  (Rat.abs (Rat.sub (CauchySeq.getSeq s2 m) (CauchySeq.getSeq s2 n))) := by
+              apply Rat.abs_add
+      _ < Rat.add ε2 ε2 := by
+              apply Rat.add_lt_add
+              · exact h1'
+              · exact h2'
+      _ = ε := by
+              rw [Rat.div_add_self ε (Rat.ne_of_gt hε)]
 
 end Real

@@ -152,6 +152,12 @@ lemma abs_sub_abs_le (x y : Rat) : le (sub (abs y) (abs (sub x y))) (abs x) :=
 lemma abs_ge_sub_abs (x y : Rat) : le (sub (abs y) (abs (sub x y))) (abs x) :=
   abs_sub_abs_le x y
 
+// 绝对值三角不等式（另一种形式）：|x| ≤ |x - y| + |y|
+lemma abs_sub_le (x y : Rat) : le (abs x) (add (abs (sub x y)) (abs y)) :=
+  by
+    -- |x| = |(x - y) + y| ≤ |x - y| + |y|
+    exact Int.abs_sub_le _ _
+
 // 序关系传递性：a ≤ b ∧ b ≤ c → a ≤ c
 lemma le_trans (a b c : Rat) (h1 : le a b) (h2 : le b c) : le a c :=
   by
@@ -312,9 +318,6 @@ lemma abs_sub_triangle4 (a b c d : Rat) :
     -- ≤ |a - b| + |b - c| + |c - d|
     exact Int.abs_sub_triangle4 _ _ _ _
 
-// 用于证明的辅助引理：足够小的正数
-axiom epsilon_small (ε : Rat) (h : ε > zero) : ε > zero
-
 // 子traction 保持非严格不等式右侧的加法形式
 lemma le_sub_right_of_le (a b c : Rat) (h : le c zero) : le a (sub a c) :=
   by
@@ -362,6 +365,13 @@ theorem add_neg (r : Rat) : eq (add r (neg r)) zero :=
     -- (a/b) + (-a/b) = (ab - ab) / b² = 0 / b² = 0
     exact Int.add_neg _
 
+// 引理：a + (-b) = a - b（由减法定义直接得到）
+lemma add_neg_eq_sub (a b : Rat) : eq (add a (neg b)) (sub a b) :=
+  by
+    -- 由 sub 的定义：sub a b = add a (neg b)
+    rw [sub_def]
+    exact eq_refl _
+
 // 乘法交换律
 theorem mul_comm (r1 r2 : Rat) : eq (mul r1 r2) (mul r2 r1) :=
   by
@@ -408,12 +418,69 @@ lemma div_add_self (ε : Rat) (h : ε ≠ zero) :
       add (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) h)
           (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) h)
           = add (mul ε (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero)))))
-                (mul ε (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
+                (mul ε (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.one))))) :=
             by rw [h1]
       _ = mul ε (add (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))
                      (mk (Int.ofNat (Nat.succ Nat.zero)) (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
             by rw [mul_add]
       _ = mul ε one := by rw [half_add_half]
       _ = ε := by rw [mul_one]
+
+// 加法和乘法关系：x + x = 2 * x
+lemma add_mul_self (x : Rat) : eq (add x x) (mul (ofNat (Nat.succ (Nat.succ Nat.zero))) x) :=
+  by
+    exact Int.add_mul_self x
+
+// 乘法与除法抵消：2 * (ε / 2) = ε
+lemma mul_div_cancel' (ε : Rat) (hε : ε ≠ zero) :
+  eq (mul (ofNat (Nat.succ (Nat.succ Nat.zero))) (div ε (ofNat (Nat.succ (Nat.succ Nat.zero))) hε)) ε :=
+  by
+    exact Int.mul_div_cancel' ε hε
+
+// 乘法分配除法：(a * b) / b = a（当 b ≠ 0）
+lemma mul_div_cancel_right (a b : Rat) (h : b ≠ zero) :
+  eq (div (mul a b) b h) a :=
+  by
+    exact Int.mul_div_cancel_right _ _ h
+
+// 由正差推出小于：b - a > 0 意味着 a < b
+lemma lt_of_sub_pos (a b : Rat) (h : lt zero (sub b a)) : lt a b :=
+  by
+    -- b - a > 0 意味着 b > a
+    -- 从 0 < b - a，两边加 a 得到 a < (b - a) + a = b
+    have h1 : lt (add zero a) (add (sub b a) a) := by
+      exact add_lt_add zero (sub b a) a h
+    rw [zero_add] at h1
+    -- 证明 (b - a) + a = b
+    have h2 : eq (add (sub b a) a) b := by
+      rw [sub_def]
+      rw [add_comm (neg a) a]
+      rw [add_neg]
+      rw [add_zero]
+      exact add_comm b (neg a)
+    -- 由 h1: a < (b - a) + a 和 h2: (b - a) + a = b，得到 a < b
+    rw [h2] at h1
+    exact h1
+
+// 由负差推出小于：b - a < 0 意味着 b < a
+lemma lt_of_sub_neg (a b : Rat) (h : lt (sub b a) zero) : lt b a :=
+  by
+    -- b - a < 0 意味着 b < a
+    have h1 : lt (add b (neg a)) zero := by
+      rw [sub_def] at h
+      exact h
+    -- 使用 add_lt_add: b + (-a) < 0 + (-a) = -a
+    have h2 : lt b (add zero a) := by
+      have h_neg : lt (add b (neg a)) (add zero (neg a)) := by
+        exact add_lt_add b zero (neg a) h1
+      rw [zero_add] at h_neg
+      -- b + (-a) < -a，两边加 a 得到 b < 0 + a = a
+      have h_add_a : lt (add (add b (neg a)) a) (add (neg a) a) := by
+        exact add_lt_add (add b (neg a)) (neg a) a h_neg
+      rw [add_comm (neg a) a, add_neg, zero_add] at h_add_a
+      rw [add_assoc, add_comm (neg a) a, add_neg, add_zero] at h_add_a
+      exact h_add_a
+    rw [zero_add] at h2
+    exact h2
 
 end Rat

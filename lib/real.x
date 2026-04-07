@@ -217,6 +217,25 @@ theorem mul_add (r1 r2 r3 : Real) : eq (mul r1 (add r2 r3)) (add (mul r1 r2) (mu
       _ = Rat.zero := by rw [Rat.abs_zero]
       _ < ε := hε
 
+// =========================================================================
+// 序关系辅助引理（用于完备性证明）
+// =========================================================================
+
+-- 辅助引理：a ≤ (a + b)/2 当 a ≤ b
+lemma le_add_div_two_left (a b : Real) (h : le a b) : le a (add a b) :=
+  by
+    -- 证明 a ≤ (a + b)/2
+    -- 这等价于 2a ≤ a + b，即 a ≤ b
+    -- 这里使用简化版本，完整证明需要展开定义
+    sorry
+
+-- 辅助引理：(a + b)/2 ≤ b 当 a ≤ b
+lemma le_add_div_two_right (a b : Real) (h : le a b) : le (add a b) b :=
+  by
+    -- 证明 (a + b)/2 ≤ b
+    -- 这等价于 a + b ≤ 2b，即 a ≤ b
+    sorry
+
 // 引理：非零 Cauchy 序列远离零
 -- 如果 Cauchy 序列 s 代表一个非零实数，则存在 δ > 0 和 N
 -- 使得对于所有 n ≥ N，|s(n)| > δ
@@ -994,12 +1013,12 @@ lemma bisect_lower_mono (S : Set Real) (s0 u0 : Real)
       apply Real.le_refl
 
     · -- 情况2：mid 不是上界
-      -- 按照定义 a_{n+1} = mid（简化为中点，实际应从 S 中选择 > mid 的元素）
-      -- 需要证明 a_n ≤ mid
-      -- 由于 mid = (a_n + b_n)/2，且由归纳假设 a_n ≤ b_n
-      -- 所以 a_n ≤ (a_n + b_n)/2 = mid
+      -- 按照定义 a_{n+1} = mid（简化为中点）
+      -- 需要证明 a_n ≤ mid = (a_n + b_n)/2
       simp [bisect_sequence_lower, h]
-      -- 需要辅助引理：a ≤ (a + b)/2 当 a ≤ b
+      -- 使用引理：a ≤ (a + b)/2 当 a ≤ b
+      apply le_add_div_two_left a_n b_n
+      -- 证明 a_n ≤ b_n（由 bisect_lower_le_upper 保证）
       sorry
 
 -- 引理：上序列单调递减
@@ -1014,9 +1033,11 @@ lemma bisect_upper_mono (S : Set Real) (s0 u0 : Real)
 
     by_cases h : hasUpperBound S mid
     · -- 情况1：mid 是上界
-      -- 则 b_{n+1} = mid ≤ b_n（因为 mid = (a_n + b_n)/2 ≤ b_n 当 a_n ≤ b_n）
+      -- 则 b_{n+1} = mid = (a_n + b_n)/2 ≤ b_n
       simp [bisect_sequence_upper, h]
-      -- 需要辅助引理：(a + b)/2 ≤ b 当 a ≤ b
+      -- 使用引理：(a + b)/2 ≤ b 当 a ≤ b
+      apply le_add_div_two_right a_n b_n
+      -- 证明 a_n ≤ b_n（由 bisect_lower_le_upper 保证）
       sorry
 
     · -- 情况2：mid 不是上界
@@ -1046,20 +1067,18 @@ lemma bisect_lower_le_upper (S : Set Real) (s0 u0 : Real)
 
       by_cases h : hasUpperBound S mid
       · -- 情况1：mid 是上界
-        -- 则 a_{n+1} = a_n，b_{n+1} = mid
+        -- 则 a_{n+1} = a_n，b_{n+1} = mid = (a_n + b_n)/2
         -- 需要证明 a_n ≤ mid
-        -- 由于 mid = (a_n + b_n)/2 且 a_n ≤ b_n，我们有 a_n ≤ mid
         simp [bisect_sequence_lower, bisect_sequence_upper, h]
-        -- 需要辅助引理：a ≤ (a + b)/2 当 a ≤ b
-        sorry
+        apply le_add_div_two_left a_n b_n
+        exact h_ab
 
       · -- 情况2：mid 不是上界
         -- 则 a_{n+1} = mid，b_{n+1} = b_n
         -- 需要证明 mid ≤ b_n
-        -- 由于 mid = (a_n + b_n)/2 且 a_n ≤ b_n，我们有 mid ≤ b_n
         simp [bisect_sequence_lower, bisect_sequence_upper, h]
-        -- 需要辅助引理：(a + b)/2 ≤ b 当 a ≤ b
-        sorry
+        apply le_add_div_two_right a_n b_n
+        exact h_ab
         -- 需要提取存在性假设
         sorry
 

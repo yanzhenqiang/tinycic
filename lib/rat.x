@@ -531,4 +531,21 @@ lemma half_add_eq_right (a b : Rat) (h : eq a b) :
     -- 需要展开定义或使用已有的乘除引理
     sorry
 
+// 代数变换引理：(a + b)/2 - a = (b - a)/2
+lemma half_add_sub_left (a b : Rat) :
+    eq (sub (div (add a b) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) a)
+       (div (sub b a) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
+  by
+    -- (a + b)/2 - a = (a + b - 2a)/2 = (b - a)/2
+    sorry
+
+// 绝对值引理：|x/2| = |x|/2
+lemma abs_div_two (x : Rat) :
+    eq (abs (div x (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))))
+       (div (abs x) (ofNat (Nat.succ (Nat.succ Nat.zero))) (mk_posint_ne_zero (PosInt.ofNat (Nat.succ (Nat.succ Nat.zero))))) :=
+  by
+    -- 对于正数 x，|x/2| = x/2 = |x|/2
+    -- 对于负数 x，|x/2| = |-x/2| = |x|/2
+    sorry
+
 end Rat

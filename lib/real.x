@@ -1866,15 +1866,20 @@ lemma limit_le_of_seq_le (a : Nat → Real) (b : Real)
     --
     -- 完整证明需要建立极限的唯一性和序保持性
     --
-    -- 简化的构造性论证：
-    -- 由 Real.le 的定义，L ≤ b 意味着 (lt L b) ∨ (eq L b)
-    -- 我们证明 ¬(lt b L) → L ≤ b
-    -- 假设 lt b L，则存在 ε > 0 使得 b + ε < L
-    -- 由 Cauchy 条件，对于充分大的 n，L.seq n > b.seq n + ε/2
-    -- 但由 h_le，a_n ≤ b，所以 L.seq n ≤ b.seq n（近似）
-    -- 矛盾
+    -- 构造性证明策略：
+    -- 使用 Real.le 的定义：L ≤ b 意味着 lt L b ∨ eq L b
     --
-    -- 注：此证明需要完整的极限理论形式化
+    -- 关键观察：对角序列 L.seq n = (a n).rep.seq n
+    -- 由 h_le n：a_n ≤ b，即 (a n).rep.seq n ≤ b.rep.seq n（近似）
+    --
+    -- 由于 a_n 由 Cauchy 序列表示，且 ∀ n, a_n ≤ b
+    -- 对于任意 ε > 0，存在 N 使得对于 n ≥ N
+    -- (a n).rep.seq n < b.rep.seq n + ε
+    --
+    -- 这意味着 L ≤ b
+    --
+    -- 注：完整的构造性证明需要展开 Real.lt 和 Real.eq 的定义
+    -- 并建立 Cauchy 序列的详细比较
     sorry
 
 -- 辅助引理：如果 b ≤ a_n 对所有 n 成立，且 a_n → L，则 b ≤ L
@@ -1885,11 +1890,13 @@ lemma limit_ge_of_seq_ge (a : Nat → Real) (b : Real)
     le b (Real.mk (CauchySeq.mk (λ n => (a n).rep.seq n)) hL) :=
   by
     -- 证明 b ≤ L：
-    -- 由 h_ge，对于所有 n，b ≤ a_n
-    -- 由极限保持不等式（反向），b ≤ L
+    -- 由 h_ge：∀ n, b ≤ a_n
+    -- 对于任意 ε > 0，存在 N 使得对于 n ≥ N
+    -- b.rep.seq n < (a n).rep.seq n + ε
     --
-    -- 注：此证明是 limit_le_of_seq_le 的对偶
-    -- 在构造性数学中需要类似的论证
+    -- 这意味着 b ≤ L
+    --
+    -- 注：此证明是 limit_le_of_seq_le 的对偶形式
     sorry
 
 def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)

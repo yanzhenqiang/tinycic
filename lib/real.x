@@ -1637,9 +1637,24 @@ def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
     (L : Real) (hL : CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n))) :
     le s L :=
   by
-    -- 这里需要证明的是：对于任意 s ∈ S，s ≤ L
-    -- 但 bisect_sequence_lower 的构造保证 a_n ∈ S 或 a_n 是 S 的下界
-    -- 这个引理表述需要重新考虑
+    -- 证明：对于任意 s ∈ S，s ≤ L
+    --
+    -- 关键观察：二分法下序列 a_n = bisect_sequence_lower n 满足：
+    -- 1. a_0 = s0 ∈ S
+    -- 2. 如果 mid = (a_n + b_n)/2 是上界，则 a_{n+1} = a_n
+    -- 3. 如果 mid 不是上界，则 a_{n+1} = mid，且存在 s' ∈ S 使得 mid < s'
+    --
+    -- 因此，对于所有 n，a_n ≤ s 对任意 s ∈ S 成立（归纳证明）
+    -- 取极限得 L ≤ s
+    --
+    -- 等等，这方向反了。实际上我们需要证明 s ≤ L
+    --
+    -- 正确的论证：
+    -- L 是下序列的极限，上序列 b_n 满足 b_n ≥ s 对所有 s ∈ S
+    -- 且 |b_n - a_n| → 0
+    -- 因此 L = lim a_n = lim b_n ≥ s 对所有 s ∈ S
+    --
+    -- 简化处理：使用极限保持不等式
     sorry
 
 -- 辅助引理：极限是最小上界

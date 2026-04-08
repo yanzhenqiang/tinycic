@@ -1466,20 +1466,29 @@ lemma mono_bounded_cauchy_aux (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (N
       -- 对于 m, n ≥ N，证明 |f(n).rep.seq n - f(m).rep.seq m| < ε
       -- 这需要额外的三角不等式分解
 
-      -- 使用已有的 Cauchy 条件
-      have h2 : Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)
-                                (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n)) < ε := by
-        -- 利用 f(m).rep 和 f(n).rep 的 Cauchy 性质
-        -- |f(n).rep.seq n - f(m).rep.seq m|
-        -- ≤ |f(n).rep.seq n - f(n).rep.seq N| + |f(n).rep.seq N - f(m).rep.seq N| + |f(m).rep.seq N - f(m).rep.seq m|
-        -- 每一项都可以任意小
-        sorry
+      -- 使用三角不等式分解
+      -- |f(n).rep.seq n - f(m).rep.seq m|
+      -- ≤ |f(n).rep.seq n - f(n).rep.seq N| + |f(n).rep.seq N - f(m).rep.seq N| + |f(m).rep.seq N - f(m).rep.seq m|
+      --
+      -- 由于 f(n).rep 和 f(m).rep 都是 Cauchy 序列，
+      -- 对于足够大的 N，每一项都可以小于 ε/3
+      --
+      -- 简化的构造性证明：
+      -- 直接使用 f(n) 和 f(m) 的 Cauchy 性质
+      have h_fn : CauchySeq.isCauchy (f n).rep := (f n).cauchy
+      have h_fm : CauchySeq.isCauchy (f m).rep := (f m).cauchy
 
-      exact h2
+      -- 由 h_mono 和 h_bounded，序列 (f k) 收敛
+      -- 因此它也是 Cauchy 序列
+      --
+      -- 注：完整证明需要建立 Nat → Real 单调有界序列的收敛性
+      -- 这里使用 sorry 标记待完成的严格证明
+      sorry
     · -- n < m 的情况（对称）
       -- |f(n) - f(m)| = |f(m) - f(n)|
       rw [Rat.abs_sub_comm]
-      -- 转化为 m ≤ n 的情况，使用相同的论证
+      -- 由于 m > n，我们可以交换 m 和 n 的角色
+      -- 使用与 m ≤ n 情况相同的论证
       sorry
 
 -- 引理：单调有界序列是 Cauchy 序列（实数完备性的体现）
@@ -1720,7 +1729,23 @@ lemma limit_le_of_seq_le (a : Nat → Real) (b : Real)
     -- 4. 由 Cauchy 序列的收敛性，L ≤ b
     --
     -- 注：此证明需要完整的极限理论形式化
-    -- 包括 Cauchy 序列收敛到极限的严格定义
+    -- 这里使用简化的构造性证明思路
+    -- 由 Real.le 的定义，我们需要证明 lt L b ∨ eq L b
+    --
+    -- 关键引理：如果 ∀ n, a_n ≤ b，且 a_n → L，则 L ≤ b
+    -- 证明：假设 L > b，则存在 ε > 0 使得 L > b + ε
+    -- 由收敛定义，存在 N 使得 |L - a_N| < ε/2
+    -- 这意味着 a_N > L - ε/2 > b + ε/2 > b，与 a_N ≤ b 矛盾
+    --
+    -- 在 Cauchy 序列表示下，我们需要：
+    -- ∀ ε > 0, ∃ N, ∀ n ≥ N, L.seq n < b.seq n + ε
+    --
+    -- 由于 a_n ≤ b，对于每个 n，要么 a_n < b，要么 a_n = b
+    -- 如果 a_n < b，则存在 δ > 0 使得 a_n + δ < b
+    -- 由 Cauchy 条件，L.seq n 接近 a_n.rep.seq n
+    -- 因此 L.seq n < b.seq n 对于大 n 成立
+    --
+    -- 完整证明需要建立极限的唯一性和序保持性
     sorry
 
 def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
@@ -1749,9 +1774,16 @@ def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
     -- 由于 a_n → L 且 b_n → L（因为 |a_n - b_n| → 0）
     -- 且 b_n ≥ s 对所有 s ∈ S（由 bisect_upper 的定义）
     -- 由极限保持不等式，L ≥ s
-    -- 这里需要证明：对于任意 s ∈ S，s ≤ L
-    -- 由于 b_n → L 且 b_n ≥ s 对所有 s ∈ S
-    -- 由极限保持不等式，L ≥ s
+    --
+    -- 构造性证明：
+    -- 1. 证明对于所有 n，s ≤ b_n（上序列始终 ≥ s）
+    -- 2. 证明 b_n → L（因为 |b_n - a_n| → 0 且 a_n → L）
+    -- 3. 由极限保持不等式，s ≤ L
+    --
+    -- 注：此证明需要：
+    -- - 上序列始终 ≥ 任意 s ∈ S 的引理
+    -- - 上序列收敛到 L 的证明
+    -- - 极限保持不等式的反向形式
     sorry
 
 -- 辅助引理：极限是最小上界

@@ -650,15 +650,37 @@ cargo test test_real -- --nocapture 2>&1 | grep -E "DEBUG.*proof term"
 
 **注意**: `obtain (h1 | h2 | h3)` 多分支语法**不支持**，会被解析为简单的 `have` 并 fallback 到 `sorry`。
 
-### Step 5: 提交前最终确认
+### Step 5: 证明逻辑验证（关键新增）
+```bash
+# 1. 验证 proof term 与目标类型匹配
+cargo test test_proof_type_matches_goal -- --nocapture
+
+# 2. 验证 proof term 不是占位符
+cargo test test_proof_not_placeholder -- --nocapture
+
+# 3. 手动检查关键定理的证明结构
+# 例如：limit_le_of_seq_le 必须使用 ε-N 论证
+grep -A20 "def limit_le_of_seq_le" lib/real.x | grep -E "(epsilon|ε|N|n ≥)"
+```
+
+**验证清单：**
+- [ ] Proof term 类型与定理声明匹配（不是简单的 `Sort` 匹配）
+- [ ] Proof term 引用了必要的假设（不是独立的）
+- [ ] 没有使用 `CauchySeq.equiv_refl` 作为无关占位符
+- [ ] 归纳步骤有实质进展（不是 `exact ih`）
+
+### Step 6: 提交前最终确认
 ```bash
 # 1. 确认文件中没有剩余的 sorry（除了 TODO 标记的）
 grep -n "sorry" lib/*.x | grep -v "TODO\|//.*sorry"
 
-# 2. 运行完整测试套件
+# 2. 检查假证明模式
+./scripts/check_placeholder_proofs.sh
+
+# 3. 运行完整测试套件
 cargo test --release
 
-# 3. 确认 git diff
+# 4. 确认 git diff
 git diff --stat
 ```
 
@@ -674,6 +696,152 @@ git diff --stat
 ### 解决方案
 对于需要多分支的情况，暂时使用 `sorry` 占位，并添加 TODO 注释说明依赖的引理。
 
+
+---
+
+## 类型匹配与证明逻辑验证（新增）
+
+### 问题背景
+当前系统存在"假证明"问题：一些定理使用了语法正确但逻辑无关的证明项（如用 `CauchySeq.equiv_refl` 证明实数不等式），测试仍能通过。这是因为测试只检查：
+1. 语法解析成功
+2. 常量存在
+3. 无编译错误
+
+但不验证：
+- **类型匹配**：证明项类型是否与定理目标匹配
+- **逻辑相关性**：证明项是否真正证明了目标
+
+### 类型匹配验证测试
+
+**必须添加的测试类型：**
+
+```rust
+#[test]
+fn test_proof_term_type_matches_goal() {
+    // 验证生成的 proof term 类型与定理声明类型匹配
+    let env = Environment::new();
+    let theorem_type = parse_type("∀ ε > 0, ∃ N, ∀ n ≥ N, |a_n - L| < ε");
+    let proof_term = generate_proof();
+    
+    let inferred_type = type_inference.infer(&proof_term);
+    assert_type_eq(inferred_type, theorem_type, 
+        "Proof term type must match theorem declaration");
+}
+
+#[test]
+fn test_proof_term_not_placeholder() {
+    // 验证 proof term 不是无关的占位符
+    let proof = generate_proof();
+    
+    // 检查是否使用了错误的自反性
+    if contains_cauchy_equiv_refl(&proof) && !is_cauchy_equality_goal(&goal) {
+        panic!("Using CauchySeq.equiv_refl for non-Cauchy goal is invalid");
+    }
+    
+    // 检查是否递归调用自身而没有进展
+    if is_trivial_recursive_call(&proof) {
+        panic!("Proof cannot just call induction hypothesis without progress");
+    }
+}
+```
+
+### 证明逻辑验证测试
+
+**验证 proof term 与目标的逻辑相关性：**
+
+```rust
+#[test]
+fn test_completeness_proof_structure() {
+    // 完备性定理的证明必须包含：
+    // 1. 构造 L = lim a_n（二分法下序列极限）
+    // 2. 证明 L 是上界
+    // 3. 证明 L 是最小上界
+    
+    let proof = load_proof("Real.completeness");
+    
+    assert!(contains_bisect_limit_construction(&proof),
+        "Completeness proof must construct limit from bisection sequence");
+    
+    assert!(contains_upper_bound_verification(&proof),
+        "Must prove L is upper bound: ∀ s ∈ S, s ≤ L");
+    
+    assert!(contains_least_upper_bound_verification(&proof),
+        "Must prove L is least: ∀ u, hasUpperBound S u → L ≤ u");
+}
+
+#[test]
+fn test_limit_preserves_inequality_proof() {
+    // limit_le_of_seq_le 的证明必须：
+    // 1. 使用 ε-N 论证
+    // 2. 引用序列条件 ∀n, a_n ≤ b
+    // 3. 引用 Cauchy 条件 hL
+    
+    let proof = load_proof("Real.limit_le_of_seq_le");
+    
+    assert!(!contains_placeholder_equiv_refl(&proof),
+        "Cannot use equiv_refl as placeholder for inequality proof");
+    
+    assert!(uses_epsilon_n_argument(&proof),
+        "Limit inequality proof must use ε-N argument");
+    
+    assert!(references_sequence_condition(&proof, "h_le"),
+        "Must reference the sequence inequality condition");
+}
+```
+
+### 开发流程更新
+
+**Step 4: 证明逻辑验证（新增强制步骤）**
+
+任何修复 `sorry` 的定理后，必须：
+
+```bash
+# 1. 检查 proof term 不是无关占位符
+cargo test test_proof_not_placeholder -- --nocapture
+
+# 2. 检查证明结构符合数学要求
+cargo test test_proof_structure -- --nocapture
+
+# 3. 手动验证关键定理的证明逻辑
+cargo test test_completeness_proof_structure -- --nocapture
+```
+
+**关键验证点：**
+- [ ] Proof term 不是 `CauchySeq.equiv_refl`（除非目标是 Cauchy 序列等价）
+- [ ] Proof term 不是简单的 `exact ih`（归纳步骤必须有进展）
+- [ ] 证明使用了定理所需的数学论证（ε-N、排中律、反证法等）
+- [ ] 证明引用了必要的假设（不是独立的无关证明）
+
+### 反例：假证明检测
+
+**假证明模式（必须检测并拒绝）：**
+
+```lean
+-- 错误：用序列自反性证明实数不等式
+lemma limit_le_of_seq_le : le L b := by
+    apply Or.inr
+    exact CauchySeq.equiv_refl (CauchySeq.mk (λ n => ...))  -- ❌ 类型不匹配
+
+-- 错误：归纳步骤没有进展
+| succ n ih =>
+    exact ih  -- ❌ 没有处理 mid 的情况，直接返回归纳假设
+```
+
+**检测方法：**
+```rust
+fn is_valid_proof(proof: &Term, goal: &Term, assumptions: &[Term]) -> bool {
+    // 1. 类型检查
+    if !type_matches(proof, goal) { return false; }
+    
+    // 2. 假设引用检查（proof 必须引用 assumptions）
+    if !references_any(proof, assumptions) { return false; }
+    
+    // 3. 占位符检查（不能是简单的自反/递归调用）
+    if is_placeholder_proof(proof, goal) { return false; }
+    
+    true
+}
+```
 
 ---
 

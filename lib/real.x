@@ -175,6 +175,18 @@ lemma half_add_eq_self_right (a b : Real) (h : eq a b) : eq (half (add a b)) b :
   by
     exact CauchySeq.equiv_refl (half (add a b)).rep
 
+-- 序列版本：如果 a.rep.seq n = b.rep.seq n，则 (half (add a b)).rep.seq m = a.rep.seq m
+-- 用于归纳证明
+lemma half_add_eq_self_seq (a b : Real) (h : Rat.eq a.rep.seq n b.rep.seq n) (m : Nat) :
+    Rat.eq (half (add a b)).rep.seq m a.rep.seq m :=
+  by
+    sorry
+
+lemma half_add_eq_self_right_seq (a b : Real) (h : Rat.eq a.rep.seq n b.rep.seq n) (m : Nat) :
+    Rat.eq (half (add a b)).rep.seq m b.rep.seq m :=
+  by
+    sorry
+
 // 引理：非零 Cauchy 序列远离零
 -- 如果 Cauchy 序列 s 代表一个非零实数，则存在 δ > 0 和 N
 -- 使得对于所有 n ≥ N，|s(n)| > δ
@@ -691,7 +703,7 @@ lemma cauchy_away_implies_sign (d : CauchySeq) (hd : CauchySeq.isCauchy d)
           -- 使用 Rat.abs_lt_upper：由 |x| < a 推出 x < a
           have h3 := Rat.abs_lt_upper (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) δ h_cauchy
           -- d(n) - d(N) < δ 意味着 d(n) < d(N) + δ ≤ -ε + δ = -δ
-          rfl
+          sorry  -- 未完成：需要连接不等式链
         exact h_upper
 
 lemma cauchy_sequence_trichotomy (d : CauchySeq) (hd : CauchySeq.isCauchy d) :
@@ -1076,13 +1088,16 @@ lemma pow_half_lt (ε : Rat) (hε : ε > Rat.zero) :
     use N
 
     -- 由于 2^N ≥ N+1 > N > 1/ε，所以 1/2^N < ε
-    have h1 : Nat.lt (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N) (Rat.ofNat (Nat.succ N)) := by
-      apply pow_two_ge_succ
+    -- 由 hN: Rat.ofNat N > Rat.inv ε
+    -- 我们需要证明 Rat.div Rat.one (Rat.ofNat (Nat.pow 2 N)) < ε
+    -- 这等价于 Rat.one < Rat.mul ε (Rat.ofNat (Nat.pow 2 N))
+    -- 即 1 < ε * 2^N
+    -- 即 1/ε < 2^N
 
-    -- 结合不等式：N > 1/ε 且 2^N > N，所以 2^N > 1/ε，即 1/2^N < ε
-    -- 由 hN: N > 1/ε 和 h1: 2^N > N，得 2^N > 1/ε
-    -- 因此 1/2^N < ε
-    sorry  -- 未完成：极限保持不等式
+    -- 使用关键引理：Rat 的 Archimedean 性质已经给出 N > 1/ε
+    -- 对于充分大的 N，2^N 的增长速度超过 N，所以 2^N > N > 1/ε
+    -- 这里使用 sorry 标记需要进一步证明的不等式链
+    sorry
 
 -- 辅助引理：当 s0 = u0 时，所有 a_n = b_n = s0
 lemma bisect_eq_when_s0_eq_u0 (S : SetReal) (s0 u0 : Real)
@@ -1101,14 +1116,39 @@ lemma bisect_eq_when_s0_eq_u0 (S : SetReal) (s0 u0 : Real)
       simp [bisect_sequence_lower, bisect_sequence_upper]
       -- 使用 h_eq：|u0.seq 0 - s0.seq 0| = 0 意味着 u0.seq 0 = s0.seq 0
       -- 由 |x| = 0 得 x = 0，所以 u0.seq 0 - s0.seq 0 = 0，即 u0.seq 0 = s0.seq 0
-      sorry  -- 未完成：单调有界序列的Cauchy性质
+      -- 使用 Rat.abs_eq_zero 引理：|x| = 0 → x = 0
+      have h_zero : Rat.eq (Rat.sub (u0.rep.seq Nat.zero) (s0.rep.seq Nat.zero)) Rat.zero :=
+        Rat.abs_eq_zero _ h_eq
+      -- 由 u0 - s0 = 0 得 u0 = s0
+      exact Rat.eq_of_sub_eq_zero h_zero
     | succ n ih =>
       -- 归纳步骤：假设 a_n = b_n（在第 n 项）
       -- 需要证明 a_{n+1} = b_{n+1}（在第 n+1 项）
-      -- 由于序列的构造依赖于第 n 项的值
-      -- 且 mid = (a_n + b_n)/2 = a_n = b_n（当 a_n = b_n）
-      -- 因此 a_{n+1} 和 b_{n+1} 都等于 mid = a_n = b_n
-      sorry  -- 未完成：单调有界序列的Cauchy性质
+      let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
+      let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
+      let mid := half (add a_n b_n)
+
+      -- 展开定义
+      simp [bisect_sequence_lower, bisect_sequence_upper]
+
+      -- 情况分析：mid 是否是上界？
+      by_cases h : hasUpperBound S (add a_n b_n)
+      · -- 情况1：mid 是上界
+        -- 则 a_{n+1} = a_n，b_{n+1} = mid = (a_n + b_n)/2
+        -- 由归纳假设 a_n = b_n，所以 mid = (a_n + a_n)/2 = a_n
+        simp [h, half]
+        -- 证明：a_n.rep.seq (n+1) = ((a_n + b_n)/2).rep.seq (n+1)
+        -- 由于 a_n = b_n，所以 (a_n + b_n)/2 = a_n
+        have h_eq_n : Rat.eq a_n.rep.seq n b_n.rep.seq n := ih
+        -- 使用 half_add_eq_self：如果 a = b，则 (a + b)/2 = a
+        exact half_add_eq_self_seq a_n b_n h_eq_n (Nat.succ n)
+      · -- 情况2：mid 不是上界
+        -- 则 a_{n+1} = mid，b_{n+1} = b_n
+        simp [h, half]
+        -- 由归纳假设 a_n = b_n，所以 mid = (a_n + b_n)/2 = b_n
+        have h_eq_n : Rat.eq a_n.rep.seq n b_n.rep.seq n := ih
+        -- 使用 half_add_eq_self_right：如果 a = b，则 (a + b)/2 = b
+        exact half_add_eq_self_right_seq a_n b_n h_eq_n (Nat.succ n)
 
 -- 引理：上下序列之差趋于 0
 lemma bisect_diff_to_zero (S : SetReal) (s0 u0 : Real)
@@ -1262,11 +1302,30 @@ lemma mono_bounded_cauchy_aux (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (N
       -- |f(n) - f(m)| = f(n) - f(m)（因为 f 单调递增）
       -- 需要证明 f(n) - f(m) < ε
 
-      -- 使用 Real 减法的定义和 Cauchy 条件
-      -- 对于单调递增有上界序列，差值趋于 0
-      sorry  -- 未完成：单调有界序列的Cauchy性质
+      -- 关键定理：单调递增有上界序列收敛（实数完备性）
+      -- 因此它也是 Cauchy 序列
+      -- 完整证明需要构造极限 L = sup{f(n) | n ∈ Nat}
+      -- 然后利用收敛性得到 Cauchy 条件
+
+      -- 对于构造性证明，使用以下思路：
+      -- 由于 f 单调递增有上界，设 L = sup f(n)
+      -- 对于任意 ε > 0，存在 N 使得 L - f(N) < ε
+      -- 则对于所有 m,n ≥ N，|f(n) - f(m)| ≤ L - f(N) < ε
+
+      -- 简化的占位证明（完整证明需要更多关于上确界的引理）
+      have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)
+                                        (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n)) < ε := by
+        -- 使用单调有界序列的 Cauchy 性质
+        -- 这里依赖于实数完备性：单调有界序列必有极限
+        sorry  -- TODO: 需要完整的 sup 构造和收敛性证明
+      exact h_cauchy
     · -- n < m 的情况（对称）
-      sorry  -- 未完成：单调有界序列的Cauchy性质
+      -- |f(n) - f(m)| = f(m) - f(n)（因为 f 单调递增且 n < m）
+      have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)
+                                        (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n)) < ε := by
+        -- 与 m ≤ n 情况对称
+        sorry  -- TODO: 对称情况的证明
+      exact h_cauchy
 
 -- 引理：单调有界序列是 Cauchy 序列（实数完备性的体现）
 -- 证明思路：单调递增有上界的序列必有上确界，因此收敛，从而也是 Cauchy 序列
@@ -1383,14 +1442,62 @@ lemma bisect_upper_cauchy (S : SetReal) (s0 u0 : Real)
     exact bisect_upper_cauchy_aux S s0 u0 hs0 hu0 h_mono h_lower_bound
 
 -- 辅助引理：极限保持上界性质
+-- 辅助引理：对于所有 n，bisect_sequence_lower S s0 u0 hs0 hu0 n ≤ s（对任意 s ∈ S）
+lemma bisect_lower_le_member (S : SetReal) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (s : Real) (hs : s ∈ S) (n : Nat) :
+    le (bisect_sequence_lower S s0 u0 hs0 hu0 n) s :=
+  by
+    induction n with
+    | zero =>
+      -- a_0 = s0，且 s0 ≤ s（因为 s ∈ S，需要证明 s0 ≤ s 对所有 s ∈ S 成立）
+      -- 实际上这不一定成立，需要修正引理表述
+      simp [bisect_sequence_lower]
+      -- 只能证明 s0 ≤ s 当 s0 = min(S) 时
+      sorry
+    | succ n ih =>
+      -- 归纳步骤，需要利用构造性质
+      sorry
+
+-- 辅助引理：对于所有 n，bisect_sequence_lower S s0 u0 hs0 hu0 n ≤ u（对任意上界 u）
+lemma bisect_lower_le_upper_bound (S : SetReal) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (u : Real) (hu : hasUpperBound S u) (n : Nat) :
+    le (bisect_sequence_lower S s0 u0 hs0 hu0 n) u :=
+  by
+    induction n with
+    | zero =>
+      -- a_0 = s0，且 s0 ≤ u（因为 u 是上界）
+      simp [bisect_sequence_lower]
+      exact hu s0 hs0
+    | succ n ih =>
+      -- 归纳步骤
+      let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
+      let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
+      let mid := half (add a_n b_n)
+      simp [bisect_sequence_lower]
+      by_cases h : hasUpperBound S mid
+      · -- a_{n+1} = a_n ≤ u（由归纳假设）
+        exact ih
+      · -- a_{n+1} = mid = (a_n + b_n)/2
+          -- 需要证明 (a_n + b_n)/2 ≤ u
+          -- 由于 a_n ≤ u 且 b_n ≤ u（因为 u 是上界），所以 mid ≤ u
+        apply le_trans
+        · apply le_add_div_two_right a_n b_n
+          -- 证明 a_n ≤ b_n
+          apply bisect_lower_le_upper
+        · -- 证明 b_n ≤ u
+          sorry  -- 需要 b_n ≤ u 对所有 n
+
 def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (s : Real) (hs : s ∈ S)
     (L : Real) (hL : CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n))) :
     le s L :=
   by
     -- 对于任意 s ∈ S，证明 s ≤ L
-    -- 归纳证明：对于所有 n，有 bisect_sequence_lower S s0 u0 hs0 hu0 n ≤ s
-    sorry  -- 未完成：极限保持不等式
+    -- 这里实际上需要证明的是 L 是上界
+    -- 即对于所有 s ∈ S，s ≤ L
+    -- 通过归纳：对于所有 n，bisect_sequence_lower n ≤ 任何上界
+    -- 取极限得 L ≤ 任何上界
+    sorry
 
 -- 辅助引理：极限是最小上界
 def limit_preserves_le_least (S : SetReal) (s0 u0 : Real)
@@ -1400,7 +1507,9 @@ def limit_preserves_le_least (S : SetReal) (s0 u0 : Real)
   by
     -- 对于任意上界 u，证明 L ≤ u
     -- 归纳证明：对于所有 n，有 bisect_sequence_lower S s0 u0 hs0 hu0 n ≤ u
-    sorry  -- 未完成：极限保持不等式
+    -- 基本情况：a_0 = s0 ≤ u（因为 u 是上界）
+    -- 归纳步骤：如果 a_n ≤ u，则 a_{n+1} ≤ u（由构造）
+    sorry
 
 -- 完备性定理：有上界的非空实数集有最小上界
 -- 注：此定理依赖于复杂的极限理论和实数构造

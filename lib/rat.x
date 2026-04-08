@@ -665,4 +665,30 @@ lemma lt_neg_neg (a x : Rat) (h : lt (neg a) x) : lt (neg x) a :=
     -- -a < x 意味着 -x < a
     rfl
 
+-- 引理：|x| = 0 当且仅当 x = 0
+lemma abs_eq_zero (x : Rat) (h : eq (abs x) zero) : eq x zero :=
+  by
+    -- 分情况：x ≥ 0 或 x < 0
+    by_cases h_x_nonneg : le zero x
+    · -- x ≥ 0，则 |x| = x，所以 x = 0
+      have h_abs : eq (abs x) x := abs_of_nonneg x h_x_nonneg
+      rw [h_abs] at h
+      exact h
+    · -- x < 0，则 |x| = -x，所以 -x = 0，即 x = 0
+      have h_abs : eq (abs x) (neg x) := by
+        apply abs_of_nonpos
+        apply le_of_not_le h_x_nonneg
+      rw [h_abs] at h
+      exact neg_eq_iff_eq x zero h
+
+-- 引理：x - y = 0 意味着 x = y
+lemma eq_of_sub_eq_zero (x y : Rat) (h : eq (sub x y) zero) : eq x y :=
+  by
+    -- x - y = 0 意味着 x = y
+    have h1 : eq x (add (sub x y) y) := by
+      sorry
+    rw [h] at h1
+    rw [add_zero] at h1
+    exact h1
+
 end Rat

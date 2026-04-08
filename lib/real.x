@@ -183,9 +183,36 @@ lemma half_add_eq_self_seq (a b : Real) (h : ∀ n, Rat.eq a.rep.seq n b.rep.seq
     -- (half (add a b)).rep.seq m = (a.rep.seq m + b.rep.seq m) / 2
     -- 由于 a.rep.seq m = b.rep.seq m，所以 = (a.rep.seq m + a.rep.seq m) / 2 = a.rep.seq m
     simp [half, add]
-    -- 使用 Rat 引理：(x + x) / 2 = x
-    rw [Rat.add_self_div_two]
-    exact h m
+
+-- 引理：中点小于等于和的一半，即 (a + b)/2 ≤ a + b
+-- 注：这里需要 a 和 b 非负或适当的条件
+-- 实际上，对于任意实数，(a + b)/2 ≤ a + b 当且仅当 a + b ≥ 0
+-- 但我们只需要一个更弱的版本：当 a ≤ b 时，(a + b)/2 ≤ b
+lemma half_add_le_right (a b : Real) (h : le a b) : le (half (add a b)) b :=
+  by
+    -- 证明 (a + b)/2 ≤ b
+    -- 等价于证明 (a + b)/2 - b ≤ 0
+    -- 即 (a + b - 2b)/2 = (a - b)/2 ≤ 0
+    -- 由于 a ≤ b，所以 a - b ≤ 0，因此 (a - b)/2 ≤ 0
+    --
+    -- 展开 Real.le 定义：lt (half (add a b)) b ∨ eq (half (add a b)) b
+    cases h with
+    | inl h_lt =>
+      -- a < b，则 (a + b)/2 < b
+      -- 证明：由 h_lt，存在 ε > 0 使得 a + ε < b
+      -- 则 (a + b)/2 < (b - ε + b)/2 = (2b - ε)/2 = b - ε/2 < b
+      --
+      -- 注：完整的构造性证明需要展开 Real.lt 的定义
+      -- 这里使用简化处理
+      sorry
+    | inr h_eq =>
+      -- a = b，则 (a + b)/2 = (a + a)/2 = a = b
+      exact Or.inr (half_add_eq_self_right a b h_eq)
+
+-- 引理：如果 a ≤ b，则 (a + b)/2 ≤ b
+-- 这是 half_add_le_right 的别名，用于清晰表达
+lemma mid_le_upper (a b : Real) (h : le a b) : le (half (add a b)) b :=
+  half_add_le_right a b h
 
 lemma half_add_eq_self_right_seq (a b : Real) (h : ∀ n, Rat.eq a.rep.seq n b.rep.seq n) (m : Nat) :
     Rat.eq (half (add a b)).rep.seq m b.rep.seq m :=
@@ -1056,7 +1083,7 @@ def bisect_sequence_upper (S : SetReal) (s0 u0 : Real)
   | Nat.succ n =>
       let a := bisect_sequence_lower S s0 u0 hs0 hu0 n
       let b := bisect_sequence_upper S s0 u0 hs0 hu0 n
-      let mid := add a b
+      let mid := half (add a b)
       if hasUpperBound S mid then mid else b
 
 -- 引理：上序列始终保持为上界（归纳证明）
@@ -1074,21 +1101,10 @@ lemma bisect_upper_is_upper_bound (S : SetReal) (s0 u0 : Real)
       let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
       let mid := half (add a_n b_n)
       simp [bisect_sequence_upper]
-      by_cases h : hasUpperBound S (add a_n b_n)
+      by_cases h : hasUpperBound S mid
       · -- b_{n+1} = mid = (a_n + b_n)/2
-        -- 由于 add a_n b_n 是上界（由 h）
-        -- 需要证明 mid 也是上界
-        --
-        -- 关键观察：如果 add a_n b_n 是上界，则对于所有 s ∈ S，s ≤ add a_n b_n
-        -- 由于 mid = (a_n + b_n)/2，且 a_n ≤ b_n（由下序列≤上序列）
-        -- 我们有 mid ≤ b_n ≤ add a_n b_n（当 a_n ≥ 0 时）
-        --
-        -- 实际上，由于 mid ≤ add a_n b_n（中点小于等于和）
-        -- 且 add a_n b_n 是上界，所以 mid ≤ s 对于某些 s ∈ S 不一定成立
-        --
-        -- 注：此证明需要验证 mid 的序性质
-        -- 在构造性实数中，需要显式证明 mid ≤ add a_n b_n
-        sorry
+        -- 由于 mid 是上界（由 h），直接得证
+        exact h
       · -- b_{n+1} = b_n
         -- 由归纳假设，b_n 是上界
         exact ih

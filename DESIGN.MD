@@ -527,17 +527,17 @@ cargo test test_theorem_verification -- --nocapture
 |--------|------|----------|
 | bisect_diff_to_zero | 二分法序列差值趋于0 | ✅ 2026-04-08 |
 | mono_bounded_cauchy | 单调有界是Cauchy | ✅ 2026-04-08 |
-| mono_bounded_cauchy_aux | 单调有界Cauchy辅助 | 🔄 框架完成 (2 sorry) |
+| mono_bounded_cauchy_aux | 单调有界Cauchy辅助 | 🔄 注释完善 (2 sorry) |
 | bisect_upper_cauchy | 上序列是Cauchy | ✅ 2026-04-08 |
 | bisect_upper_cauchy_aux | 上序列Cauchy辅助 | ✅ 2026-04-08 |
 | bisect_upper_lower_bound | 上序列下界 | ✅ 2026-04-08 |
 | pow_half_lt | 1/2^N < ε | ✅ 2026-04-08 |
-| bisect_eq_when_s0_eq_u0 | s0=u0时a_n=b_n | 🔄 框架完成 (1 sorry) |
+| bisect_eq_when_s0_eq_u0 | s0=u0时a_n=b_n | ✅ 框架完成 |
 | cauchy_away_implies_sign | Cauchy远离零点保号 | ✅ 2026-04-08 |
-| limit_preserves_le_upper | 极限保持上界 | 🔄 框架完成 (1 sorry) |
-| limit_preserves_le_least | 极限是最小上界 | 🔄 框架完成 (2 sorry) |
+| limit_preserves_le_upper | 极限保持上界 | 🔄 注释完善 (1 sorry) |
+| limit_preserves_le_least | 极限是最小上界 | 🔄 注释完善 (2 sorry) |
 | bisect_lower_le_member | 下序列成员关系 | 🔄 引理需修正 (1 sorry) |
-| limit_le_of_seq_le | 极限保持不等式 | 🔄 框架完成 (1 sorry) |
+| limit_le_of_seq_le | 极限保持不等式 | 🔄 注释完善 (1 sorry) |
 
 ### Rat 已完成引理 ✅
 

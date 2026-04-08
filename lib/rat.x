@@ -715,4 +715,19 @@ lemma neg_add_distrib (a b : Rat) : eq (neg (add a b)) (add (neg a) (neg b)) :=
   by
     sorry
 
+-- 引理：(x + x) / 2 = x
+lemma add_self_div_two (x : Rat) : eq (div (add x x) (ofNat (Nat.succ (Nat.succ Nat.zero)))) x :=
+  by
+    sorry
+
+-- 引理：等价的传递性
+lemma eq_trans (a b c : Rat) (h1 : eq a b) (h2 : eq b c) : eq a c :=
+  by
+    sorry
+
+-- 引理：等价的对称性
+lemma eq_symm (a b : Rat) (h : eq a b) : eq b a :=
+  by
+    sorry
+
 end Rat

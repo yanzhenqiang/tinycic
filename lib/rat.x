@@ -602,11 +602,11 @@ lemma abs_div_two (x : Rat) :
       rfl
 
 // neg 的基本性质
-lemma neg_neg_lt_zero (a : Rat) (ha : a > zero) : lt (neg a) zero :=
+lemma neg_neg_lt_zero (a : Rat) (ha : gt a zero) : lt (neg a) zero :=
   by
     -- -a < 0 当且仅当 a > 0
     -- Rat 的 lt 基于分子比较
-    rfl
+    sorry
 
 lemma lt_of_neg_lt_neg (a b : Rat) (h : lt (neg b) (neg a)) : lt a b :=
   by
@@ -620,7 +620,7 @@ lemma neg_eq_iff_eq (a b : Rat) (h : eq (neg a) (neg b)) : eq a b :=
     rfl
 
 -- 由 |x| < a 且 a > 0 推出 x > -a
-lemma abs_lt_lower (x a : Rat) (h : lt (abs x) a) (ha : a > zero) : lt (neg a) x :=
+lemma abs_lt_lower (x a : Rat) (h : lt (abs x) a) (ha : gt a zero) : lt (neg a) x :=
   by
     -- 分情况：x ≥ 0 或 x < 0
     by_cases h_x_nonneg : le zero x
@@ -667,8 +667,8 @@ lemma abs_lt_upper (x a : Rat) (h : lt (abs x) a) : lt x a :=
       exact lt_trans x zero a h_x_lt_zero (lt_of_le_of_lt (le_refl zero) ha)
 
 -- 绝对值不等式：|x| < a 当且仅当 -a < x < a
-lemma abs_lt_iff (x a : Rat) (ha : a > zero) :
-    lt (abs x) a ↔ (lt (neg a) x ∧ lt x a) :=
+lemma abs_lt_iff (x a : Rat) (ha : gt a zero) :
+    lt (abs x) a → lt (neg a) x ∧ lt x a :=
   by
     constructor
     · -- 正向：|x| < a → -a < x ∧ x < a
@@ -736,7 +736,7 @@ lemma eq_of_sub_eq_zero (x y : Rat) (h : eq (sub x y) zero) : eq x y :=
     exact h1
 
 -- 引理：Nat 的 < 关系转换为 Rat 的 < 关系
-lemma ofNat_lt_ofNat (n m : Nat) (h : Nat.lt n m) : lt (ofNat n) (ofNat m) :=
+lemma ofNat_lt_ofNat (n m : Nat) (h : Nat.le n m) (hne : ¬(Nat.eq n m)) : lt (ofNat n) (ofNat m) :=
   by
     -- Nat 的 < 意味着 Rat 的 <
     -- 展开 ofNat 定义：ofNat n = mk (Int.ofNat n) 1

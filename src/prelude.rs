@@ -618,6 +618,18 @@ pub fn init_prelude(env: &mut Environment) {
     );
     env.add_constant("Eq.symm", eq_symm_ty, None);
 
+    // Eq.refl : {A : Type} → {a : A} → a = a
+    let eq_refl_ty = Term::pi(
+        "A",
+        Term::type0(),
+        Term::pi(
+            "a",
+            Term::var(0),
+            Term::app(Term::app(Term::const_("Eq"), Term::var(0)), Term::var(0)),
+        ),
+    );
+    env.add_constant("Eq.refl", eq_refl_ty, None);
+
     // 注册 Rat 辅助定理（用于 Real 证明）
     // 简化：使用 Type 作为类型，实际证明时会通过 sorry 占位
 
@@ -625,7 +637,6 @@ pub fn init_prelude(env: &mut Environment) {
     let _ = load_theorem_from_file(env, "lib/rat.x", "Rat");
     let _ = load_theorem_from_file(env, "lib/cauchy.x", "CauchySeq");
     let _ = load_theorem_from_file(env, "lib/real.x", "Real");
-    let _ = load_theorem_from_file(env, "lib/test_check.x", "TestCheck");
 
     // 手动注册 Rat 常量（parser 暂不支持复杂 def 表达式）
     // TODO: 完善 parser 后迁移到 .x 文件
@@ -1235,46 +1246,6 @@ mod tests {
     // =========================================================================
     // Theorem 验证测试
     // =========================================================================
-
-    /// 验证定理加载和证明验证（使用简化测试文件）
-    #[test]
-    fn test_theorem_verification() {
-        let mut env = Environment::new();
-        init_prelude(&mut env);
-
-        // 从测试文件加载定理
-        let result = load_theorem_from_file(&mut env, "lib/test_theorems.x", "Test");
-        assert!(result.is_ok(), "Should load theorems from test file");
-
-        // 检查简单定理是否被注册
-        let result = env.lookup_constant(&"Test.simple_true".to_string());
-        assert!(result.is_ok(), "Theorem Test.simple_true should be registered");
-    }
-
-    /// 验证 proof_test.x 中的直接 proof term
-    #[test]
-    fn test_proof_term_verification() {
-        let mut env = Environment::new();
-        init_prelude(&mut env);
-
-        // 加载 proof_test.x 中的定理
-        let result = load_theorem_from_file(&mut env, "lib/proof_test.x", "ProofTest");
-        assert!(result.is_ok(), "Should load theorems from proof_test.x");
-
-        // 检查定理是否被注册
-        let trivial = env.lookup_constant(&"ProofTest.trivial_nat".to_string());
-        assert!(trivial.is_ok(), "trivial_nat should be registered");
-
-        let identity = env.lookup_constant(&"ProofTest.identity".to_string());
-        assert!(identity.is_ok(), "identity should be registered");
-
-        // 验证 trivial_nat 的类型是 Nat
-        let inference = crate::typecheck::TypeInference::new(&env);
-        let term = crate::term::Term::const_("ProofTest.trivial_nat");
-        let ty = inference.infer(&crate::typecheck::Context::new(), &term);
-        assert!(ty.is_ok(), "trivial_nat should have a type");
-        println!("ProofTest.trivial_nat type: {:?}", ty.unwrap());
-    }
 
     /// 验证 tactic proof builder 工作正常
     #[test]

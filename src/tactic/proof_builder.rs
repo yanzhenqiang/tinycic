@@ -33,6 +33,8 @@ pub enum ParsedTactic {
     Rw(Vec<Rc<Term>>),
     /// sorry - placeholder
     Sorry,
+    /// rfl - reflexivity
+    Rfl,
     /// cases h with | inl h1 => ... | inr h2 => ...
     /// For Or elimination: cases (name, vec of (constructor_name, tactics))
     Cases(Name, Vec<(String, Vec<ParsedTactic>)>),
@@ -75,8 +77,20 @@ impl ProofBuilder {
                 ParsedTactic::Have(name, _, _) => {
                     self.context.push(name.clone());
                 }
-                _ => {}
+                ParsedTactic::Rfl |
+                ParsedTactic::Use(_) |
+                ParsedTactic::Exact(_) |
+                ParsedTactic::Calc(_) |
+                ParsedTactic::Rw(_) |
+                ParsedTactic::Sorry |
+                ParsedTactic::Cases(_, _) => {}
             }
+        }
+
+        // Check if the last tactic is rfl
+        if let Some(ParsedTactic::Rfl) = tactics.last() {
+            // Return Eq.refl for reflexivity proofs
+            return Term::app(Term::const_("Eq.refl"), goal.clone());
         }
 
         // For now, return sorry applied to goal
@@ -389,6 +403,7 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
             }
         }
         "sorry" => Some(ParsedTactic::Sorry),
+        "rfl" => Some(ParsedTactic::Rfl),
         _ => None,
     }
 }
@@ -567,24 +582,7 @@ mod tests {
     // ==================== BREAKAGE DETECTION TESTS ====================
     // These tests verify that invalid/unknown tactics are properly detected
     // and rejected in strict mode. This prevents "fake proofs" where invalid
-    // tactics (like 'rfl') silently fall back to sorry.
-
-    #[test]
-    fn test_breakage_detection_rfl_is_rejected() {
-        // 'rfl' is NOT a valid tactic in TinyCIC - it should be rejected in strict mode
-        let script = r#"
-            intro x
-            rfl
-            exact x
-        "#;
-
-        let result = parse_tactic_script_strict(script);
-        assert!(result.is_err(), "Strict mode should reject 'rfl' tactic, but it was accepted");
-
-        let error_msg = result.unwrap_err();
-        assert!(error_msg.contains("rfl"), "Error message should mention 'rfl'");
-        assert!(error_msg.contains("Unknown tactic"), "Error should indicate unknown tactic");
-    }
+    // tactics silently fall back to sorry.
 
     #[test]
     fn test_breakage_detection_typo_in_tactic() {
@@ -630,8 +628,8 @@ mod tests {
     }
 
     #[test]
-    fn test_non_strict_mode_skips_unknown() {
-        // Non-strict mode (default) should silently skip unknown tactics (backward compatibility)
+    fn test_rfl_tactic_supported() {
+        // rfl is now a supported tactic
         let script = r#"
             intro x
             rfl
@@ -639,10 +637,11 @@ mod tests {
         "#;
 
         let tactics = parse_tactic_script(script);
-        // Should have 2 tactics: intro and exact (rfl is silently skipped)
-        assert_eq!(tactics.len(), 2);
+        // Should have 3 tactics: intro, rfl, and exact
+        assert_eq!(tactics.len(), 3);
         assert!(matches!(tactics[0], ParsedTactic::Intro(_)));
-        assert!(matches!(tactics[1], ParsedTactic::Exact(_)));
+        assert!(matches!(tactics[1], ParsedTactic::Rfl));
+        assert!(matches!(tactics[2], ParsedTactic::Exact(_)));
     }
 
     // ==================== END BREAKAGE DETECTION TESTS ====================

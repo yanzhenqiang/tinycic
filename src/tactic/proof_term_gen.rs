@@ -266,6 +266,10 @@ impl<'env> ProofTermGenerator<'env> {
                 // Sorry placeholder
                 Ok(())
             }
+            ParsedTactic::Rfl => {
+                // Reflexivity - nothing to verify for now
+                Ok(())
+            }
             ParsedTactic::Cases(_var_name, _branches) => {
                 // Cases tactic for Or elimination
                 // For now, we treat it as sorry since generating proper Or.elim

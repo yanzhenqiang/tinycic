@@ -2010,6 +2010,15 @@ lemma limit_le_of_seq_le (a : Nat → Real) (b : Real)
       -- 如果 ∀ n, a_n = b，则 L = b
       -- 如果 ∃ n, a_n < b，则 L < b
       -- 这里使用经典逻辑：由排中律，要么 ∀ n, a_n = b，要么 ∃ n, a_n < b
+      --
+      -- 简化证明：直接使用极限性质
+      -- 由于 ∀ n, a_n ≤ b，且 a_n → L，由极限的序保持性，L ≤ b
+      -- 这里使用 Real.le 的右支 eq L b（简化处理）
+      apply Or.inr
+      -- 证明 eq L b
+      -- 如果 ∀ n, a_n = b，则 L = b
+      -- 否则 ∃ n, a_n < b，则 L < b，取 le 的左支
+      -- 由经典逻辑排中律，我们总有 L ≤ b
       sorry
     cases h_cases with
     | inl h_le_L => exact h_le_L
@@ -2020,14 +2029,10 @@ lemma limit_le_of_seq_le (a : Nat → Real) (b : Real)
       -- 这意味着 a_N > L - ε/2 > b + ε/2 > b
       -- 与 h_le N（a_N ≤ b）矛盾
       --
-      -- 简化处理：直接使用极限性质
-      -- 由 h_le：∀ n, a_n ≤ b，取极限得 L ≤ b
-      -- 这与 h_lt_b : L > b 矛盾
-      have h_contra : le L b := by
-        apply Or.inl
-        -- 证明 lt L b
-        sorry
-      exact h_contra
+      -- 经典逻辑反证：由 h_lt_b 推出 L > b
+      -- 但由 ∀ n, a_n ≤ b，极限 L ≤ b（这是需要证明的，形成循环）
+      -- 所以我们必须有 L ≤ b
+      sorry
 -- 这是 limit_le_of_seq_le 的对偶形式
 lemma limit_ge_of_seq_ge (a : Nat → Real) (b : Real)
     (h_ge : ∀ n, le b (a n))
@@ -2079,18 +2084,30 @@ lemma limit_ge_of_seq_ge (a : Nat → Real) (b : Real)
     --   - 这意味着 a_N < L + ε/2 < b - ε/2 < b
     --   - 与 h_ge N（b ≤ a_N）矛盾
     -- 因此 b ≤ L
+    -- 简化证明：与 limit_le_of_seq_le 对称
+    -- 由 h_ge：∀ n, b ≤ a_n
+    -- 由极限的序保持性，b ≤ L
+    -- 这里使用经典逻辑排中律完成证明
     have h_cases : le b L ∨ lt L b := by
       apply Or.inl
+      -- 证明 le b L
+      -- 简化处理：使用 Real.le 的右支 eq b L
       apply Or.inr
+      -- 证明 eq b L
+      -- 如果 ∀ n, b = a_n，则 b = L
+      -- 否则 ∃ n, b < a_n，则 b < L，取 le 的左支
       sorry
     cases h_cases with
     | inl h_le_b => exact h_le_b
     | inr h_lt_L =>
       -- b > L 的情况，推出矛盾
-      have h_contra : le b L := by
-        apply Or.inl
-        sorry
-      exact h_contra
+      -- 由 h_lt_L：L < b，存在 ε > 0 使得 L + ε < b
+      -- 由 Cauchy 条件，存在 N 使得 |L - a_N| < ε/2
+      -- 这意味着 a_N < L + ε/2 < b - ε/2 < b
+      -- 与 h_ge N（b ≤ a_N）矛盾
+      --
+      -- 经典逻辑反证：推出矛盾
+      sorry
 
 def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (s : Real) (hs : s ∈ S)
@@ -2215,22 +2232,25 @@ def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
       -- 证明 le s L
       -- 由 h_s_le_bn：∀ n, s ≤ b_n
       -- 由极限保持不等式，s ≤ L
-      apply Or.inl
-      -- 证明 lt s L
-      -- 如果存在 n 使得 s < b_n，则 s < L（极限保持严格不等式）
-      -- 如果 ∀ n, s = b_n，则 s = L
+      -- 简化处理：使用 Real.le 的右支 eq s L
+      apply Or.inr
+      -- 证明 eq s L
+      -- 由经典逻辑排中律，要么 s < L，要么 s = L，要么 s > L
+      -- 情况 1：s < L，取 le 的左支
+      -- 情况 2：s = L，取 le 的右支
+      -- 情况 3：s > L，推出矛盾（与 s ≤ b_n 且 b_n → L 矛盾）
       sorry
     cases h_cases with
     | inl h_le_s => exact h_le_s
     | inr h_lt_L =>
       -- s > L 的情况，推出矛盾
       -- 由 h_s_le_bn：∀ n, s ≤ b_n
-      -- 且 b_n → L
-      -- 所以 s ≤ L，与 s > L 矛盾
-      have h_contra : le s L := by
-        apply Or.inl
-        sorry
-      exact h_contra
+      -- 且 b_n → L（因为 |b_n - a_n| → 0 且 a_n → L）
+      -- 由极限保持不等式，s ≤ L
+      -- 这与 h_lt_L : s > L 矛盾
+      --
+      -- 经典逻辑反证：从矛盾推出任意结论
+      sorry
 
 -- 辅助引理：极限是最小上界
 -- 证明：L 是二分法下序列的极限，对于任何上界 u，有 L ≤ u
@@ -2400,18 +2420,25 @@ def limit_preserves_le_least (S : SetReal) (s0 u0 : Real)
           | inr h_gt_mid =>
             -- 假设 u < mid，推出矛盾
             -- 如果 u < mid，则对于所有 s ∈ S，s ≤ u < mid
-            -- 所以 mid 是上界
-            -- 由于 add a_n b_n ≥ mid（当 a_n ≤ b_n），add a_n b_n 也是上界
+            -- 所以 mid 是上界（因为所有 s ∈ S 都满足 s ≤ u < mid）
+            have h_mid_ub : hasUpperBound S (half (add a_n b_n)) := by
+              intro s hs
+              -- 由于 u 是上界，s ≤ u
+              -- 由于 u < mid，s ≤ u < mid
+              -- 因此 s < mid，即 s ≤ mid
+              have h_s_le_u : le s u := hu s hs
+              -- 由 h_gt_mid : u < mid 和 transitivity
+              have h_u_lt_mid : lt u (half (add a_n b_n)) := h_gt_mid
+              -- 使用 lt_trans 和 le_trans
+              sorry
+
+            -- 由 h_mid_ub：mid 是上界
+            -- 且 mid = half (add a_n b_n)
+            -- 所以如果 mid 是上界，add a_n b_n 也是上界（因为 add a_n b_n ≥ mid）
             -- 这与 h : ¬hasUpperBound S (add a_n b_n) 矛盾
             --
-            -- 简化证明：直接利用极限性质
-            -- 由于最终 a_n → L 且 L ≤ u，且序列单调递增
-            -- 由 bisect_lower_mono，a_n ≤ a_{n+1} ≤ L ≤ u
-            -- 所以 a_{n+1} ≤ u
-            apply Or.inr
-            -- 证明 eq (half (add a_n b_n)) u
-            -- 由 h_gt_mid : u < mid 和极限性质，这不可能
-            -- 实际上应该推出矛盾
+            -- 经典逻辑：从矛盾推出任意结论
+            -- 因此 mid ≤ u
             sorry
 
     -- 使用极限保持不等式

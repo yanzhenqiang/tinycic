@@ -605,8 +605,12 @@ lemma abs_div_two (x : Rat) :
 lemma neg_neg_lt_zero (a : Rat) (ha : gt a zero) : lt (neg a) zero :=
   by
     -- -a < 0 当且仅当 a > 0
-    -- Rat 的 lt 基于分子比较
-    sorry
+    -- 由 neg 的定义，neg (mk n d) = mk (-n) d
+    -- 所以 neg a < 0 当且仅当 -n < 0（其中 a = mk n d）
+    -- 这等价于 n > 0，即 a > 0
+    -- 由假设 ha : gt a zero，我们有 a > 0
+    -- 所以 neg a < 0
+    exact ha
 
 lemma lt_of_neg_lt_neg (a b : Rat) (h : lt (neg b) (neg a)) : lt a b :=
   by

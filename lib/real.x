@@ -1463,28 +1463,32 @@ lemma bisect_upper_lower_bound (S : SetReal) (s0 u0 : Real)
         simp [bisect_sequence_upper, h]
         exact ih
 
--- 引理：上序列始终小于等于任意上界
-lemma bisect_upper_le_upper (S : SetReal) (s0 u0 : Real)
-    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (u : Real) (hu : hasUpperBound S u) (n : Nat) :
-    le (bisect_sequence_upper S s0 u0 hs0 hu0 n) u :=
+-- 引理：上序列始终小于等于初始上界 u0
+lemma bisect_upper_le_u0 (S : SetReal) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
+    le (bisect_sequence_upper S s0 u0 hs0 hu0 n) u0 :=
   by
     induction n with
     | zero =>
-      -- b_0 = u0，且 u0 ≤ u（需要证明 u0 ≤ 任何上界）
-      -- 实际上这需要 u0 是最小上界，这里简化处理
+      -- b_0 = u0，显然 u0 ≤ u0
       simp [bisect_sequence_upper]
-      sorry  -- 需要额外引理：初始上界 u0 ≤ 任何其他上界
+      apply Real.le_refl
     | succ n ih =>
       -- 归纳步骤
       let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
       let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
       let mid := half (add a_n b_n)
       simp [bisect_sequence_upper]
-      by_cases h : hasUpperBound S mid
+      by_cases h : hasUpperBound S (add a_n b_n)
       · -- b_{n+1} = mid = (a_n + b_n)/2
-        -- 由于 a_n ≤ u 且 b_n ≤ u（由归纳），所以 mid ≤ u
-        sorry
-      · -- b_{n+1} = b_n ≤ u（由归纳假设）
+        -- 需要证明 (a_n + b_n)/2 ≤ u0
+        -- 由于 a_n ≤ b_n ≤ u0（由 bisect_lower_le_upper 和归纳假设）
+        apply le_trans
+        · apply le_add_div_two_right a_n b_n
+          apply bisect_lower_le_upper
+        · -- 证明 b_n ≤ u0（归纳假设）
+          exact ih
+      · -- b_{n+1} = b_n ≤ u0（由归纳假设）
         exact ih
 
 -- 辅助引理：上序列递减有下界是 Cauchy
@@ -1534,57 +1538,73 @@ lemma bisect_lower_le_member (S : SetReal) (s0 u0 : Real)
       -- 归纳步骤，需要利用构造性质
       sorry
 
--- 辅助引理：对于所有 n，bisect_sequence_lower S s0 u0 hs0 hu0 n ≤ u（对任意上界 u）
-lemma bisect_lower_le_upper_bound (S : SetReal) (s0 u0 : Real)
-    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (u : Real) (hu : hasUpperBound S u) (n : Nat) :
-    le (bisect_sequence_lower S s0 u0 hs0 hu0 n) u :=
+-- 辅助引理：对于所有 n，bisect_sequence_lower S s0 u0 hs0 hu0 n ≤ u0
+lemma bisect_lower_le_u0 (S : SetReal) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
+    le (bisect_sequence_lower S s0 u0 hs0 hu0 n) u0 :=
   by
     induction n with
     | zero =>
-      -- a_0 = s0，且 s0 ≤ u（因为 u 是上界）
+      -- a_0 = s0，且 s0 ≤ u0（因为 u0 是上界）
       simp [bisect_sequence_lower]
-      exact hu s0 hs0
+      exact hu0 s0 hs0
     | succ n ih =>
       -- 归纳步骤
       let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
       let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
       let mid := half (add a_n b_n)
       simp [bisect_sequence_lower]
-      by_cases h : hasUpperBound S mid
-      · -- a_{n+1} = a_n ≤ u（由归纳假设）
+      by_cases h : hasUpperBound S (add a_n b_n)
+      · -- a_{n+1} = a_n ≤ u0（由归纳假设）
         exact ih
       · -- a_{n+1} = mid = (a_n + b_n)/2
-          -- 需要证明 (a_n + b_n)/2 ≤ u
-          -- 由于 a_n ≤ u（归纳假设）且 b_n ≤ u（由 bisect_upper_le_upper），所以 mid ≤ u
+        -- 需要证明 (a_n + b_n)/2 ≤ u0
+        -- 由于 a_n ≤ u0（归纳假设）且 b_n ≤ u0（由 bisect_upper_le_u0）
         apply le_trans
         · apply le_add_div_two_right a_n b_n
           -- 证明 a_n ≤ b_n
           apply bisect_lower_le_upper
-        · -- 证明 b_n ≤ u
-          exact bisect_upper_le_upper S s0 u0 hs0 hu0 u hu n
+        · -- 证明 b_n ≤ u0
+          exact bisect_upper_le_u0 S s0 u0 hs0 hu0 n
+
+-- 辅助引理：如果 a_n ≤ b 对所有 n 成立，且 a_n → L，则 L ≤ b
+-- 这是极限保持不等式性质的体现
+lemma limit_le_of_seq_le (a : Nat → Real) (b : Real)
+    (h_le : ∀ n, le (a n) b)
+    (L : Real) (hL : CauchySeq.isCauchy (CauchySeq.mk (λ n => (a n).rep.seq n))) :
+    le (Real.mk (CauchySeq.mk (λ n => (a n).rep.seq n)) hL) b :=
+  by
+    -- 构造性证明思路：
+    -- 对于任意 ε > 0，存在 N 使得 |L - a_N| < ε
+    -- 由于 a_N ≤ b，所以 L ≤ a_N + ε ≤ b + ε
+    -- 由于 ε 任意，得 L ≤ b
+    sorry
 
 def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (s : Real) (hs : s ∈ S)
     (L : Real) (hL : CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n))) :
     le s L :=
   by
-    -- 对于任意 s ∈ S，证明 s ≤ L
-    -- 这里实际上需要证明的是 L 是上界
-    -- 即对于所有 s ∈ S，s ≤ L
-    -- 通过归纳：对于所有 n，bisect_sequence_lower n ≤ 任何上界
-    -- 取极限得 L ≤ 任何上界
+    -- 这里需要证明的是：对于任意 s ∈ S，s ≤ L
+    -- 但 bisect_sequence_lower 的构造保证 a_n ∈ S 或 a_n 是 S 的下界
+    -- 这个引理表述需要重新考虑
     sorry
 
 -- 辅助引理：极限是最小上界
+-- 证明：L 是二分法下序列的极限，对于任何上界 u，有 L ≤ u
 def limit_preserves_le_least (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (u : Real) (hu : hasUpperBound S u)
     (L : Real) (hL : CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n))) :
     le L u :=
   by
-    -- 对于任意上界 u，证明 L ≤ u
-    -- 归纳证明：对于所有 n，有 bisect_sequence_lower S s0 u0 hs0 hu0 n ≤ u
-    -- 基本情况：a_0 = s0 ≤ u（因为 u 是上界）
-    -- 归纳步骤：如果 a_n ≤ u，则 a_{n+1} ≤ u（由构造）
+    -- 证明思路：
+    -- 1. 对于所有 n，bisect_sequence_lower n ≤ u0（由 bisect_lower_le_u0）
+    -- 2. 如果 u 是 S 的上界，则 u0 和 u 都是上界
+    -- 3. 极限 L 满足 L ≤ u0
+    -- 4. 但我们需要 L ≤ u，这需要额外的论证
+
+    -- 关键观察：二分法构造使得 L 是所有上界的下确界
+    -- 因此 L ≤ 任何上界 u
     sorry
 
 -- 完备性定理：有上界的非空实数集有最小上界

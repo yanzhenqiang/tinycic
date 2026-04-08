@@ -1146,8 +1146,8 @@ lemma bisect_eq_when_s0_eq_u0 (S : SetReal) (s0 u0 : Real)
     Rat.eq (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n
            (bisect_sequence_upper S s0 u0 hs0 hu0 n).rep.seq n :=
   by
-    -- 由 |u0 - s0| = 0 得 u0 = s0（在第 0 项）
-    -- 归纳证明 a_n = b_n 在第 n 项成立
+    -- 关键观察：如果 s0 = u0，则下序列和上序列在所有项都相等
+    -- 因为 a_0 = s0 = u0 = b_0，且归纳步骤保持相等
     induction n with
     | zero =>
       -- 基本情况：a_0 = s0，b_0 = u0
@@ -1160,26 +1160,10 @@ lemma bisect_eq_when_s0_eq_u0 (S : SetReal) (s0 u0 : Real)
       exact Rat.eq_of_sub_eq_zero h_zero
     | succ n ih =>
       -- 归纳步骤：假设 a_n = b_n 在第 n 项
-      -- 需要证明 a_{n+1} = b_{n+1} 在第 n+1 项
-      let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
-      let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
-
-      -- 展开定义
-      simp [bisect_sequence_lower, bisect_sequence_upper]
-
-      -- 情况分析：mid 是否是上界？
-      by_cases h : hasUpperBound S (add a_n b_n)
-      · -- 情况1：mid 是上界
-        -- 则 a_{n+1} = a_n，b_{n+1} = mid = (a_n + b_n)/2
-        simp [h, half]
-        -- 在第 n+1 项，a_n.rep.seq (n+1) 和 b_n.rep.seq (n+1) 的关系需要分析
-        -- 由于我们只知道在第 n 项相等，不能直接推出第 n+1 项相等
-        -- 这需要 Real 相等的传递性（Cauchy 序列等价）
-        sorry
-      · -- 情况2：mid 不是上界
-        -- 则 a_{n+1} = mid，b_{n+1} = b_n
-        simp [h, half]
-        sorry
+      -- 关键：我们实际上需要证明 Real 相等（Cauchy 序列等价）
+      -- 而不仅仅是单点相等
+      -- 这需要更复杂的论证，暂时使用 sorry
+      sorry
 
 -- 引理：上下序列之差趋于 0
 lemma bisect_diff_to_zero (S : SetReal) (s0 u0 : Real)
@@ -1348,25 +1332,36 @@ lemma mono_bounded_cauchy_aux (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (N
       -- 对于 ε > 0，存在 k 使得 M - k*ε < f(0)
       -- 这意味着最多 k 次 "ε-跳跃"
 
-      -- 简化的构造性证明（基于有限跳跃论证）
+      -- 构造性证明：利用单调有界序列的收敛性
+      -- 关键定理：单调递增有上界序列收敛到其上确界
+      -- 因此它也是 Cauchy 序列
+
+      -- 由于我们使用的是 Cauchy 序列表示的实数
+      -- 每个 f(n) 本身就是 Cauchy 序列
+      -- 序列 (f n) 是 Nat → Real 的单调序列
+
+      -- 证明思路：
+      -- 1. 由于 f 单调递增有上界 M，设 L = sup {f n | n ∈ Nat}
+      -- 2. 对于任意 ε > 0，存在 N 使得 L - ε < f N ≤ L
+      -- 3. 对于所有 m, n ≥ N，|f m - f n| < ε
+
+      -- 在 Cauchy 序列表示下的证明：
+      -- 对于给定的 ε > 0，我们需要找到 N 使得
+      -- 对于所有 m, n ≥ N，|f m - f n| < ε
+
+      -- 由于 f 单调递增，f m ≤ f n 当 m ≤ n
+      -- 所以 |f n - f m| = f n - f m
+
+      -- 关键观察：差值序列 d_n = f n - f 0 单调递增且有上界 M - f 0
+      -- 因此 d_n 收敛，从而是 Cauchy 序列
+
+      -- 这里使用简化的占位证明
+      -- 完整的构造性证明需要显式构造 sup
       have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)
                                         (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n)) < ε := by
-        -- 利用 f(m) 和 f(n) 的 Cauchy 表示
-        -- 由于 f(m) 和 f(n) 都是 Real，它们由 Cauchy 序列表示
-        -- 我们可以利用这些 Cauchy 序列的性质
-
-        -- 关键：f(n) - f(m) = Real.sub (f n) (f m)
-        -- 由于 f 单调递增且 m ≤ n，f(m) ≤ f(n)
-        -- 所以 |f(n) - f(m)| = f(n) - f(m)
-
-        -- 利用 f(n) 的有界性：f(n) ≤ M
-        -- 和 f(m) 的单调性：f(0) ≤ f(m)
-        -- 所以 f(n) - f(m) ≤ M - f(0)
-
-        -- 对于足够大的 m, n，这个差可以任意小
-        -- （这是单调有界序列的基本性质）
-
-        sorry  -- 需要额外的引理来完成严格证明
+        -- 利用 Real 的序结构和极限性质
+        -- 这需要额外的引理来完成严格证明
+        sorry
       exact h_cauchy
     · -- n < m 的情况（对称）
       -- |f(n) - f(m)| = f(m) - f(n)（因为 f 单调递增且 n < m）
@@ -1375,7 +1370,9 @@ lemma mono_bounded_cauchy_aux (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (N
         -- 与 m ≤ n 情况对称
         -- 使用 abs_sub_comm: |a - b| = |b - a|
         rw [Rat.abs_sub_comm]
-        -- 现在可以应用上面的论证（交换 m 和 n 的角色）
+        -- 由于 f 单调递增且 n < m，f n ≤ f m
+        -- 所以 |f m - f n| = f m - f n
+        -- 这与 m ≤ n 情况相同
         sorry
       exact h_cauchy
 
@@ -1574,10 +1571,27 @@ lemma limit_le_of_seq_le (a : Nat → Real) (b : Real)
     (L : Real) (hL : CauchySeq.isCauchy (CauchySeq.mk (λ n => (a n).rep.seq n))) :
     le (Real.mk (CauchySeq.mk (λ n => (a n).rep.seq n)) hL) b :=
   by
-    -- 构造性证明思路：
-    -- 对于任意 ε > 0，存在 N 使得 |L - a_N| < ε
-    -- 由于 a_N ≤ b，所以 L ≤ a_N + ε ≤ b + ε
-    -- 由于 ε 任意，得 L ≤ b
+    -- 证明 L ≤ b：即 L < b 或 L = b
+    -- 使用反证法：假设 L > b，则存在 ε > 0 使得 L > b + ε
+    -- 但由极限定义，存在 N 使得 |L - a_N| < ε/2
+    -- 这意味着 a_N > L - ε/2 > b + ε/2，与 a_N ≤ b 矛盾
+
+    -- 展开 le 定义：lt L b ∨ eq L b
+    -- 我们证明 ¬(lt b L) → le L b
+
+    -- 由 h_le：对于所有 n，a_n ≤ b，即 a_n < b 或 a_n = b
+    -- 我们需要证明 L ≤ b
+
+    -- 构造性证明：
+    -- 对于任意 ε > 0，由于 L 是极限，存在 N 使得 |L - a_N| < ε
+    -- 即 L - ε < a_N < L + ε
+    -- 由于 a_N ≤ b，我们有 L - ε < b，即 L < b + ε
+    -- 由于 ε 任意，这蕴含 L ≤ b
+
+    -- 简化处理：直接通过定义证明
+    -- L ≤ b 当且仅当 ¬(b < L)
+    -- 如果 b < L，则存在 ε > 0 使得对于充分大的 n，b + ε < a_n
+    -- 这与 a_n ≤ b 矛盾
     sorry
 
 def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)

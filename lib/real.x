@@ -1531,8 +1531,32 @@ lemma mono_bounded_cauchy_aux (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (N
       -- 第一项和第三项由 f(n).rep 和 f(m).rep 的 Cauchy 性质 < ε/2
       -- 第二项需要利用 f 的单调性和有界性
 
-      -- 注：完整证明需要额外引理来控制 |f(n).rep.seq N - f(m).rep.seq N|
-      -- 这里使用简化的构造性论证
+      -- 关键引理：由于 f 单调递增且 m ≤ n，我们有 f(m) ≤ f(n)
+      -- 这意味着对于所有 k，f(m).rep.seq k ≤ f(n).rep.seq k（近似）
+      -- 因此 |f(n).rep.seq N - f(m).rep.seq N| = f(n).rep.seq N - f(m).rep.seq N
+      --
+      -- 由 h_mono: f(m) ≤ f(n)，所以 f(m).rep.seq N ≤ f(n).rep.seq N
+      -- 由 h_bounded: f(n) ≤ M，所以 f(n).rep.seq N ≤ M.rep.seq N
+      --
+      -- 对于足够大的 N，f(m).rep.seq N 和 f(n).rep.seq N 都接近它们各自的极限
+      -- 由于序列单调有界，差值趋于 0
+      --
+      -- 简化的构造性论证：
+      -- 由 hN1: |f(n).rep.seq n - f(n).rep.seq N| < ε/2
+      -- 由 hN2: |f(m).rep.seq m - f(m).rep.seq N| < ε/2
+      --
+      -- 由于 f 单调递增，f(m) ≤ f(n)
+      -- 所以 f(m).rep.seq N ≤ f(n).rep.seq N
+      --
+      -- 关键观察：对于单调序列，对角线差值可以被控制
+      -- |f(n).rep.seq n - f(m).rep.seq m|
+      -- ≤ |f(n).rep.seq n - f(n).rep.seq N| + |f(n).rep.seq N - f(m).rep.seq N| + |f(m).rep.seq N - f(m).rep.seq m|
+      -- < ε/2 + |f(n).rep.seq N - f(m).rep.seq N| + ε/2
+      --
+      -- 由 f 的单调性，|f(n).rep.seq N - f(m).rep.seq N| = f(n).rep.seq N - f(m).rep.seq N
+      -- 这个差值可以由 f(n) 和 f(m) 的 Cauchy 性质控制
+      --
+      -- 注：完整的构造性证明需要建立单调序列对角线收敛的严格理论
       sorry
     · -- n < m 的情况（对称）
       -- |f(n) - f(m)| = |f(m) - f(n)|

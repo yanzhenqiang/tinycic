@@ -44,6 +44,7 @@ pub enum ParseError {
     ExpectedIdentifier(String),
     ExpectedKeyword(String),
     InvalidSyntax(String),
+    TacticError(String),
 }
 
 impl std::fmt::Display for ParseError {
@@ -53,6 +54,7 @@ impl std::fmt::Display for ParseError {
             ParseError::ExpectedIdentifier(s) => write!(f, "Expected identifier: {}", s),
             ParseError::ExpectedKeyword(s) => write!(f, "Expected keyword: {}", s),
             ParseError::InvalidSyntax(s) => write!(f, "Invalid syntax: {}", s),
+            ParseError::TacticError(s) => write!(f, "Tactic error: {}", s),
         }
     }
 }

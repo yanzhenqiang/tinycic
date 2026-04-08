@@ -331,8 +331,16 @@ pub fn load_theorem_from_file(env: &mut Environment, path: &str, namespace: &str
                     let namespaced_statement = add_namespace_prefix(&decl.statement, namespace, env);
                     let namespaced_proof = decl.proof.as_ref().map(|p| add_namespace_prefix(p, namespace, env));
 
+                    // In strict mode, theorem must have a proof
+                    let proof = match namespaced_proof {
+                        Some(p) => p,
+                        None => {
+                            eprintln!("✗ Failed to verify theorem {}: No proof provided", full_name);
+                            continue;
+                        }
+                    };
                     let namespaced_decl = TheoremDecl::new(full_name.clone(), namespaced_statement)
-                        .with_proof(namespaced_proof.unwrap_or_else(|| Term::const_("sorry")));
+                        .with_proof(proof);
 
                     // 使用 TheoremProcessor 处理并验证
                     let processor = TheoremProcessor::new();
@@ -552,13 +560,8 @@ pub fn init_prelude(env: &mut Environment) {
          // 使用新的 import 机制加载模块
     // 这会处理模块依赖，确保先加载导入的模块
     let mut loaded = std::collections::HashSet::new();
-    // 注册 sorry 作为不完整证明的占位符（必须在 theorem 加载之前）
-    // sorry : (A : Type) -> A  用于 Type 级别
-    let sorry_ty = Term::pi("A", Term::type0(), Term::var(0));
-    env.add_constant("sorry", sorry_ty, None);
-    // sorryProp : (A : Prop) -> A  用于 Prop 级别
-    let sorry_prop_ty = Term::pi("A", Term::sort(0), Term::var(0));
-    env.add_constant("sorryProp", sorry_prop_ty, None);
+    // 严格模式：不注册 sorry 占位符
+    // 所有定理必须有完整的证明
 
     // 加载 Int 模块（包含定理定义）
     let _ = load_module_with_imports(env, "lib/int.x", "Int", &mut loaded);

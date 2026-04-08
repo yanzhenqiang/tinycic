@@ -1193,47 +1193,39 @@ impl<'a> Parser<'a> {
         let script = self.collect_remaining_as_script();
 
         // Build proof from tactic script
-        if !script.trim().is_empty() {
-            let tactics = crate::tactic::proof_builder::parse_tactic_script(&script);
-
-            // Check if all tactics are "sorry" or trivial
-            let all_sorry = tactics.iter().all(|t| {
-                matches!(t, crate::tactic::proof_builder::ParsedTactic::Sorry)
-            });
-
-            if all_sorry {
-                return Ok(Term::const_("sorry"));
-            }
-
-            // Use ProofTermGenerator to generate actual proof term
-            if let Some(goal) = goal_type {
-                // Create generator with initial bindings for theorem parameters
-                let mut generator = if let Some(bindings) = params {
-                    crate::tactic::proof_term_gen::ProofTermGenerator::new_with_bindings(goal, bindings)
-                } else {
-                    crate::tactic::proof_term_gen::ProofTermGenerator::new_without_env(goal)
-                };
-                for (i, t) in tactics.iter().enumerate() {
-                    eprintln!("DEBUG: tactic {}: {:?}", i, t);
-                }
-                match generator.generate(&tactics) {
-                    Ok(proof_term) => {
-                        eprintln!("DEBUG: Generated proof: {:?}", proof_term);
-                        return Ok(proof_term);
-                    }
-                    Err(e) => {
-                        // If generation fails, fall back to sorry but log the error
-                        eprintln!("Warning: Proof generation failed: {}", e);
-                        return Ok(Term::const_("sorry"));
-                    }
-                }
-            }
-
-            // No goal type provided, return sorry
-            Ok(Term::const_("sorry"))
-        } else {
-            Ok(Term::const_("sorry"))
+        if script.trim().is_empty() {
+            return Err(ParseError::InvalidSyntax(
+                "Empty proof block. Theorem must have a complete proof.".to_string()));
         }
+
+        let tactics = crate::tactic::proof_builder::parse_tactic_script(&script);
+
+        // Use ProofTermGenerator to generate actual proof term
+        if let Some(goal) = goal_type {
+            // Create generator with initial bindings for theorem parameters
+            let mut generator = if let Some(bindings) = params {
+                crate::tactic::proof_term_gen::ProofTermGenerator::new_with_bindings(goal, bindings)
+            } else {
+                crate::tactic::proof_term_gen::ProofTermGenerator::new_without_env(goal)
+            };
+            for (i, t) in tactics.iter().enumerate() {
+                eprintln!("DEBUG: tactic {}: {:?}", i, t);
+            }
+            match generator.generate(&tactics) {
+                Ok(proof_term) => {
+                    eprintln!("DEBUG: Generated proof: {:?}", proof_term);
+                    return Ok(proof_term);
+                }
+                Err(e) => {
+                    // Strict mode: propagate error instead of silently using sorry
+                    return Err(ParseError::TacticError(format!("Proof generation failed: {}", e)));
+                }
+            }
+        }
+
+        // No goal type provided - error in strict mode
+        Err(ParseError::InvalidSyntax(
+            "Cannot generate proof without goal type. Theorem statement may be incomplete.".to_string()))
     }
 
     /// Collect a tactic line as string
@@ -1276,7 +1268,7 @@ impl<'a> Parser<'a> {
                 Token::Ident(s) => {
                     let s = s.clone();
                     if s == "apply" || s == "rw" || s == "calc" ||
-                       s == "have" || s == "obtain" || s == "sorry" {
+                       s == "have" || s == "obtain" {
                         if !parts.is_empty() {
                             break; // New tactic starts
                         }
@@ -1475,7 +1467,7 @@ impl<'a> Parser<'a> {
                     // Check if this is a new tactic (not part of calc)
                     if s == "intro" || s == "use" || s == "exact" ||
                        s == "apply" || s == "have" || s == "obtain" ||
-                       s == "sorry" || s == "calc" || s == "rw" {
+                       s == "calc" || s == "rw" {
                         break;
                     }
                     // Collect this calc step line

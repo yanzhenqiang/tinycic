@@ -112,14 +112,14 @@ impl<'env> ProofTermGenerator<'env> {
     }
 
     /// Generate proof term from tactics
+    /// Returns error if any tactic fails (strict mode - no silent fallback to sorry)
     pub fn generate(&mut self, tactics: &[ParsedTactic]) -> Result<Rc<Term>, String> {
         // Process each tactic
         for (i, tactic) in tactics.iter().enumerate() {
             eprintln!("DEBUG generate step {}: intro_bindings count = {}", i, self.intro_bindings.len());
-            if let Err(_e) = self.apply_tactic(tactic) {
-                // Fall back to sorry on error
-                return Ok(Term::app(Term::const_("sorry"),
-                    self.goal_stack.last().unwrap_or(&Term::const_("_")).clone()));
+            if let Err(e) = self.apply_tactic(tactic) {
+                // Strict mode: return error instead of silently using sorry
+                return Err(format!("Tactic {} failed: {}", i, e));
             }
         }
 
@@ -129,23 +129,25 @@ impl<'env> ProofTermGenerator<'env> {
             .ok_or("No goal")?;
 
         // Try to build a proper proof term
-        let mut proof = if let Some(ref calc_state) = self.calc_state {
+        let mut proof = if let Some(ParsedTactic::Exact(term)) = tactics.last() {
+            // Use exact proof term directly - this is the most specific proof
+            term.clone()
+        } else if let Some(ParsedTactic::Rfl) = tactics.last() {
+            // Return Eq.refl for reflexivity proofs
+            Term::app(Term::const_("Eq.refl"), final_goal.clone())
+        } else if let Some(ref calc_state) = self.calc_state {
             // We have a calc block, build proof from it
             if !calc_state.lhs_exprs.is_empty() {
-                self.build_calc_proof(calc_state)
+                self.build_calc_proof(calc_state)?
             } else {
-                Term::app(Term::const_("sorry"), final_goal.clone())
+                return Err("Calc block has no steps".to_string());
             }
-        } else if self.pending_rewrite.is_some() {
+        } else if let Some(ref rewrites) = self.pending_rewrite {
             // We have pending rewrites, build equality proof
-            if let Some(ref rewrites) = self.pending_rewrite {
-                self.build_equality_proof(rewrites)
-            } else {
-                Term::app(Term::const_("sorry"), final_goal.clone())
-            }
+            self.build_equality_proof(rewrites)
         } else {
-            // Default to sorry
-            Term::app(Term::const_("sorry"), final_goal.clone())
+            // No proof strategy matched - this is an error in strict mode
+            return Err("No proof could be generated from tactics".to_string());
         };
 
         // Wrap with lambda abstractions (intro statements) FIRST
@@ -225,18 +227,14 @@ impl<'env> ProofTermGenerator<'env> {
                 } else {
                     ty.clone()
                 };
-                // If proof is "sorry", apply it to the type to get the right type
-                let actual_proof = if let Term::Const(proof_name) = proof.as_ref() {
+                // In strict mode, reject sorry proofs
+                if let Term::Const(proof_name) = proof.as_ref() {
                     if proof_name == "sorry" {
-                        Term::app(proof.clone(), actual_ty.clone())
-                    } else {
-                        proof.clone()
+                        return Err("'have' cannot use 'sorry' as proof in strict mode".to_string());
                     }
-                } else {
-                    proof.clone()
-                };
-                self.let_bindings.push((name.clone(), actual_ty.clone(), actual_proof.clone()));
-                self.ctx.push(LocalDecl::with_value(name.clone(), actual_ty.clone(), actual_proof));
+                }
+                self.let_bindings.push((name.clone(), actual_ty.clone(), proof.clone()));
+                self.ctx.push(LocalDecl::with_value(name.clone(), actual_ty.clone(), proof.clone()));
                 Ok(())
             }
             ParsedTactic::Calc(steps) => {
@@ -260,10 +258,6 @@ impl<'env> ProofTermGenerator<'env> {
                 if !terms.is_empty() {
                     self.pending_rewrite = Some(terms.clone());
                 }
-                Ok(())
-            }
-            ParsedTactic::Sorry => {
-                // Sorry placeholder
                 Ok(())
             }
             ParsedTactic::Rfl => {
@@ -368,9 +362,9 @@ impl<'env> ProofTermGenerator<'env> {
 
     /// Build proof term from calc state
     /// Handles underscore resolution and builds Eq.trans chain
-    fn build_calc_proof(&self, calc_state: &CalcState) -> Rc<Term> {
+    fn build_calc_proof(&self, calc_state: &CalcState) -> Result<Rc<Term>, String> {
         if calc_state.lhs_exprs.is_empty() {
-            return Term::const_("sorry");
+            return Err("Calc block has no steps".to_string());
         }
 
         // Resolve underscores and build the actual expression chain
@@ -426,7 +420,7 @@ impl<'env> ProofTermGenerator<'env> {
             };
         }
 
-        combined_proof.unwrap_or_else(|| Term::const_("sorry"))
+        combined_proof.ok_or_else(|| "Failed to build calc proof".to_string())
     }
 }
 

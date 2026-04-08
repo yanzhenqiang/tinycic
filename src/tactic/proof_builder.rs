@@ -31,8 +31,6 @@ pub enum ParsedTactic {
     Calc(Vec<CalcStep>),
     /// rw [rules] - rewrite (simplified)
     Rw(Vec<Rc<Term>>),
-    /// sorry - placeholder
-    Sorry,
     /// rfl - reflexivity
     Rfl,
     /// cases h with | inl h1 => ... | inr h2 => ...
@@ -82,7 +80,6 @@ impl ProofBuilder {
                 ParsedTactic::Exact(_) |
                 ParsedTactic::Calc(_) |
                 ParsedTactic::Rw(_) |
-                ParsedTactic::Sorry |
                 ParsedTactic::Cases(_, _) => {}
             }
         }
@@ -93,9 +90,16 @@ impl ProofBuilder {
             return Term::app(Term::const_("Eq.refl"), goal.clone());
         }
 
-        // For now, return sorry applied to goal
-        // A full implementation would build the actual proof term
-        Term::app(Term::const_("sorry"), goal.clone())
+        // Handle exact tactic: return the provided proof term
+        // This ensures type checking validates the proof term against the goal
+        if let Some(ParsedTactic::Exact(term)) = tactics.last() {
+            // Return the exact proof term - type checker will verify it matches the goal
+            return term.clone();
+        }
+
+        // For tactics that don't generate a proof term yet, panic in strict mode
+        // This should not happen if the tactic parser and proof generator are complete
+        panic!("Failed to generate proof term for goal: {:?}. Tactics provided could not construct a valid proof.", goal)
     }
 
     /// Convert a name to a DeBruijn variable if it's in context
@@ -189,7 +193,7 @@ fn parse_tactic_script_impl(script: &str, strict: bool) -> Result<Vec<ParsedTact
                 tactics.push(tactic);
             } else if strict {
                 // In strict mode, unknown tactics cause an error
-                return Err(format!("Unknown tactic: '{}' at line {}. Only intro, use, exact, apply, have, obtain, sorry, calc, rw, cases are supported.", line, i + 1));
+                return Err(format!("Unknown tactic: '{}' at line {}. Only intro, use, exact, apply, have, obtain, calc, rw, cases are supported.", line, i + 1));
             }
             i += 1;
         }
@@ -211,7 +215,7 @@ fn is_tactic_line(line: &str) -> bool {
     }
 
     matches!(parts[0],
-        "intro" | "use" | "exact" | "apply" | "have" | "obtain" | "sorry" | "calc" | "rw" | "cases"
+        "intro" | "use" | "exact" | "apply" | "have" | "obtain" | "calc" | "rw" | "cases"
     )
 }
 
@@ -338,16 +342,12 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
                     let type_str = after_colon[..assign_pos].trim();
                     // Parse the type as a term
                     let ty = parse_simple_term(type_str);
-                    // Proof will be generated from subsequent tactics
-                    Some(ParsedTactic::Have(name, ty, Term::const_("sorry")))
+                    // Proof should be generated from subsequent tactics
+                    // In strict mode, have without inline proof is not supported
+                    panic!("'have' without inline proof (:= ...) is not yet supported in strict mode")
                 } else {
-                    // No := found, use placeholder
-                    let name = parts[1]
-                        .trim_end_matches(':')
-                        .trim_start_matches('(')
-                        .trim_end_matches(')')
-                        .to_string();
-                    Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("sorry")))
+                    // No := found, not supported in strict mode
+                    panic!("'have' without inline proof (:= ...) is not yet supported in strict mode")
                 }
             } else {
                 None
@@ -385,7 +385,9 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
                             .to_string())
                         .unwrap_or_else(|| "_".to_string())
                 };
-                Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("sorry")))
+                // Proof should come from subsequent tactics
+                // In strict mode, obtain without inline proof is not supported
+                panic!("'obtain' without inline proof (:= ...) is not yet supported in strict mode")
             } else {
                 None
             }
@@ -402,7 +404,6 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
                 Some(ParsedTactic::Rw(vec![]))
             }
         }
-        "sorry" => Some(ParsedTactic::Sorry),
         "rfl" => Some(ParsedTactic::Rfl),
         _ => None,
     }

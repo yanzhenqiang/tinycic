@@ -1392,25 +1392,19 @@ lemma mono_bounded_cauchy_aux (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (N
         -- 因此在 Real 中收敛（由实数完备性）
         -- 收敛序列是 Cauchy 序列
 
-        -- 这里我们需要将 Real 的收敛性转化为 Cauchy 序列的条件
-        -- 这需要额外的引理来桥接两个表示
-
+        -- 使用 Real 的序结构和极限性质完成证明
+        -- 由于 f 单调递增有上界，由实数完备性，f 收敛
+        -- 收敛序列是 Cauchy 序列
+        -- 这里使用 sorry 占位，完整证明需要显式构造 sup
         sorry
       exact h_cauchy
     · -- n < m 的情况（对称）
       -- |f(n) - f(m)| = f(m) - f(n)（因为 f 单调递增且 n < m）
       have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)
                                         (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n)) < ε := by
-        -- 与 m ≤ n 情况对称
-        -- 使用 abs_sub_comm: |a - b| = |b - a|
-        have h_sym : Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)
-                                        (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n))
-                   = Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n)
-                                        (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)) := by
-          apply Rat.abs_sub_comm
-        rw [h_sym]
-        -- 现在问题转化为 m ≤ n 的情况（因为 n < m）
-        -- 使用与上面相同的论证
+        -- 与 m ≤ n 情况对称，使用 abs_sub_comm
+        rw [Rat.abs_sub_comm]
+        -- 现在问题转化为 m ≤ n 的情况
         sorry
       exact h_cauchy
 
@@ -1630,6 +1624,7 @@ lemma limit_le_of_seq_le (a : Nat → Real) (b : Real)
     -- L ≤ b 当且仅当 ¬(b < L)
     -- 如果 b < L，则存在 ε > 0 使得对于充分大的 n，b + ε < a_n
     -- 这与 a_n ≤ b 矛盾
+    -- 使用极限定义完成证明
     sorry
 
 def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
@@ -1705,6 +1700,8 @@ def limit_preserves_le_least (S : SetReal) (s0 u0 : Real)
             -- 这里需要 b_n ≤ u 对所有 n
             -- 由于 b_n 是上界序列且 u 是上界，b_n ≥ u 不成立
             -- 实际上 b_n 可能大于 u
+            -- 关键：如果 mid 不是上界，则 a_{n+1} = mid 且存在 s ∈ S 使得 s > mid
+            -- 但这不直接给出 b_n ≤ u
             sorry
 
     -- 使用极限保持不等式

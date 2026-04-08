@@ -119,7 +119,15 @@ impl<'a> Parser<'a> {
     }
 
     fn advance(&mut self) {
+        let old_pos = self.lexer.position();
         self.current = self.lexer.next_token();
+        let new_pos = self.lexer.position();
+        eprintln!("DEBUG advance: {} -> {}, token={:?}", old_pos, new_pos, self.current);
+    }
+
+    /// Get current position in input
+    pub fn position(&self) -> usize {
+        self.lexer.position()
     }
 
     /// Replace constants with De Bruijn indices based on a parameter stack
@@ -812,6 +820,8 @@ impl<'a> Parser<'a> {
             return Err(ParseError::ExpectedKeyword(":=".to_string()));
         }
         self.advance();
+        
+        eprintln!("DEBUG parse_theorem after advance: remaining={:?}", self.lexer.remaining_input());
 
         // Parse proof with the statement as the goal type and params as initial bindings
         let proof = self.parse_proof(Some(statement.clone()), Some(params))?;
@@ -1178,9 +1188,14 @@ impl<'a> Parser<'a> {
 
     fn parse_proof(&mut self, goal_type: Option<Rc<Term>>, params: Option<Vec<(Name, Rc<Term>)>>) -> Result<Rc<Term>, ParseError> {
         // Expect 'by' keyword
+        eprintln!("DEBUG parse_proof: current token={:?}, remaining={:?}", self.current, self.lexer.remaining_input());
+        let remaining_debug = self.lexer.remaining_input();
+        if remaining_debug.contains("cases ") {
+            }
         match &self.current {
             Token::By => {
-                self.advance();
+                // Don't advance here - we want to collect the remaining content
+                // including any tokens that next_token() might have looked ahead
             }
             _ => {
                 // No 'by' block, try to parse a simple term
@@ -1190,7 +1205,13 @@ impl<'a> Parser<'a> {
 
         // Collect the remaining input as raw string and use parse_tactic_script
         // This is more reliable than token-by-token collection for multi-line structures
-        let script = self.collect_remaining_as_script();
+        let remaining = self.lexer.remaining_input();
+        let (script, bytes_to_advance) = self.collect_remaining_as_script();
+        
+        // Advance lexer past the collected script
+        self.lexer.skip_bytes(bytes_to_advance);
+        // Sync parser state with lexer
+        self.current = self.lexer.next_token();
 
         // Build proof from tactic script
         if script.trim().is_empty() {
@@ -1353,14 +1374,15 @@ impl<'a> Parser<'a> {
     }
 
     /// Collect remaining input as script until block end
-    /// This uses the lexer's remaining input for reliable multi-line parsing
-    fn collect_remaining_as_script(&mut self) -> String {
+    /// Returns (script, byte_count) where byte_count is the number of bytes to advance
+    fn collect_remaining_as_script(&mut self) -> (String, usize) {
         // Get remaining input from lexer - copy to avoid borrow issues
         let remaining: String = self.lexer.remaining_input().to_string();
 
         // Split into lines and collect until we hit a block-ending keyword
         let lines: Vec<&str> = remaining.lines().collect();
         let mut script_lines = Vec::new();
+        let mut byte_count = 0;
 
         for line in lines {
             let trimmed = line.trim();
@@ -1381,20 +1403,11 @@ impl<'a> Parser<'a> {
             if !trimmed.is_empty() && !trimmed.starts_with("--") && !trimmed.starts_with("//") {
                 script_lines.push(line);
             }
+            byte_count += line.len() + 1; // +1 for newline (lines() strips it)
         }
 
-        // Calculate total characters to skip (including newlines)
-        let total_chars: usize = script_lines.iter().map(|l| l.len() + 1).sum();
-
-        // Advance parser to end of collected script
-        for _ in 0..total_chars {
-            if self.current == Token::Eof {
-                break;
-            }
-            self.advance();
-        }
-
-        script_lines.join("\n")
+        (script_lines.join("
+"), byte_count)
     }
 
     /// Skip arguments of a tactic until we reach the end of the tactic

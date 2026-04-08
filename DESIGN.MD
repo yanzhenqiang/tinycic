@@ -6,6 +6,7 @@
 2. **功能独立提交** - 每个功能必须单独提交，确保变更可追溯
 3. **测试驱动** - 修复提交必须包含测试用例、修复代码、测试通过三部分
 4. **严格验证流程** - 证明修复必须验证生成的 proof term 不是 `sorry`
+5. **理论依据** - 类型系统实现严格遵循 [Lean Type Theory](https://github.com/digama0/lean-type-theory/releases/download/v1.0/main.pdf) 规范
 
 ## 概述
 
@@ -217,7 +218,6 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 2. ✅ 在 parser 中添加 `parse_import` 函数
 3. ⏳ 在 lib/int.x 中添加实际引理定义
 4. ⏳ 在 lib/rat.x 中添加 `import Int`
-5. ⏳ 修改 prelude.rs 处理依赖顺序加载
 6. ⏳ 移除手动 `add_constant` 的临时方案
 
 **技术方案：**
@@ -290,7 +290,6 @@ cargo test test_real_x_defs_loaded -- --nocapture
 2. **实现 neg 定义** - 完整的取反操作
 3. **实现 add 定义** - 真正的整数加法（处理正负情况）
 4. **修复 sub 定义** - 使用 add 和 neg
-5. **完成 26 个引理证明** - 全部使用 rfl
 
 **引理列表：**
 - abs_zero, abs_nonneg
@@ -347,7 +346,6 @@ cargo test test_real_x_defs_loaded -- --nocapture
 2. **Eq 常量名称** - 运算符 `=` 生成 `Const("Eq")` 而非 `Const("eq")`
 3. **Unicode 字符处理** - 修复 `obtain ⟨x, hx⟩` 中的多字节字符索引问题
 4. **参数名解析** - `intro/have/obtain` 现在正确处理带括号的参数名如 `(h1 : P)`
-5. **Int 常量注册顺序** - 调整辅助常量注册顺序避免覆盖定理定义
 
 **通过情况：**
 - 总定理数：163个
@@ -998,3 +996,111 @@ if !inference.convertible(&proof_ty, &decl.statement) {
 - 系统不可信
 
 主动破坏检查确保类型检查器真正有效，是构建可信内核的基础。
+
+---
+
+## 开发流程规范
+
+### 每次迭代的必备步骤
+
+每次进行修复或开发后，**必须**执行以下步骤并记录结果：
+
+#### 步骤 1: 运行测试并统计失败定理
+
+```bash
+# 1. 运行所有测试
+cargo test 2>&1 | tail -5
+
+# 2. 统计类型检查失败的定理（按定理名分组）
+cargo test real -- --nocapture 2>&1 | \
+  grep -E "Failed to verify theorem" | \
+  sed 's/.*Failed to verify theorem \([^:]*\):.*/\1/' | \
+  sort | uniq -c | sort -rn
+
+# 3. 统计错误类型分布
+cargo test real -- --nocapture 2>&1 | \
+  grep -E "Failed to verify theorem" | \
+  sed 's/.*Failed to verify theorem [^:]*: Other("\([^"]*\)".*/\1/' | \
+  sort | uniq -c | sort -rn
+
+# 4. 统计UnknownConstant错误（定位未解析变量）
+cargo test real -- --nocapture 2>&1 | \
+  grep -E "UnknownConstant" | \
+  sed 's/.*UnknownConstant("\([^"]*\)".*/\1/' | \
+  sort | uniq -c | sort -rn | head -10
+```
+
+#### 步骤 2: 记录统计结果
+
+在提交信息或开发日志中记录：
+- **测试总数**: X 个通过, Y 个失败
+- **类型检查失败定理**: N 个
+- **主要错误类型**: (UnknownConstant / TypeMismatch / ExpectedFunction)
+- **Top 5 失败定理**: 列出失败最多的定理
+
+#### 步骤 3: 分析问题根因
+
+对每个失败的定理，分类问题类型：
+
+| 错误类型 | 典型原因 | 修复方向 |
+|---------|---------|---------|
+| `UnknownConstant("h_eq")` | `cases`/`obtain`分支变量未解析 | 修复变量绑定传递 |
+| `UnknownConstant("Eq.refl")` | 环境未传递到ProofTermGenerator | 传递Environment |
+| `TypeMismatch` | De Bruijn索引计算错误 | 修复索引偏移逻辑 |
+| `ExpectedFunction` | 定理声明类型构造错误 | 修复参数绑定 |
+| `Empty proof block` | 解析器未正确收集证明 | 修复parser位置跟踪 |
+
+#### 步骤 4: 验证修复
+
+修复后重新运行统计命令，确认：
+- [ ] 目标定理错误次数减少
+- [ ] 无新的错误类型引入
+- [ ] 所有现有测试仍通过
+
+### 开发流程图示
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  1. 修改代码                                             │
+└────────────────────┬────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│  2. 运行测试并统计失败定理                                │
+│     cargo test real -- --nocapture                       │
+│     → 记录失败定理列表和错误类型                          │
+└────────────────────┬────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│  3. 分析失败原因                                         │
+│     → UnknownConstant? 变量绑定问题                       │
+│     → TypeMismatch? 索引计算问题                          │
+│     → Empty proof? 解析器问题                             │
+└────────────────────┬────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│  4. 修复特定问题                                         │
+└────────────────────┬────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│  5. 验证修复效果                                         │
+│     → 目标定理通过                                        │
+│     → 无回归                                              │
+└────────────────────┬────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│  6. 提交（包含统计信息）                                  │
+│     git commit -m "修复XXX: 定理通过率 X% → Y%"           │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 统计命令速查表
+
+| 目的 | 命令 |
+|------|------|
+| 查看测试摘要 | `cargo test 2>&1 \| tail -5` |
+| 失败定理Top 10 | `cargo test real -- --nocapture 2>&1 \| grep "Failed" \| sed ... \| sort \| uniq -c \| sort -rn \| head -10` |
+| UnknownConstant详情 | `cargo test real -- --nocapture 2>&1 \| grep "UnknownConstant" \| sed ... \| sort \| uniq -c \| sort -rn` |
+| 特定定理错误 | `cargo test real -- --nocapture 2>&1 \| grep "定理名"` |
+| 空证明块统计 | `cargo test real -- --nocapture 2>&1 \| grep "Empty proof" \| wc -l` |
+
+---

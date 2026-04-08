@@ -2500,12 +2500,10 @@ theorem cauchy_add (s1 s2 : CauchySeq) (h1 : CauchySeq.isCauchy s1) (h2 : Cauchy
     let ε_half := Rat.div ε (Rat.ofNat (Nat.succ (Nat.succ Nat.zero)))
 
     -- 由 h1，存在 N1 使得对于 m,n ≥ N1，|s1(m) - s1(n)| < ε/2
-    have h1' := h1 ε_half (Rat.div_pos hε (Rat.ofNat_pos (Nat.succ (Nat.succ Nat.zero))))
-    obtain ⟨N1, hN1⟩ := h1'
+    obtain ⟨N1, hN1⟩ := h1 ε_half (Rat.div_pos hε (Rat.ofNat_pos (Nat.succ (Nat.succ Nat.zero))))
 
     -- 由 h2，存在 N2 使得对于 m,n ≥ N2，|s2(m) - s2(n)| < ε/2
-    have h2' := h2 ε_half (Rat.div_pos hε (Rat.ofNat_pos (Nat.succ (Nat.succ Nat.zero))))
-    obtain ⟨N2, hN2⟩ := h2'
+    obtain ⟨N2, hN2⟩ := h2 ε_half (Rat.div_pos hε (Rat.ofNat_pos (Nat.succ (Nat.succ Nat.zero))))
 
     -- 取 N = max(N1, N2)
     let N := Nat.max N1 N2

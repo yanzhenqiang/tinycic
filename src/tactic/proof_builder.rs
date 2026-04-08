@@ -34,8 +34,9 @@ pub enum ParsedTactic {
     /// rfl - reflexivity
     Rfl,
     /// cases h with | inl h1 => ... | inr h2 => ...
-    /// For Or elimination: cases (name, vec of (constructor_name, tactics))
-    Cases(Name, Vec<(String, Vec<ParsedTactic>)>),
+    /// For Or elimination: cases (var_name, vec of (constructor_name, branch_var, tactics))
+    /// branch_var is the pattern variable introduced in this branch (e.g., h1 in "inl h1 =>")
+    Cases(Name, Vec<(String, Option<Name>, Vec<ParsedTactic>)>),
 }
 
 /// Builds proof terms from tactics
@@ -391,10 +392,10 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
                             .to_string())
                         .unwrap_or_else(|| "_".to_string())
                 };
-                // Proof should come from subsequent tactics
-                // This is allowed - obtain destructures existential quantifiers
-                // and subsequent tactics complete the proof
-                Some(ParsedTactic::Have(name, Term::const_("_"), Term::const_("_")))
+                // Extract proof expression after :=
+                let proof_str = line[assign_pos + 2..].trim();
+                let proof = parse_simple_term(proof_str);
+                Some(ParsedTactic::Have(name, Term::const_("_"), proof))
             } else {
                 None
             }
@@ -420,7 +421,6 @@ fn parse_tactic_line(line: &str) -> Option<ParsedTactic> {
 /// Returns Cases(name, vec of (constructor_name, branch_tactics))
 fn parse_cases_block(lines: &[&str], i: &mut usize) -> Option<ParsedTactic> {
     let line = lines[*i].trim();
-
     // Parse: "cases h with" or "cases h"
     let parts: Vec<&str> = line.split_whitespace().collect();
     if parts.len() < 2 {
@@ -436,7 +436,7 @@ fn parse_cases_block(lines: &[&str], i: &mut usize) -> Option<ParsedTactic> {
     }
 
     // Collect branches
-    let mut branches: Vec<(String, Vec<ParsedTactic>)> = Vec::new();
+    let mut branches: Vec<(String, Option<Name>, Vec<ParsedTactic>)> = Vec::new();
 
     while branch_start < lines.len() {
         let branch_line = lines[branch_start].trim();
@@ -460,12 +460,16 @@ fn parse_cases_block(lines: &[&str], i: &mut usize) -> Option<ParsedTactic> {
                 &branch_line["·".len()..]
             };
 
-            // Extract constructor name (e.g., "inl h1 =>" or just "inl")
+            // Extract constructor name and branch variable
+            // Format: "inl h1 =>" or "inl =>" or just "inl"
             let ctor_part = without_marker.split("=>").next().unwrap_or(without_marker).trim();
-            let ctor_name = ctor_part.split_whitespace().next().unwrap_or("_").to_string();
-
+            let ctor_tokens: Vec<&str> = ctor_part.split_whitespace().collect();
+            let ctor_name = ctor_tokens.get(0).unwrap_or(&"_").to_string();
+            
+            // Extract branch variable (e.g., h1 in "inl h1 =>")
+            let branch_var = ctor_tokens.get(1).map(|s| s.to_string());
             // Collect tactics for this branch until next branch or end
-            let mut branch_tactics = Vec::new();
+            let mut branch_tactics: Vec<ParsedTactic> = Vec::new();
             branch_start += 1;
 
             while branch_start < lines.len() {
@@ -492,7 +496,7 @@ fn parse_cases_block(lines: &[&str], i: &mut usize) -> Option<ParsedTactic> {
                 branch_start += 1;
             }
 
-            branches.push((ctor_name, branch_tactics));
+            branches.push((ctor_name, branch_var, branch_tactics));
         } else if is_tactic_line(branch_line) {
             // This is a new top-level tactic, stop collecting branches
             break;

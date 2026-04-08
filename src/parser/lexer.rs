@@ -196,6 +196,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_whitespace(&mut self) {
+        let start_pos = self.pos;
         while self.pos < self.input.len() {
             let c = self.current_char();
             if c.is_whitespace() {
@@ -213,6 +214,9 @@ impl<'a> Lexer<'a> {
             } else {
                 break;
             }
+        }
+        if self.pos - start_pos > 100 {
+            eprintln!("DEBUG skip_whitespace skipped {} chars from {}", self.pos - start_pos, start_pos);
         }
     }
 
@@ -267,6 +271,11 @@ impl<'a> Lexer<'a> {
     /// Get the current position
     pub fn position(&self) -> usize {
         self.pos
+    }
+
+    /// Skip forward by n bytes
+    pub fn skip_bytes(&mut self, n: usize) {
+        self.pos = (self.pos + n).min(self.input.len());
     }
 }
 

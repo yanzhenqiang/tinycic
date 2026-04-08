@@ -338,7 +338,13 @@ pub fn load_theorem_from_file(env: &mut Environment, path: &str, namespace: &str
                     let processor = TheoremProcessor::new();
                     match processor.register(env, &namespaced_decl) {
                         Ok(_) => {
-                            if namespaced_decl.proof.as_ref().map_or(false, |p| crate::strict_verification::contains_sorry(p)) { eprintln!("⚠ Warning: Theorem {} proof contains sorry!", full_name); } else { println!("✓ Verified theorem: {}", full_name); }
+                            if namespaced_decl.proof.as_ref().map_or(false, |p| crate::strict_verification::contains_sorry(p)) {
+                                eprintln!("⚠ Warning: Theorem {} proof contains sorry!", full_name);
+                            } else if namespaced_decl.proof.as_ref().map_or(false, |p| crate::strict_verification::contains_true_placeholder(p)) {
+                                eprintln!("⚠ Warning: Theorem {} proof contains True placeholder!", full_name);
+                            } else {
+                                println!("✓ Verified theorem: {}", full_name);
+                            }
                         }
                         Err(e) => {
                             eprintln!("✗ Failed to verify theorem {}: {:?}", full_name, e);

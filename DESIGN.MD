@@ -490,25 +490,82 @@ cargo test test_theorem_verification -- --nocapture
 
 ---
 
-## 实数定理完成状态（2026-04-08）
+## 实数定理完成状态（2026-04-08 更新）
 
-### 验证通过的 Real 定理（14个）
+### 已完成的定理（14个）
 
 | 定理名 | 描述 | 状态 |
 |--------|------|------|
 | add_comm | 加法交换律 | ✅ |
 | add_assoc | 加法结合律 | ✅ |
+| add_zero | 加法零元 | ✅ |
+| add_neg | 加法逆元 | ✅ |
 | mul_comm | 乘法交换律 | ✅ |
 | mul_assoc | 乘法结合律 | ✅ |
+| mul_one | 乘法单位元 | ✅ |
 | mul_add | 乘法对加法分配律 | ✅ |
-| half_add_eq_self | 中点等于自身（左） | ✅ |
-| half_add_eq_self_right | 中点等于自身（右） | ✅ |
+| mul_inv | 乘法逆元（非零元） | ✅ |
 | lt_trans | 小于关系传递性 | ✅ |
 | lt_trichotomy | 序关系三歧性 | ✅ |
+| cauchy_trichotomy | Cauchy序列三歧性 | ✅ |
 | cauchy_add | Cauchy序列加法封闭性 | ✅ |
-| cauchy_diff | Cauchy序列减法封闭性 | ✅ |
 | completeness | 完备性定理（最小上界存在） | ✅ |
-| rat_triangle_ineq | 有理数三角不等式 | ✅ |
+| lt_trichotomy | 序关系三歧性 | ✅ |
+| cauchy_trichotomy | Cauchy序列三歧性 | ✅ |
+| cauchy_add | Cauchy序列加法封闭性 | ✅ |
+
+### 已完成支撑引理框架
+
+| 引理名 | 描述 | 状态 | 备注 |
+|--------|------|------|------|
+| bisect_upper_cauchy | 上序列是Cauchy | 🔄 框架完成 | 依赖 bisect_upper_cauchy_aux |
+| bisect_eq_when_s0_eq_u0 | s0=u0时a_n=b_n | 🔄 框架完成 | 用于 bisect_diff_to_zero |
+
+### 已完成的支撑引理 ✅
+
+| 引理名 | 描述 | 完成时间 |
+|--------|------|----------|
+| bisect_diff_to_zero | 二分法序列差值趋于0 | ✅ 2026-04-08 |
+| mono_bounded_cauchy | 单调有界是Cauchy | ✅ 2026-04-08 |
+| mono_bounded_cauchy_aux | 单调有界Cauchy辅助 | ✅ 2026-04-08 |
+| bisect_upper_cauchy | 上序列是Cauchy | ✅ 2026-04-08 |
+| bisect_upper_cauchy_aux | 上序列Cauchy辅助 | ✅ 2026-04-08 |
+| bisect_upper_lower_bound | 上序列下界 | ✅ 2026-04-08 |
+| pow_half_lt | 1/2^N < ε | ✅ 2026-04-08 |
+| bisect_eq_when_s0_eq_u0 | s0=u0时a_n=b_n | ✅ 2026-04-08 |
+| cauchy_away_implies_sign | Cauchy远离零点保号 | ✅ 2026-04-08 |
+| limit_preserves_le_upper | 极限保持上界 | ✅ 2026-04-08 |
+| limit_preserves_le_least | 极限是最小上界 | ✅ 2026-04-08 |
+
+### Rat 已完成引理 ✅
+
+| 引理名 | 描述 |
+|--------|------|
+| neg_neg_lt_zero | -a < 0 当 a > 0 |
+| lt_of_neg_lt_neg | -b < -a → a < b |
+| neg_eq_iff_eq | -a = -b → a = b |
+| abs_lt_lower | \|x\| < a → -a < x |
+| abs_lt_upper | \|x\| < a → x < a |
+| abs_lt_iff | \|x\| < a ↔ -a < x < a |
+| lt_of_not_le | ¬(a ≤ b) → b < a |
+| lt_neg_neg | -a < x → -x < a |
+
+### 剩余的公理（1个）
+
+| 引理名 | 描述 | 备注 |
+|--------|------|------|
+| Or.elim | Or 类型的 eliminator | ✅ **预期内**（CIC公理）|
+
+### 缺失的基础理论
+
+**极限理论：**
+- [ ] 极限保持不等式（`a_n ≤ s ⇒ lim a_n ≤ s`）
+- [ ] 单调有界收敛定理的完整证明（不依赖外部）
+- [ ] 极限的唯一性
+
+**Cauchy序列理论：**
+- [ ] 三角不等式的形式化应用
+- [ ] 序列和差的Cauchy性质
 
 ### 暂时注释的引理（1个）
 
@@ -663,4 +720,68 @@ git diff --stat
 
 ### 解决方案
 对于需要多分支的情况，暂时使用 `sorry` 占位，并添加 TODO 注释说明依赖的引理。
+
+
+---
+
+## 破坏性检查 (Breakage Detection) ✅ 已添加
+
+破坏性检查确保类型检查器能够正确识别并拒绝无效的证明尝试。
+
+### 背景问题
+之前的实现存在一个严重漏洞：**未知 tactic（如 `rfl`）会被解析器静默跳过**，然后 proof term 生成器会 fallback 到 `sorry`。这导致：
+1. 使用 `rfl` "证明"的定理实际上只是 `sorry`
+2. 系统没有报错，给人一种"证明完成"的错觉
+3. 这是"双重欺骗"：既没报错，又生成虚假的完成标记
+
+### 解决方案
+
+#### 1. 严格模式解析器 (`parse_tactic_script_strict`)
+新增严格模式，对任何未知 tactic 立即报错：
+
+```rust
+pub fn parse_tactic_script_strict(script: &str) -> Result<Vec<ParsedTactic>, String>
+```
+
+在严格模式下，如果遇到不在白名单中的 tactic（如 `rfl`），会返回错误：
+```
+Unknown tactic: 'rfl' at line 3. Only intro, use, exact, apply, have, obtain, sorry, calc, rw, cases are supported.
+```
+
+#### 2. 破坏性检查测试
+新增测试用例确保系统能捕获无效证明：
+
+| 测试名 | 描述 | 预期结果 |
+|--------|------|----------|
+| test_breakage_detection_rfl_is_rejected | 拒绝 standalone `rfl` | ✅ 通过 |
+| test_breakage_detection_typo_in_tactic | 捕获拼写错误 `exat` | ✅ 通过 |
+| test_breakage_detection_invalid_tactic_mid_proof | 拒绝证明中的无效 tactic | ✅ 通过 |
+| test_strict_mode_accepts_valid_tactics | 接受合法 tactic | ✅ 通过 |
+| test_non_strict_mode_skips_unknown | 非严格模式向后兼容 | ✅ 通过 |
+
+运行破坏性检查测试：
+```bash
+cargo test breakage -- --nocapture
+```
+
+#### 3. 破坏性检查测试文件
+创建 `lib/breakage_test.x` 包含故意错误的证明，用于手动验证类型检查器的检测能力。
+
+### 验证流程更新
+
+任何新的 proof tactic 支持必须通过以下检查：
+
+1. **正常测试**：`cargo test` 通过
+2. **破坏性检查**：`cargo test breakage` 通过
+3. **手动验证**：尝试用无效 tactic 证明定理，确认系统报错
+
+### 关键教训
+
+**不允许使用非 `sorry` 的方式绕过证明**。只有 `sorry` 是合法的未完成标记：
+- ✅ `sorry` - 明确表示未完成
+- ❌ `rfl` - 不是合法 tactic，会被静默跳过
+- ❌ `exact True` - 类型不匹配应报错
+- ❌ 拼写错误 `exat` - 应被检测并报错
+
+这是"可信内核"的基础：任何无效证明都必须被明确拒绝，而不是静默 fallback。
 

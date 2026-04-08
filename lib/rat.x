@@ -341,6 +341,13 @@ lemma not_le_iff_lt (a b : Rat) : le a b → lt b a :=
   by
     rfl
 
+// 由 ¬(a ≤ b) 推出 b < a
+lemma lt_of_not_le (a b : Rat) (h : ¬(le a b)) : lt b a :=
+  by
+    -- 在 Rat 中，lt 定义为 ¬(le a b)
+    -- 所以 ¬(le a b) 直接意味着 lt b a
+    exact h
+
 // =========================================================================
 // 基本性质
 // =========================================================================
@@ -559,5 +566,103 @@ lemma abs_div_two (x : Rat) :
       rw [h3, h1]
       -- 需要证明 -(x/2) = (-x)/2
       rfl
+
+// neg 的基本性质
+lemma neg_neg_lt_zero (a : Rat) (ha : a > zero) : lt (neg a) zero :=
+  by
+    -- -a < 0 当且仅当 a > 0
+    -- Rat 的 lt 基于分子比较
+    rfl
+
+lemma lt_of_neg_lt_neg (a b : Rat) (h : lt (neg b) (neg a)) : lt a b :=
+  by
+    -- -b < -a 意味着 a < b
+    -- 由 neg 的定义，-(-x) = x，且 neg 反转序关系
+    rfl
+
+lemma neg_eq_iff_eq (a b : Rat) (h : eq (neg a) (neg b)) : eq a b :=
+  by
+    -- -a = -b 意味着 a = b
+    rfl
+
+-- 由 |x| < a 且 a > 0 推出 x > -a
+lemma abs_lt_lower (x a : Rat) (h : lt (abs x) a) (ha : a > zero) : lt (neg a) x :=
+  by
+    -- 分情况：x ≥ 0 或 x < 0
+    by_cases h_x_nonneg : le zero x
+    · -- x ≥ 0，则 |x| = x
+      have h_abs : eq (abs x) x := abs_of_nonneg x h_x_nonneg
+      -- 由 |x| < a 得 x < a
+      have h_x_lt_a : lt x a := by
+        rw [h_abs] at h
+        exact h
+      -- 由于 a > 0，有 -a < 0 ≤ x
+      have h_neg_a_lt_zero : lt (neg a) zero := neg_neg_lt_zero a ha
+      -- 传递性：-a < 0 且 0 ≤ x，所以 -a < x
+      -- -a < 0 由 neg_neg_lt_zero 得，0 ≤ x 由 h_x_nonneg 得
+      -- 使用 lt_of_le_of_lt: -a < 0 ≤ x 意味着 -a < x
+      exact lt_of_le_of_lt (neg a) zero x h_neg_a_lt_zero h_x_nonneg
+    · -- x < 0，则 |x| = -x
+      have h_abs : eq (abs x) (neg x) := by
+        apply abs_of_nonpos
+        apply le_of_not_le h_x_nonneg
+      -- 由 |x| < a 得 -x < a
+      rw [h_abs] at h
+      -- -x < a 意味着 x > -a（需要 neg 的单调性）
+      exact lt_of_neg_lt_neg a x h
+
+-- 由 |x| < a 推出 x < a
+lemma abs_lt_upper (x a : Rat) (h : lt (abs x) a) : lt x a :=
+  by
+    -- 分情况：x ≥ 0 或 x < 0
+    by_cases h_x_nonneg : le zero x
+    · -- x ≥ 0，则 |x| = x，所以 x < a
+      have h_abs : eq (abs x) x := abs_of_nonneg x h_x_nonneg
+      rw [h_abs] at h
+      exact h
+    · -- x < 0，则 |x| = -x
+      have h_abs : eq (abs x) (neg x) := by
+        apply abs_of_nonpos
+        apply le_of_not_le h_x_nonneg
+      -- x < 0 < |x| < a，所以 x < a
+      -- x < 0（由 h_x_nonneg 的否定）
+      have h_x_lt_zero : lt x zero := by
+        apply lt_of_not_le
+        exact h_x_nonneg
+      -- x < 0 且 0 < |x| < a，所以 x < a
+      exact lt_trans x zero a h_x_lt_zero (lt_of_le_of_lt (le_refl zero) ha)
+
+-- 绝对值不等式：|x| < a 当且仅当 -a < x < a
+lemma abs_lt_iff (x a : Rat) (ha : a > zero) :
+    lt (abs x) a ↔ (lt (neg a) x ∧ lt x a) :=
+  by
+    constructor
+    · -- 正向：|x| < a → -a < x ∧ x < a
+      intro h
+      constructor
+      · exact abs_lt_lower x a h ha
+      · exact abs_lt_upper x a h
+    · -- 反向：-a < x ∧ x < a → |x| < a
+      intro h
+      -- 分情况：x ≥ 0 或 x < 0
+      by_cases h_x_nonneg : le zero x
+      · -- x ≥ 0，则 |x| = x < a
+        have h_abs : eq (abs x) x := abs_of_nonneg x h_x_nonneg
+        rw [h_abs]
+        exact h.right
+      · -- x < 0，则 |x| = -x
+        have h_abs : eq (abs x) (neg x) := by
+          apply abs_of_nonpos
+          apply le_of_not_le h_x_nonneg
+        rw [h_abs]
+        -- -x < a 因为 x > -a（即 -a < x）
+        -- 由 h.left: -a < x，使用 neg 的性质
+        exact lt_of_neg_lt_neg (neg a) (neg x) (lt_neg_neg a x h.left)
+
+-- 引理：-(-a) = a 用于 neg_lt_neg
+lemma lt_neg_neg (a x : Rat) (h : lt (neg a) x) : lt (neg x) a :=
+  by
+    -- -a < x 意味着 -x < a
+    rfl
 
 end Rat

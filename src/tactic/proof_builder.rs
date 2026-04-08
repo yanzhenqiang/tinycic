@@ -105,7 +105,21 @@ impl Default for ProofBuilder {
 
 /// Parse tactic script into ParsedTactic list
 /// Handles multi-line calc blocks
+///
+/// When `strict` is true, unknown tactic lines will return an error instead of being silently skipped.
+/// This is used for breakage detection tests.
 pub fn parse_tactic_script(script: &str) -> Vec<ParsedTactic> {
+    // Default to non-strict mode for backward compatibility
+    parse_tactic_script_impl(script, false).unwrap_or_else(|_| Vec::new())
+}
+
+/// Parse tactic script with strict mode option
+/// Returns Err if strict mode is enabled and an unknown tactic is encountered
+pub fn parse_tactic_script_strict(script: &str) -> Result<Vec<ParsedTactic>, String> {
+    parse_tactic_script_impl(script, true)
+}
+
+fn parse_tactic_script_impl(script: &str, strict: bool) -> Result<Vec<ParsedTactic>, String> {
     let mut tactics = Vec::new();
     let lines: Vec<&str> = script.lines().collect();
     let mut i = 0;
@@ -139,7 +153,10 @@ pub fn parse_tactic_script(script: &str) -> Vec<ParsedTactic> {
                     // This is a new tactic, not part of calc
                     break;
                 } else {
-                    // Unknown line, skip it
+                    // Unknown line in calc block
+                    if strict && !is_branch_marker(step_line) {
+                        return Err(format!("Unknown calc step or tactic: '{}' at line {}", step_line, i + 1));
+                    }
                     i += 1;
                 }
             }
@@ -156,12 +173,20 @@ pub fn parse_tactic_script(script: &str) -> Vec<ParsedTactic> {
             // Regular tactic line
             if let Some(tactic) = parse_tactic_line(line) {
                 tactics.push(tactic);
+            } else if strict {
+                // In strict mode, unknown tactics cause an error
+                return Err(format!("Unknown tactic: '{}' at line {}. Only intro, use, exact, apply, have, obtain, sorry, calc, rw, cases are supported.", line, i + 1));
             }
             i += 1;
         }
     }
 
-    tactics
+    Ok(tactics)
+}
+
+/// Check if a line is a branch marker (for cases blocks)
+fn is_branch_marker(line: &str) -> bool {
+    line.starts_with('|') || line.starts_with('·')
 }
 
 /// Check if a line is a tactic (not a calc step)
@@ -538,6 +563,89 @@ mod tests {
             _ => panic!("Expected Intro"),
         }
     }
+
+    // ==================== BREAKAGE DETECTION TESTS ====================
+    // These tests verify that invalid/unknown tactics are properly detected
+    // and rejected in strict mode. This prevents "fake proofs" where invalid
+    // tactics (like 'rfl') silently fall back to sorry.
+
+    #[test]
+    fn test_breakage_detection_rfl_is_rejected() {
+        // 'rfl' is NOT a valid tactic in TinyCIC - it should be rejected in strict mode
+        let script = r#"
+            intro x
+            rfl
+            exact x
+        "#;
+
+        let result = parse_tactic_script_strict(script);
+        assert!(result.is_err(), "Strict mode should reject 'rfl' tactic, but it was accepted");
+
+        let error_msg = result.unwrap_err();
+        assert!(error_msg.contains("rfl"), "Error message should mention 'rfl'");
+        assert!(error_msg.contains("Unknown tactic"), "Error should indicate unknown tactic");
+    }
+
+    #[test]
+    fn test_breakage_detection_typo_in_tactic() {
+        // Typo in tactic name should be detected
+        let script = r#"
+            intro x
+            exat x
+        "#;
+
+        let result = parse_tactic_script_strict(script);
+        assert!(result.is_err(), "Strict mode should reject typo 'exat'");
+    }
+
+    #[test]
+    fn test_breakage_detection_invalid_tactic_mid_proof() {
+        // Invalid tactic in the middle of a proof should be detected
+        let script = r#"
+            intro a b
+            have h : Nat
+            invalid_tactic_here
+            exact a
+        "#;
+
+        let result = parse_tactic_script_strict(script);
+        assert!(result.is_err(), "Strict mode should reject 'invalid_tactic_here'");
+    }
+
+    #[test]
+    fn test_strict_mode_accepts_valid_tactics() {
+        // Valid tactics should work in strict mode
+        let script = r#"
+            intro x y
+            have h : Nat := sorry
+            exact x
+            sorry
+            rw [thm1]
+            calc
+            cases h with
+        "#;
+
+        let result = parse_tactic_script_strict(script);
+        assert!(result.is_ok(), "Strict mode should accept valid tactics: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_non_strict_mode_skips_unknown() {
+        // Non-strict mode (default) should silently skip unknown tactics (backward compatibility)
+        let script = r#"
+            intro x
+            rfl
+            exact x
+        "#;
+
+        let tactics = parse_tactic_script(script);
+        // Should have 2 tactics: intro and exact (rfl is silently skipped)
+        assert_eq!(tactics.len(), 2);
+        assert!(matches!(tactics[0], ParsedTactic::Intro(_)));
+        assert!(matches!(tactics[1], ParsedTactic::Exact(_)));
+    }
+
+    // ==================== END BREAKAGE DETECTION TESTS ====================
 
     #[test]
     fn test_parse_use() {

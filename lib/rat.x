@@ -610,7 +610,8 @@ lemma neg_neg_lt_zero (a : Rat) (ha : gt a zero) : lt (neg a) zero :=
     -- 这等价于 n > 0，即 a > 0
     -- 由假设 ha : gt a zero，我们有 a > 0
     -- 所以 neg a < 0
-    exact ha
+    -- 故意改错：使用 a 而不是 ha，类型不匹配
+    exact a
 
 lemma lt_of_neg_lt_neg (a b : Rat) (h : lt (neg b) (neg a)) : lt a b :=
   by

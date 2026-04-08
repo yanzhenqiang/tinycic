@@ -906,3 +906,95 @@ cargo test breakage -- --nocapture
 
 这是"可信内核"的基础：任何无效证明都必须被明确拒绝，而不是静默 fallback。
 
+
+---
+
+## 主动破坏检查 (Active Destruction Check) ✅ 已添加
+
+主动破坏检查是一种验证类型检查器正确性的测试方法：故意编写语义错误的证明，验证系统能否正确识别并拒绝。
+
+### 核心思想
+
+类型检查器的可靠性至关重要。**主动破坏检查**通过故意构造错误的证明来验证：
+1. 类型检查能否捕获类型不匹配
+2. 系统是否接受无效的证明项
+3. 错误信息是否清晰准确
+
+### 检查方法
+
+**示例：故意构造类型不匹配**
+
+```lean
+-- 定理：如果 a > 0，则 -a < 0
+lemma neg_neg_lt_zero (a : Rat) (ha : gt a zero) : lt (neg a) zero :=
+  by
+    -- 正确的证明应该是：exact ha（使用假设 ha: gt a zero）
+    -- 故意改错：使用 a（类型 Rat）而不是 ha（类型 gt a zero）
+    exact a  -- ❌ 类型错误：Rat ≠ Prop
+```
+
+**验证要求：**
+- 系统必须拒绝此证明
+- 报错信息应指出类型不匹配：期望 `Prop`，得到 `Rat`
+- 测试不应通过
+
+### 实施步骤
+
+1. **选择中等复杂度的证明**
+   - 包含多个参数（如 `a : Rat`, `ha : gt a zero`）
+   - 目标是命题（`Prop`）而非类型
+
+2. **故意构造类型错误**
+   - 将 `exact ha` 改为 `exact a`
+   - `a` 的类型是 `Rat`，目标的类型是 `Prop`
+   - 这是明显的类型不匹配
+
+3. **运行测试验证**
+   ```bash
+   cargo test --lib
+   ```
+   - 预期结果：测试失败，显示类型检查错误
+   - 实际结果：测试通过（说明类型检查有问题）
+
+4. **修复类型检查器**
+   - 定位 `TheoremProcessor::process` 中的类型验证逻辑
+   - 确保 `infer(&ctx, &proof_term)` 正确返回证明项类型
+   - 确保 `convertible(&proof_ty, &expected_ty)` 正确比较类型
+
+### 实际案例
+
+**问题发现：**
+在 `lib/rat.x` 中，将 `neg_neg_lt_zero` 的证明从 `exact ha` 改为 `exact a` 后：
+- `cargo test` 仍然通过
+- 没有类型不匹配错误
+- 证明被错误地接受
+
+**根因分析：**
+```rust
+// src/inductive/mod.rs: TheoremProcessor::process
+let proof_ty = inference.infer(&ctx, &proof_term)?;
+if !inference.convertible(&proof_ty, &decl.statement) {
+    return Err(...);
+}
+```
+
+问题可能在于：
+1. `proof_term` 未经 lambda 包装就直接验证
+2. `decl.statement` 是完整的 Pi 类型，而 `proof_ty` 只是 `Rat`
+3. 比较逻辑没有正确处理参数化定理
+
+### 验证清单
+
+- [ ] 故意类型错误的证明被拒绝
+- [ ] 类型不匹配错误信息清晰
+- [ ] 测试在破坏检查后失败
+- [ ] 修复后测试恢复通过
+
+### 关键教训
+
+**类型检查器必须是可靠的。**如果系统接受 `exact a`（`a: Rat`）来证明 `lt (neg a) zero`（`Prop`），那么：
+- 所有数学保证都是虚假的
+- 证明可能是完全错误的
+- 系统不可信
+
+主动破坏检查确保类型检查器真正有效，是构建可信内核的基础。

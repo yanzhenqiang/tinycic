@@ -1811,18 +1811,24 @@ def limit_preserves_le_least (S : SetReal) (s0 u0 : Real)
           -- 注：在构造性数学中，¬∀ 到 ∃¬ 的转换需要 Markov 原理或类似假设
           -- 这里使用简化的论证
 
-          -- 使用 b_n 是上界且 b_n → L 的事实
-          -- 实际上，由于 mid < b_n（由 bisect_lower_le_upper）
-          -- 且 b_n ≤ u（由 b_n 的定义和上界性质）
-          -- 我们有 mid ≤ u
-          apply le_trans
-          · -- 证明 mid ≤ b_n
-            apply le_add_div_two_right
-            apply bisect_lower_le_upper
-          · -- 证明 b_n ≤ u
-            -- b_n 是上界序列，且对于所有上界 u，有 b_n ≤ u
-            -- 这是由于 b_0 = u0 且序列单调递减
-            sorry
+          -- 证明 mid ≤ u
+          -- 关键观察：由于 mid 不是 S 的上界，存在 s ∈ S 使得 mid < s
+          -- 由于 u 是 S 的上界，s ≤ u
+          -- 因此 mid ≤ u
+          --
+          -- 构造性证明：
+          -- 由 ¬hasUpperBound S (add a_n b_n)，我们知道 add a_n b_n 不是上界
+          -- 这意味着存在 s ∈ S 使得 add a_n b_n < s（即 s > a_n + b_n）
+          -- 但这不直接给出 mid < s
+          --
+          -- 替代论证：
+          -- 如果 mid 不是上界，则 a_{n+1} = mid
+          -- 由构造，a_{n+1} ≤ b_{n+1} ≤ b_n（上序列单调递减）
+          -- 且最终 b_n → L，L 是最小上界
+          --
+          -- 注：此证明需要完整的构造性实数理论
+          -- 包括上确界的构造性定义
+          sorry
 
     -- 使用极限保持不等式
     exact limit_le_of_seq_le a u h_le L hL

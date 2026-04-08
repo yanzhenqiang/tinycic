@@ -476,7 +476,7 @@ cargo test test_theorem_verification -- --nocapture
 - 绝对值性质：abs_zero, abs_nonneg, abs_add, abs_mul 通过
 - 序关系：le_trans, lt_trans, le_refl, le_antisymm 通过
 
-**Real (1/14 通过，13 失败):**
+**Real (14/14 声明类型验证通过，6 sorry 待完成):**
 - 失败原因：calc 块证明生成 Eq.trans 等常量未定义、变量绑定问题、类型不匹配
 - 修复策略：将复杂证明替换为 sorry
 
@@ -527,15 +527,17 @@ cargo test test_theorem_verification -- --nocapture
 |--------|------|----------|
 | bisect_diff_to_zero | 二分法序列差值趋于0 | ✅ 2026-04-08 |
 | mono_bounded_cauchy | 单调有界是Cauchy | ✅ 2026-04-08 |
-| mono_bounded_cauchy_aux | 单调有界Cauchy辅助 | ✅ 2026-04-08 |
+| mono_bounded_cauchy_aux | 单调有界Cauchy辅助 | 🔄 框架完成 (2 sorry) |
 | bisect_upper_cauchy | 上序列是Cauchy | ✅ 2026-04-08 |
 | bisect_upper_cauchy_aux | 上序列Cauchy辅助 | ✅ 2026-04-08 |
 | bisect_upper_lower_bound | 上序列下界 | ✅ 2026-04-08 |
 | pow_half_lt | 1/2^N < ε | ✅ 2026-04-08 |
-| bisect_eq_when_s0_eq_u0 | s0=u0时a_n=b_n | ✅ 2026-04-08 |
+| bisect_eq_when_s0_eq_u0 | s0=u0时a_n=b_n | 🔄 框架完成 (1 sorry) |
 | cauchy_away_implies_sign | Cauchy远离零点保号 | ✅ 2026-04-08 |
-| limit_preserves_le_upper | 极限保持上界 | ✅ 2026-04-08 |
-| limit_preserves_le_least | 极限是最小上界 | ✅ 2026-04-08 |
+| limit_preserves_le_upper | 极限保持上界 | 🔄 框架完成 (1 sorry) |
+| limit_preserves_le_least | 极限是最小上界 | 🔄 框架完成 (2 sorry) |
+| bisect_lower_le_member | 下序列成员关系 | 🔄 引理需修正 (1 sorry) |
+| limit_le_of_seq_le | 极限保持不等式 | 🔄 框架完成 (1 sorry) |
 
 ### Rat 已完成引理 ✅
 

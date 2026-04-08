@@ -431,15 +431,17 @@ mod tests {
 
     #[test]
     fn test_generate_simple_proof() {
+        // In strict mode, empty tactics should fail (no sorry fallback)
         let env = Environment::new();
         let goal = Term::const_("Nat");
         let mut generator = ProofTermGenerator::new(&env, goal);
 
-        let script = "sorry";
+        let script = "";  // Empty script - no proof provided
         let tactics = parse_tactic_script(script);
         let proof = generator.generate(&tactics);
 
-        assert!(proof.is_ok());
+        // Should fail because no proof could be generated
+        assert!(proof.is_err(), "Empty proof should fail in strict mode");
     }
 
     #[test]
@@ -449,14 +451,13 @@ mod tests {
         let goal = Term::pi("n", Term::const_("Nat"), Term::const_("Nat"));
         let mut generator = ProofTermGenerator::new(&env, goal);
 
+        // In strict mode, intro alone is not enough - need exact proof
         let script = "intro n";
         let tactics = parse_tactic_script(script);
         let proof = generator.generate(&tactics);
 
-        assert!(proof.is_ok());
-        let proof_term = proof.unwrap();
-        // Should be λn : Nat, sorry Nat
-        println!("Generated proof: {:?}", proof_term);
+        // Should fail because no complete proof (exact) provided
+        assert!(proof.is_err(), "Incomplete proof should fail in strict mode");
     }
 
     #[test]
@@ -467,14 +468,13 @@ mod tests {
             Term::pi("b", Term::const_("Nat"), Term::const_("Nat")));
         let mut generator = ProofTermGenerator::new(&env, goal);
 
+        // In strict mode, intro alone is not enough - need exact proof
         let script = "intro a b";
         let tactics = parse_tactic_script(script);
         let proof = generator.generate(&tactics);
 
-        assert!(proof.is_ok());
-        let proof_term = proof.unwrap();
-        // Should be λa : Nat, λb : Nat, sorry Nat
-        println!("Generated proof with multiple intros: {:?}", proof_term);
+        // Should fail because no complete proof (exact) provided
+        assert!(proof.is_err(), "Incomplete proof should fail in strict mode");
     }
 
     #[test]
@@ -483,24 +483,21 @@ mod tests {
         let goal = Term::pi("n", Term::const_("Nat"), Term::const_("Nat"));
         let mut generator = ProofTermGenerator::new_without_env(goal);
 
-        // intro n; have h : Nat; sorry
+        // In strict mode, have without inline proof and no exact is not enough
         let script = r#"
             intro n
             have h : Nat
-            sorry
         "#;
         let tactics = parse_tactic_script(script);
         let proof = generator.generate(&tactics);
 
-        assert!(proof.is_ok());
-        let proof_term = proof.unwrap();
-        // Should be λn : Nat, let h : Nat := sorry in sorry
-        println!("Generated proof with have: {:?}", proof_term);
+        // Should fail because no complete proof provided
+        assert!(proof.is_err(), "Incomplete proof with have should fail in strict mode");
     }
 
     #[test]
     fn test_generate_with_calc_and_rw() {
-        // Test a calc block with rw
+        // Test a calc block with rw - incomplete proof should fail in strict mode
         // Goal: (a : Nat) → (b : Nat) → Eq Nat (add a b) (add b a)
         let goal = Term::pi("a", Term::const_("Nat"),
             Term::pi("b", Term::const_("Nat"),
@@ -509,7 +506,7 @@ mod tests {
 
         let mut generator = ProofTermGenerator::new_without_env(goal);
 
-        // intro a b; calc; rw [add_comm]
+        // intro a b; calc; rw [add_comm] - incomplete proof
         let script = r#"
             intro a b
             calc
@@ -518,23 +515,14 @@ mod tests {
         let tactics = parse_tactic_script(script);
         let proof = generator.generate(&tactics);
 
-        assert!(proof.is_ok());
-        let proof_term = proof.unwrap();
-        // Should contain Eq.symm or similar, not just sorry
-        println!("Generated calc/rw proof: {:?}", proof_term);
-
-        // Verify it's a lambda (from intro)
-        match proof_term.as_ref() {
-            Term::Lambda { .. } => {
-                // Good, has lambda from intro
-            }
-            _ => panic!("Expected Lambda from intro, got {:?}", proof_term),
-        }
+        // Should fail because calc/rw without exact is not a complete proof
+        assert!(proof.is_err(), "Incomplete calc proof should fail in strict mode");
     }
 
     #[test]
     fn test_generate_calc_proof_with_underscore() {
         // Test calc proof generation with underscore resolution
+        // calc block with steps should generate a valid proof term
         let goal = Term::const_("Prop");
         let mut generator = ProofTermGenerator::new_without_env(goal);
 
@@ -548,7 +536,8 @@ mod tests {
         let tactics = parse_tactic_script(script);
         let proof = generator.generate(&tactics);
 
-        assert!(proof.is_ok());
+        // calc block with steps generates a valid proof term (Eq.trans chain)
+        assert!(proof.is_ok(), "Calc block should generate valid proof: {:?}", proof.err());
         let proof_term = proof.unwrap();
         println!("Generated calc proof: {:?}", proof_term);
 

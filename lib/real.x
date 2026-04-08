@@ -1059,6 +1059,49 @@ def bisect_sequence_upper (S : SetReal) (s0 u0 : Real)
       let mid := add a b
       if hasUpperBound S mid then mid else b
 
+-- 引理：上序列始终保持为上界（归纳证明）
+lemma bisect_upper_is_upper_bound (S : SetReal) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (n : Nat) :
+    hasUpperBound S (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
+  by
+    induction n with
+    | zero =>
+      -- 基本情况：b_0 = u0 是上界
+      exact hu0
+    | succ n ih =>
+      -- 归纳步骤
+      let a_n := bisect_sequence_lower S s0 u0 hs0 hu0 n
+      let b_n := bisect_sequence_upper S s0 u0 hs0 hu0 n
+      let mid := half (add a_n b_n)
+      simp [bisect_sequence_upper]
+      by_cases h : hasUpperBound S (add a_n b_n)
+      · -- b_{n+1} = mid = (a_n + b_n)/2
+        -- 由于 add a_n b_n 是上界（由 h）
+        -- 需要证明 mid 也是上界
+        --
+        -- 关键观察：如果 add a_n b_n 是上界，则对于所有 s ∈ S，s ≤ add a_n b_n
+        -- 由于 mid = (a_n + b_n)/2，且 a_n ≤ b_n（由下序列≤上序列）
+        -- 我们有 mid ≤ b_n ≤ add a_n b_n（当 a_n ≥ 0 时）
+        --
+        -- 实际上，由于 mid ≤ add a_n b_n（中点小于等于和）
+        -- 且 add a_n b_n 是上界，所以 mid ≤ s 对于某些 s ∈ S 不一定成立
+        --
+        -- 注：此证明需要验证 mid 的序性质
+        -- 在构造性实数中，需要显式证明 mid ≤ add a_n b_n
+        sorry
+      · -- b_{n+1} = b_n
+        -- 由归纳假设，b_n 是上界
+        exact ih
+
+-- 引理：对于任意 s ∈ S，s ≤ 上序列 b_n
+lemma bisect_upper_ge_member (S : SetReal) (s0 u0 : Real)
+    (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (s : Real) (hs : s ∈ S) (n : Nat) :
+    le s (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
+  by
+    have h_ub : hasUpperBound S (bisect_sequence_upper S s0 u0 hs0 hu0 n) :=
+      bisect_upper_is_upper_bound S s0 u0 hs0 hu0 n
+    exact h_ub s hs
+
 -- 引理：下序列单调递增
 lemma bisect_lower_mono (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) :
@@ -1818,6 +1861,21 @@ lemma limit_le_of_seq_le (a : Nat → Real) (b : Real)
     -- 注：此证明需要完整的极限理论形式化
     sorry
 
+-- 辅助引理：如果 b ≤ a_n 对所有 n 成立，且 a_n → L，则 b ≤ L
+-- 这是 limit_le_of_seq_le 的对偶形式
+lemma limit_ge_of_seq_ge (a : Nat → Real) (b : Real)
+    (h_ge : ∀ n, le b (a n))
+    (L : Real) (hL : CauchySeq.isCauchy (CauchySeq.mk (λ n => (a n).rep.seq n))) :
+    le b (Real.mk (CauchySeq.mk (λ n => (a n).rep.seq n)) hL) :=
+  by
+    -- 证明 b ≤ L：
+    -- 由 h_ge，对于所有 n，b ≤ a_n
+    -- 由极限保持不等式（反向），b ≤ L
+    --
+    -- 注：此证明是 limit_le_of_seq_le 的对偶
+    -- 在构造性数学中需要类似的论证
+    sorry
+
 def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (s : Real) (hs : s ∈ S)
     (L : Real) (hL : CauchySeq.isCauchy (CauchySeq.mk (λ n => (bisect_sequence_lower S s0 u0 hs0 hu0 n).rep.seq n))) :
@@ -1857,12 +1915,18 @@ def limit_preserves_le_upper (S : SetReal) (s0 u0 : Real)
     -- 对于任意 s ∈ S，s ≤ b_n 对所有 n 成立
     -- 由 limit_le_of_seq_le（反向），s ≤ L
     --
-    -- 关键引理需要补充：
-    -- lemma bisect_upper_ge_member (S : SetReal) (s0 u0 : Real)
-    --     (hs0 : s0 ∈ S) (hu0 : hasUpperBound S u0) (s : Real) (hs : s ∈ S) (n : Nat) :
-    --     le s (bisect_sequence_upper S s0 u0 hs0 hu0 n)
+    -- 使用引理 bisect_upper_ge_member：对于所有 n，s ≤ b_n
+    have h_s_le_bn : ∀ n, le s (bisect_sequence_upper S s0 u0 hs0 hu0 n) := by
+      intro n
+      exact bisect_upper_ge_member S s0 u0 hs0 hu0 s hs n
+
+    -- 由 limit_ge_of_seq_ge，s ≤ L
+    -- 注：需要证明上序列 b_n 收敛到 L，即构造 Cauchy 序列
+    -- 由 bisect_diff_to_zero，|b_n - a_n| → 0，所以 b_n 也是 Cauchy
+    -- 且与 a_n 有相同极限 L
     --
-    -- 注：此证明需要完整的二分法序列理论
+    -- 简化的构造性论证：
+    -- 由于 ∀ n, s ≤ b_n，且 b_n → L，由极限序保持性，s ≤ L
     sorry
 
 -- 辅助引理：极限是最小上界

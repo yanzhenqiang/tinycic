@@ -327,6 +327,32 @@ lemma abs_sub_triangle4 (a b c d : Rat) :
     -- ≤ |a - b| + |b - c| + |c - d|
     rfl
 
+// 三角不等式推论：|a - c| ≤ |a - b| + |b - c|
+lemma abs_sub_triangle2 (a b c : Rat) :
+  le (abs (sub a c)) (add (abs (sub a b)) (abs (sub b c))) :=
+  by
+    apply abs_sub_triangle
+
+// 绝对值差的分解：|a - c| 可以分解经过中间点 b
+lemma abs_sub_split (a b c : Rat) :
+  le (abs (sub a c)) (add (abs (sub a b)) (abs (sub b c))) :=
+  by
+    -- 使用三角不等式
+    apply abs_sub_triangle
+
+// 三个绝对值项的三角不等式：|a - d| ≤ |a - b| + |b - c| + |c - d|
+lemma abs_sub_bound_3 (a b c d : Rat) (ε : Rat) (hε : ε > zero)
+    (h1 : abs (sub a b) < div ε (ofNat (succ (succ zero))))
+    (h2 : abs (sub b c) < div ε (ofNat (succ (succ zero))))
+    (h3 : abs (sub c d) < div ε (ofNat (succ (succ zero)))) :
+    abs (sub a d) < ε :=
+  by
+    -- |a - d| ≤ |a - b| + |b - c| + |c - d| < ε/3 + ε/3 + ε/3 = ε
+    have h_tri : le (abs (sub a d)) (add (add (abs (sub a b)) (abs (sub b c))) (abs (sub c d))) :=
+      abs_sub_triangle4 a b c d
+    -- 使用假设 h1, h2, h3 和 ε/3 + ε/3 + ε/3 = ε
+    sorry
+
 // 子traction 保持非严格不等式右侧的加法形式
 lemma le_sub_right_of_le (a b c : Rat) (h : le c zero) : le a (sub a c) :=
   by

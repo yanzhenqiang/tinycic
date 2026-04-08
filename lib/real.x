@@ -702,8 +702,26 @@ lemma cauchy_away_implies_sign (d : CauchySeq) (hd : CauchySeq.isCauchy d)
           have h2 : Rat.abs (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) < δ := h_cauchy
           -- 使用 Rat.abs_lt_upper：由 |x| < a 推出 x < a
           have h3 := Rat.abs_lt_upper (Rat.sub (CauchySeq.getSeq d n) (CauchySeq.getSeq d N)) δ h_cauchy
-          -- d(n) - d(N) < δ 意味着 d(n) < d(N) + δ ≤ -ε + δ = -δ
-          sorry  -- 未完成：需要连接不等式链
+          -- d(n) - d(N) < δ 意味着 d(n) < d(N) + δ
+          have h4 : Rat.lt (CauchySeq.getSeq d n) (Rat.add (CauchySeq.getSeq d N) δ) :=
+            Rat.lt_of_sub_lt (CauchySeq.getSeq d n) (CauchySeq.getSeq d N) δ h3
+          -- d(N) ≤ -ε，所以 d(N) + δ ≤ -ε + δ = -ε + ε/2 = -ε/2 = -δ
+          have h5 : Rat.le (Rat.add (CauchySeq.getSeq d N) δ) (Rat.neg δ) := by
+            -- d(N) ≤ -ε = -2δ，所以 d(N) + δ ≤ -2δ + δ = -δ
+            have h6 : Rat.le (CauchySeq.getSeq d N) (Rat.neg (Rat.add δ δ)) := by
+              rw [show Rat.neg (Rat.add δ δ) = Rat.neg ε by rfl]
+              exact h1
+            -- d(N) + δ ≤ -2δ + δ = -δ
+            have h7 : Rat.eq (Rat.add (Rat.neg (Rat.add δ δ)) δ) (Rat.neg δ) := by
+              rw [Rat.neg_add_distrib]
+              rw [Rat.add_assoc]
+              rw [Rat.add_neg]
+              rw [Rat.add_zero]
+            rw [← h7]
+            apply Rat.add_le_add_right
+            exact h6
+          -- 结合：d(n) < d(N) + δ ≤ -δ
+          exact Rat.lt_of_lt_of_le (CauchySeq.getSeq d n) (Rat.add (CauchySeq.getSeq d N) δ) (Rat.neg δ) h4 h5
         exact h_upper
 
 lemma cauchy_sequence_trichotomy (d : CauchySeq) (hd : CauchySeq.isCauchy d) :
@@ -1087,17 +1105,30 @@ lemma pow_half_lt (ε : Rat) (hε : ε > Rat.zero) :
     -- 取这个 N，证明 1/2^N < ε
     use N
 
-    -- 由于 2^N ≥ N+1 > N > 1/ε，所以 1/2^N < ε
-    -- 由 hN: Rat.ofNat N > Rat.inv ε
-    -- 我们需要证明 Rat.div Rat.one (Rat.ofNat (Nat.pow 2 N)) < ε
-    -- 这等价于 Rat.one < Rat.mul ε (Rat.ofNat (Nat.pow 2 N))
-    -- 即 1 < ε * 2^N
-    -- 即 1/ε < 2^N
+    -- 证明 1/2^N < ε
+    -- 这等价于 2^N > 1/ε
 
-    -- 使用关键引理：Rat 的 Archimedean 性质已经给出 N > 1/ε
-    -- 对于充分大的 N，2^N 的增长速度超过 N，所以 2^N > N > 1/ε
-    -- 这里使用 sorry 标记需要进一步证明的不等式链
-    sorry
+    -- 步骤1: 由 pow_two_ge_succ，我们有 2^N ≥ N+1
+    have h1 : Nat.le (Nat.succ N) (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N) :=
+      pow_two_ge_succ N
+
+    -- 步骤2: N+1 > N，所以 2^N > N
+    have h2 : Nat.lt N (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N) :=
+      Nat.lt_of_le_of_lt (Nat.le_succ N) h1
+
+    -- 步骤3: 转换为 Rat 比较
+    -- 2^N > N 意味着 Rat.ofNat (2^N) > Rat.ofNat N
+    have h3 : Rat.lt (Rat.ofNat N) (Rat.ofNat (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N)) :=
+      Rat.ofNat_lt_ofNat N (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N) h2
+
+    -- 步骤4: 由 hN，我们有 Rat.ofNat N > Rat.inv ε
+    -- 所以 Rat.ofNat (2^N) > Rat.inv ε
+    have h4 : Rat.lt (Rat.inv ε) (Rat.ofNat (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N)) :=
+      Rat.lt_trans (Rat.inv ε) (Rat.ofNat N) (Rat.ofNat (Nat.pow (Nat.succ (Nat.succ Nat.zero)) N)) hN h3
+
+    -- 步骤5: 由 Rat.ofNat (2^N) > Rat.inv ε，得到 1/2^N < ε
+    -- 即 Rat.div Rat.one (Rat.ofNat (2^N)) < ε
+    exact Rat.lt_of_inv_lt h4
 
 -- 辅助引理：当 s0 = u0 时，所有 a_n = b_n = s0
 lemma bisect_eq_when_s0_eq_u0 (S : SetReal) (s0 u0 : Real)
@@ -1302,29 +1333,50 @@ lemma mono_bounded_cauchy_aux (f : Nat → Real) (h_mono : ∀ n, le (f n) (f (N
       -- |f(n) - f(m)| = f(n) - f(m)（因为 f 单调递增）
       -- 需要证明 f(n) - f(m) < ε
 
-      -- 关键定理：单调递增有上界序列收敛（实数完备性）
-      -- 因此它也是 Cauchy 序列
-      -- 完整证明需要构造极限 L = sup{f(n) | n ∈ Nat}
-      -- 然后利用收敛性得到 Cauchy 条件
+      -- 关键观察：由于 f 单调递增有上界 M
+      -- 且 m ≤ n，我们有 f(m) ≤ f(n) ≤ M
+      -- 所以 |f(n) - f(m)| = f(n) - f(m)
 
-      -- 对于构造性证明，使用以下思路：
-      -- 由于 f 单调递增有上界，设 L = sup f(n)
-      -- 对于任意 ε > 0，存在 N 使得 L - f(N) < ε
-      -- 则对于所有 m,n ≥ N，|f(n) - f(m)| ≤ L - f(N) < ε
+      -- 使用反证法思路的构造性证明：
+      -- 如果对于无限多个 n，f(n) - f(m) ≥ ε，则序列可以无限增长
+      -- 但由于 f(n) ≤ M，这样的 n 只能有限个
 
-      -- 简化的占位证明（完整证明需要更多关于上确界的引理）
+      -- 由于 f 单调递增，f(n) - f(m) ≥ 0
+      -- 且 f(n) - f(m) ≤ M - f(0)（因为 f(n) ≤ M 且 f(0) ≤ f(m)）
+
+      -- 利用二分法思想：
+      -- 对于 ε > 0，存在 k 使得 M - k*ε < f(0)
+      -- 这意味着最多 k 次 "ε-跳跃"
+
+      -- 简化的构造性证明（基于有限跳跃论证）
       have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)
                                         (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n)) < ε := by
-        -- 使用单调有界序列的 Cauchy 性质
-        -- 这里依赖于实数完备性：单调有界序列必有极限
-        sorry  -- TODO: 需要完整的 sup 构造和收敛性证明
+        -- 利用 f(m) 和 f(n) 的 Cauchy 表示
+        -- 由于 f(m) 和 f(n) 都是 Real，它们由 Cauchy 序列表示
+        -- 我们可以利用这些 Cauchy 序列的性质
+
+        -- 关键：f(n) - f(m) = Real.sub (f n) (f m)
+        -- 由于 f 单调递增且 m ≤ n，f(m) ≤ f(n)
+        -- 所以 |f(n) - f(m)| = f(n) - f(m)
+
+        -- 利用 f(n) 的有界性：f(n) ≤ M
+        -- 和 f(m) 的单调性：f(0) ≤ f(m)
+        -- 所以 f(n) - f(m) ≤ M - f(0)
+
+        -- 对于足够大的 m, n，这个差可以任意小
+        -- （这是单调有界序列的基本性质）
+
+        sorry  -- 需要额外的引理来完成严格证明
       exact h_cauchy
     · -- n < m 的情况（对称）
       -- |f(n) - f(m)| = f(m) - f(n)（因为 f 单调递增且 n < m）
       have h_cauchy : Rat.abs (Rat.sub (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) m)
                                         (CauchySeq.getSeq (CauchySeq.mk (λ n => (f n).rep.seq n)) n)) < ε := by
         -- 与 m ≤ n 情况对称
-        sorry  -- TODO: 对称情况的证明
+        -- 使用 abs_sub_comm: |a - b| = |b - a|
+        rw [Rat.abs_sub_comm]
+        -- 现在可以应用上面的论证（交换 m 和 n 的角色）
+        sorry
       exact h_cauchy
 
 -- 引理：单调有界序列是 Cauchy 序列（实数完备性的体现）

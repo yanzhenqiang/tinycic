@@ -691,4 +691,28 @@ lemma eq_of_sub_eq_zero (x y : Rat) (h : eq (sub x y) zero) : eq x y :=
     rw [add_zero] at h1
     exact h1
 
+-- 引理：Nat 的 < 关系转换为 Rat 的 < 关系
+lemma ofNat_lt_ofNat (n m : Nat) (h : Nat.lt n m) : lt (ofNat n) (ofNat m) :=
+  by
+    -- Nat 的 < 意味着 Rat 的 <
+    sorry
+
+-- 引理：如果 1/ε < a，则 1/a < ε（对于正数）
+lemma lt_of_inv_lt {ε a : Rat} (hε : lt zero ε) (ha : lt zero a)
+    (h : lt (inv ε) a) : lt (div one a) ε :=
+  by
+    -- 由 1/ε < a，乘以 ε 得到 1 < a * ε
+    -- 然后除以 a 得到 1/a < ε
+    sorry
+
+-- 引理：a ≤ b 意味着 a + c ≤ b + c
+lemma add_le_add_right (a b c : Rat) (h : le a b) : le (add a c) (add b c) :=
+  by
+    sorry
+
+-- 引理：-(a + b) = -a + -b（分配律）
+lemma neg_add_distrib (a b : Rat) : eq (neg (add a b)) (add (neg a) (neg b)) :=
+  by
+    sorry
+
 end Rat

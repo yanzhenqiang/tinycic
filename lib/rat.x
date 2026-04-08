@@ -130,6 +130,12 @@ lemma abs_add (a b : Rat) : le (abs (add a b)) (add (abs a) (abs b)) :=
     -- 展开定义，使用 Int 的三角不等式
     rfl
 
+// 绝对值减法交换律：|a - b| = |b - a|
+lemma abs_sub_comm (a b : Rat) : eq (abs (sub a b)) (abs (sub b a)) :=
+  by
+    -- |a - b| = |-(b - a)| = |b - a|
+    rfl
+
 // 绝对值与乘法：|a * b| = |a| * |b|
 lemma abs_mul (a b : Rat) : eq (abs (mul a b)) (mul (abs a) (abs b)) :=
   by

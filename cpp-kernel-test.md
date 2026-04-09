@@ -7,15 +7,15 @@
 - **平台**: Android/Termux (aarch64)
 - **编译器**: Clang 21.1.8
 - **C++标准**: C++20
-- **Lean 4 源码**: `lean4/src/`
+- **Lean 4 源码**: `lean4/src/` (作为 submodule)
 
 ## 编译脚本
 
-**文件**: `lean4/build_kernel/build.sh`
+**文件**: `build_lean_kernel/build.sh`
 
 **使用方法**:
 ```bash
-cd lean4/build_kernel
+cd build_lean_kernel
 ./build.sh
 ```
 
@@ -39,7 +39,7 @@ cd lean4/build_kernel
 ### 生成的静态库
 
 ```
-libleankernel.a  (10.2 MB)
+libleankernel.a  (10.2 MB, 在 lean4/build_kernel/ 目录)
 ├── 53 个对象文件
 ├── kernel: 类型检查核心
 ├── runtime: 内存管理/对象模型
@@ -51,11 +51,11 @@ libleankernel.a  (10.2 MB)
 
 ```bash
 # 1. 配置头文件
-echo '#define LEAN_NO_MIMALLOC' > include/lean/config.h
+echo '#define LEAN_NO_MIMALLOC' > lean4/src/include/lean/config.h
 
 # 2. 编译 kernel
-g++ -std=c++20 -c src/kernel/type_checker.cpp \
-    -Isrc -Isrc/include \
+g++ -std=c++20 -c lean4/src/kernel/type_checker.cpp \
+    -Ilean4/src -Ilean4/src/include \
     -o type_checker.o
 
 # 3. 打包静态库
@@ -65,146 +65,141 @@ ar rcs libleankernel.a *.o
 g++ my_test.cpp -L. -lleankernel -o my_test
 ```
 
-## 测试结果
+## 关键发现：Lean 4 的两层架构
 
-### 测试 1: 基础对象创建 ✓ PASS
-```cpp
-level l0 = mk_level_zero();        // 宇宙层级 0
-expr sort0 = mk_sort(l0);          // Sort 0
-expr nat = mk_const(name("Nat"));  // Nat 常量
-expr arrow = mk_arrow(nat, nat);   // Nat -> Nat
-expr lam = mk_lambda("x", nat, mk_bvar(0));  // λx.x
+Lean 4 采用**分层设计**：
+
 ```
-**结果**: 所有基础对象成功创建
+Layer 1: Lean 代码 (Lean/Expr.lean, Lean/Declaration.lean)
+         ↓ 编译成 C
+         导出函数: lean_expr_mk_bvar, lean_mk_theorem_val, ...
 
-### 测试 2: 类型检查核心函数 ✓ PASS
-```cpp
-TypeChecker tc;
-tc.ensure_sort_core(sort0);    // 确认是 Sort
-tc.ensure_pi_core(arrow);      // 确认是 Pi 类型
+Layer 2: C++ Kernel (src/kernel/*.cpp)
+         调用 Layer 1 的导出函数
+         实现: type_checker, environment, etc.
 ```
-**结果**: WHNF 归约和类型检查正常工作
 
-### 测试 3: 链接测试 ⚠ PARTIAL
+### 为什么需要 Lean 导出函数
+
+**C++ 层的 `mk_bvar()` 实现**：
 ```cpp
-// 简单表达式操作可以链接
-g++ test.cpp libleankernel.a -o test  // OK
-
-// 但使用 declaration 会失败
-theorem_val thm(...);  // 链接错误: undefined lean_mk_theorem_val
-```
-**结果**: 基础功能可链接，声明构造需要 Lean 导出函数
-
-## 类型检查核心机制 (from type_checker.cpp)
-
-### 关键函数
-
-```cpp
-// 确保表达式归约到 Sort
-level ensure_sort_core(expr e) {
-    e = whnf(e);                    // 弱头归一
-    if (is_sort(e))                 // 检查是否为 Sort
-        return sort_level(e);       // 返回 universe level
-    // throw kernel_exception(...)
-}
-
-// 确保表达式归约到 Pi 类型  
-expr ensure_pi_core(expr e) {
-    e = whnf(e);                    // 弱头归一
-    if (is_pi(e))                   // 检查是否为 Pi
-        return e;                   // 返回 Pi 表达式
-    // throw kernel_exception(...)
-}
-
-// 推断表达式类型
-expr infer_type_core(expr const &e) {
-    switch (e.kind()) {
-    case BVar:  /* error - loose bvar */
-    case Sort:  return mk_sort(mk_succ(sort_level(e)));  // Sort u : Sort (u+1)
-    case Const: return env.get(const_name(e)).get_type(); // 环境查找
-    case App:   /* ensure Pi, check domain match, return codomain */
-    case Lambda:/* infer body, create Pi type */
-    case Pi:    /* ensure domain/codomain are Sorts, return Sort (max u v) */
-    }
+// kernel/expr.cpp
+expr mk_bvar(nat const & idx) {
+    return expr(lean_expr_mk_bvar(idx.to_obj_arg()));  // ← 调用 Lean 导出函数！
 }
 ```
 
-### Kernel 验证的检查点
+**这些导出函数定义在**：
+- `lean4/stage0/stdlib/Lean/Expr.c` (由 Lean/Expr.lean 编译生成)
+- `lean4/stage0/stdlib/Lean/Declaration.c`
 
-1. **Sort 层级一致性**
-   ```cpp
-   Sort 0 : Sort 1, Sort 1 : Sort 2, ...
-   ```
+**结论**：纯 C++ 静态库**不完整**，缺少 Lean 层导出的函数。
 
-2. **常量存在性**
-   ```cpp
-   expr nat = mk_const("Nat");
-   // kernel 检查: "Nat" 必须在 environment 中声明
-   ```
+## 类型检查核心机制
 
-3. **Lambda 类型正确性**
-   ```cpp
-   // fun (x : Nat) => x
-   mk_lambda("x", nat, mk_bvar(0))
-   // kernel 检查: nat 必须是 Sort, body 类型正确
-   ```
+### 类型检查器接口 (在静态库中)
 
-4. **函数应用类型匹配**
-   ```cpp
-   // succ zero
-   mk_app(succ, zero)
-   // kernel 检查: succ 类型是 Pi, zero 类型匹配 domain
-   ```
+```cpp
+// type_checker.h - 这些函数在 type_checker.o 中实现
+class type_checker {
+public:
+    expr infer(expr const & t);              // 推断类型
+    bool is_def_eq(expr const & t, expr const & s);  // 定义等价
+    expr whnf(expr const & t);               // 弱头归一
+    expr check(expr const & t);              // 类型检查
+};
+```
 
-5. **无松散绑定变量**
-   ```cpp
-   mk_bvar(0)  // 不在 lambda/Pi 内 = 错误
-   ```
+**这些函数可用**，但创建 `type_checker` 需要 `environment`，而 environment 构造又依赖 Lean 导出函数。
 
-## 发现的问题
+### Kernel 检查的内容
 
-### 问题 1: C++20 atomic 支持
-**现象**: `object.cpp` 使用 `std::atomic::wait/notify`  
-**解决**: Android libc++ 29 已支持 C++20，直接编译即可
+| 检查项 | 说明 |
+|--------|------|
+| Sort 层级 | Sort 0 : Sort 1, Sort 1 : Sort 2, ... |
+| 常量存在性 | Const 必须在 environment 中声明 |
+| Lambda 类型 | 定义域必须是 Sort，值类型正确 |
+| Pi 类型 | 域和余域都必须是 Sort |
+| 函数应用 | 函数必须是 Pi 类型，参数匹配 domain |
+| 无松散 bvar | 绑定变量必须在 lambda/Pi 作用域内 |
 
-### 问题 2: Lean 导出函数缺失
-**现象**: 链接时报告 `undefined lean_mk_*`
-**原因**: 这些函数在 `Lean/Declaration.lean` 中定义，需要 Lean 编译器
-**影响**: 无法构造 theorem/definition/axiom 等复杂声明
-**解决**: 仅使用 kernel 的基础表达式功能
+## 可行的测试方案
 
-### 问题 3: 动态库链接失败
-**现象**: `relocation R_AARCH64_* cannot be used with -shared`
-**原因**: 对象文件未使用 `-fPIC` 编译
-**解决**: 使用静态库，或重新编译加 `-fPIC`
+### 方案 1: 表达式结构检查 (可行)
+
+**不依赖 Lean 导出函数**，只检查表达式结构：
+
+```cpp
+#include "kernel/expr.h"
+
+void test() {
+    // 使用内联函数（在头文件中）
+    expr nat = mk_const(name("Nat"));
+    bool is_c = is_const(nat);  // 内联检查
+
+    // 检查 Pi 类型结构
+    expr arrow = mk_arrow(nat, nat);
+    bool is_p = is_pi(arrow);
+    expr dom = binding_domain(arrow);
+}
+```
+
+**限制**：只能做结构检查，不能做完整类型检查。
+
+### 方案 2: 链接 stage0 stdlib (推荐)
+
+使用 Lean 编译器生成的 C 代码：
+
+```bash
+# 编译 stage0 stdlib
+g++ -c lean4/stage0/stdlib/Lean/Expr.c -o Lean_Expr.o
+g++ -c lean4/stage0/stdlib/Lean/Declaration.c -o Lean_Declaration.o
+
+# 链接所有对象
+ar rcs liblean_complete.a \
+    *.o Lean_Expr.o Lean_Declaration.o
+```
+
+**结果**：完整的 Lean kernel，支持所有功能。
+
+### 方案 3: 使用 Lean 解释器
+
+直接用 Lean 测试：
+```bash
+cd lean4
+./build/release/stage1/bin/lean my_test.lean
+```
+
+## 当前状态总结
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| Kernel 编译 | ✓ 成功 | 18个 kernel 文件 |
+| Runtime 编译 | ✓ 成功 | 24个 runtime 文件 |
+| 静态库生成 | ✓ 成功 | 10MB |
+| 表达式结构检查 | ✓ 可行 | 内联函数 |
+| 完整类型检查 | ✗ 需 stubs | 或链接 stage0 |
+| theorem 构造 | ✗ 需 Lean | Declaration.lean |
 
 ## 文件清单
 
 ```
-lean4/build_kernel/
-├── build.sh              # 编译脚本
+build_lean_kernel/
+├── build.sh              # 主编译脚本
 ├── minimal_test.cpp      # 最小测试程序
-├── kernel_test.cpp       # 完整测试程序
-├── CMakeLists.txt        # CMake 配置
-├── libleankernel.a       # 生成的静态库 (10MB)
-└── *.o                   # 53个对象文件
+├── theorem_sim_test.cpp  # Theorem 模拟测试
+├── simple_expr_test.cpp  # 简单表达式测试
+├── direct_expr_test.cpp  # 直接构造测试
+└── lean_stubs.cpp        # 导出函数 stubs
 
-lean4/src/include/lean/
-├── config.h              # 编译配置
-├── version.h             # 版本信息
-├── githash.h             # Git 哈希
-└── ...
+lean4/build_kernel/        # (本地，不提交)
+├── libleankernel.a       # 10MB 静态库
+├── *.o (53个对象文件)
+└── 测试程序
 ```
 
-## 总结
+## 下一步
 
-| 目标 | 状态 | 说明 |
-|------|------|------|
-| Kernel 编译 | ✓ 成功 | 18个 kernel 文件全部编译 |
-| Runtime 编译 | ✓ 成功 | 24个 runtime 文件全部编译 |
-| 静态库生成 | ✓ 成功 | 10MB 静态库可用 |
-| 基础测试 | ✓ 通过 | 表达式创建/类型检查正常 |
-| 链接测试 | ⚠ 部分 | 基础功能可用，声明构造需 Lean |
-| 动态库 | ✗ 失败 | 需 -fPIC 重编译 |
-
-**核心成果**: 成功编译 Lean 4 kernel 为静态库，可用于理解类型检查机制。
+1. **完整测试**: 链接 `lean4/stage0/stdlib/*.c` 获得完整功能
+2. **Python 模拟**: 使用 `test_kernel.py` 进行算法级测试
+3. **直接研究源码**: 阅读 `type_checker.cpp` 理解算法

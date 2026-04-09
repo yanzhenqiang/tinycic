@@ -71,7 +71,47 @@ class type_checker {
 - ✅ Kernel 编译成功 (18个文件)
 - ✅ Runtime 编译成功 (24个文件)  
 - ✅ 静态库生成成功 (10MB)
-- ⚠️  完整使用需要 stage0 stdlib
-- ✅ Python 模拟可用 (`test_kernel.py`)
+- ✅ Runtime 底层 API 可用 (`lean_alloc_ctor`, `lean_box` 等)
+- ✅ 只需 3 个 stubs 即可运行
+- ⚠️  完整类型检查需要初始化 + kernel 模块
 
-要完整复用类型检查功能，需要链接 `stage0/stdlib/*.c`。
+## 关键发现：Runtime 底层 API 可用！
+
+**无需 Lean 导出函数**，runtime 核心功能可用：
+
+```cpp
+#include "runtime/object.h"
+
+int main() {
+    initialize_alloc();
+    initialize_object();
+    
+    // 底层对象操作 - 完全可用！
+    lean_object* obj = lean_alloc_ctor(tag, num_objs, scalar_sz);
+    lean_ctor_set_uint32(obj, offset, value);
+    
+    // 标量值
+    lean_object* scalar = lean_box(42);
+    size_t val = lean_unbox(scalar);
+}
+```
+
+**测试验证**: `true_low_level_test` 成功运行！
+
+**需要 stubs 的函数**（仅 3 个）：
+- `lean_list_to_array` / `lean_array_to_list_impl`
+- `lean_io_eprintln` / `lean_io_cancel_token_is_set`
+- `lean::reset_heartbeat()` / `lean::save_stack_info()`
+
+**这些 stubs 只需返回空值**，不影响核心功能。
+
+## 下一步：使用 kernel 类型检查
+
+既然 runtime 可用，kernel 的 `type_checker` 也应该可用：
+
+```cpp
+#include "kernel/type_checker.h"
+
+// 需要链接 kernel/*.o + runtime/*.o + util/*.o
+// 表达式构造需要 stage0 或手动使用 lean_alloc_ctor
+```

@@ -1,0 +1,22 @@
+-- Theorem: varignon
+Point A, B, C, D, E, F, G, H
+
+Segment AB := Segment(A, B)
+Segment BC := Segment(B, C)
+Segment CD := Segment(C, D)
+Segment DA := Segment(D, A)
+Segment EF := Segment(E, F)
+Segment GH := Segment(G, H)
+Segment FG := Segment(F, G)
+Segment HE := Segment(H, E)
+
+-- Constraints:
+Midpoint(AB, E)
+Midpoint(BC, F)
+Midpoint(CD, G)
+Midpoint(DA, H)
+EqualLength(EF, GH)
+EqualLength(FG, HE)
+
+-- Labels:
+AutoLabel A, B, C, D, E, F, G, H

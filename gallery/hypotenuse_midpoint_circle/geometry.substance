@@ -1,0 +1,14 @@
+-- Theorem: hypotenuse_midpoint_circle
+Point A, B, C, M
+
+Circle c_M_A := CircleR(M, A)
+Segment AC := Segment(A, C)
+Angle ang_A_B_C := InteriorAngle(A, B, C)
+
+-- Constraints:
+RightMarked(ang_A_B_C)
+Midpoint(AC, M)
+OnCircle(c_M_A, B)
+
+-- Labels:
+AutoLabel A, B, C, M

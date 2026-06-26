@@ -1,0 +1,15 @@
+-- Theorem: thales_converse
+Point O, B, A, C
+
+Circle c_O_B := CircleR(O, B)
+Segment AB := Segment(A, B)
+Angle ang_A_C_B := InteriorAngle(A, C, B)
+
+-- Constraints:
+RightMarked(ang_A_C_B)
+On(O, AB)
+OnCircle(c_O_B, A)
+OnCircle(c_O_B, C)
+
+-- Labels:
+AutoLabel O, B, A, C

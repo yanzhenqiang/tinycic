@@ -1,18 +1,23 @@
 -- Theorem: butterfly
-Point O
-Point R
-Point P
-Point Q
+Point O, R, P, Q, M, A, B, C, D, X, Y
 
--- Given:
-OnCircle(P, O, R)
-OnCircle(Q, O, R)
-Between(A, M, B)
-OnCircle(B, O, R)
-Between(C, M, D)
-OnCircle(D, O, R)
-Collinear(X, A, D)
-Collinear(Y, B, C)
+Circle c_O_R := CircleR(O, R)
+Segment PQ := Chord(c_O_R, P, Q)
+Segment AB := Chord(c_O_R, A, B)
+Segment CD := Chord(c_O_R, C, D)
+Segment AD := Chord(c_O_R, A, D)
+Segment BC := Chord(c_O_R, B, C)
+Segment XY := Segment(X, Y)
 
--- Prove:
-Goal_Midpoint(M, X, Y)
+-- Constraints:
+Midpoint(PQ, M)
+On(M, AB)
+On(M, CD)
+On(X, PQ)
+On(X, AD)
+On(Y, PQ)
+On(Y, BC)
+Midpoint(XY, M)
+
+-- Labels:
+AutoLabel O, R, P, Q, M, A, B, C, D, X, Y

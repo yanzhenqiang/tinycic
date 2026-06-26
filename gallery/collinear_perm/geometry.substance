@@ -1,10 +1,10 @@
 -- Theorem: collinear_perm
-Point A
-Point B
-Point C
+Point A, B, C
 
--- Given:
-Collinear(A, B, C)
+Segment AC := Segment(A, C)
 
--- Prove:
-Goal_Collinear(B, A, C)
+-- Constraints:
+On(B, AC)
+
+-- Labels:
+AutoLabel A, B, C

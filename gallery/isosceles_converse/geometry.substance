@@ -1,0 +1,14 @@
+-- Theorem: isosceles_converse
+Point A, B, C
+
+Segment AB := Segment(A, B)
+Segment AC := Segment(A, C)
+Angle ang_A_B_C := InteriorAngle(A, B, C)
+Angle ang_A_C_B := InteriorAngle(A, C, B)
+
+-- Constraints:
+EqualAngle(ang_A_B_C, ang_A_C_B)
+EqualLength(AB, AC)
+
+-- Labels:
+AutoLabel A, B, C

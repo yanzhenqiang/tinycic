@@ -1,0 +1,16 @@
+-- Theorem: midsegment
+Point A, B, C, D, E
+
+Segment AB := Segment(A, B)
+Segment AC := Segment(A, C)
+Segment DE := Segment(D, E)
+Segment BC := Segment(B, C)
+Triangle tri_A_B_C := Triangle(A, B, C)
+
+-- Constraints:
+Midpoint(AB, D)
+Midpoint(AC, E)
+Parallel(DE, BC)
+
+-- Labels:
+AutoLabel A, B, C, D, E

@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 import config from "./gallery-config.mjs";
+import { renderWithRetry } from "./render-verify.mjs";
 
 function main() {
     const args = process.argv.slice(2);
@@ -76,19 +77,21 @@ function main() {
             continue;
         }
 
-        // Render SVG with random variation for diverse layouts
-        const render = spawnSync("node", [
-            "web/penrose-render.mjs",
-            path.join(thDir, "geometry.substance"),
-            path.join(thDir, "geometry.style"),
-            path.join(thDir, "geometry.domain"),
-            path.join(thDir, "output.svg"),
-            th.name + "-" + Date.now(),
-        ], { encoding: "utf-8", cwd: process.cwd() });
+        // Render SVG with verification retry.
+        const subPath = path.join(thDir, "geometry.substance");
+        const styPath = path.join(thDir, "geometry.style");
+        const domPath = path.join(thDir, "geometry.domain");
+        const outPath = path.join(thDir, "output.svg");
+        const render = renderWithRetry(thDir, th.name, "lib/Geometry.cic", 5, process.cwd());
 
-        if (render.status !== 0) {
-            console.error(`  RENDER FAIL ${th.name}: ${render.stderr}`);
+        if (!render.ok) {
+            console.error(`  RENDER FAIL ${th.name}: could not produce a verified diagram after 5 attempts`);
             continue;
+        }
+        if (render.attempt > 0) {
+            console.log(`  OK ${th.name} (retry ${render.attempt + 1})`);
+        } else {
+            console.log(`  OK ${th.name}`);
         }
 
         // Read substance for the panel
@@ -100,7 +103,6 @@ function main() {
             substance,
             svgPath: `./${th.name}/output.svg`,
         });
-        console.log(`  OK ${th.name}`);
     }
 
     // Build index.html

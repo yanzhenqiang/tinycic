@@ -1,0 +1,21 @@
+-- Theorem: circumcenter
+Point A, B, C, D, E, F, O
+
+Segment BC := Segment(B, C)
+Segment AC := Segment(A, C)
+Segment AB := Segment(A, B)
+Angle ang_O_D_B := InteriorAngle(O, D, B)
+Angle ang_O_E_A := InteriorAngle(O, E, A)
+Angle ang_O_F_A := InteriorAngle(O, F, A)
+Triangle tri_A_B_C := Triangle(A, B, C)
+
+-- Constraints:
+Midpoint(BC, D)
+Midpoint(AC, E)
+Midpoint(AB, F)
+RightMarked(ang_O_D_B)
+RightMarked(ang_O_E_A)
+RightMarked(ang_O_F_A)
+
+-- Labels:
+AutoLabel A, B, C, D, E, F, O

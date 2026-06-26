@@ -1,0 +1,21 @@
+-- Theorem: centroid
+Point A, B, C, D, E, F, G
+
+Segment BC := Segment(B, C)
+Segment AC := Segment(A, C)
+Segment AB := Segment(A, B)
+Segment AD := Segment(A, D)
+Segment BE := Segment(B, E)
+Segment CF := Segment(C, F)
+Triangle tri_A_B_C := Triangle(A, B, C)
+
+-- Constraints:
+Midpoint(BC, D)
+Midpoint(AC, E)
+Midpoint(AB, F)
+On(G, AD)
+On(G, BE)
+On(G, CF)
+
+-- Labels:
+AutoLabel A, B, C, D, E, F, G

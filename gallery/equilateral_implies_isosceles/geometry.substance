@@ -1,10 +1,14 @@
 -- Theorem: equilateral_implies_isosceles
-Point A
-Point B
-Point C
+Point A, B, C
 
--- Given:
-Equilateral(A, B, C)
+Segment AB := Segment(A, B)
+Segment BC := Segment(B, C)
+Segment CA := Segment(C, A)
 
--- Prove:
-Goal_Isosceles(A, B, C)
+-- Constraints:
+EqualLength(AB, BC)
+EqualLength(BC, CA)
+EqualLength(AB, CA)
+
+-- Labels:
+AutoLabel A, B, C

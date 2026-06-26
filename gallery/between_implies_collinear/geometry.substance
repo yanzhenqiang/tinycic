@@ -1,10 +1,10 @@
 -- Theorem: between_implies_collinear
-Point A
-Point B
-Point C
+Point A, B, C
 
--- Given:
-Between(A, B, C)
+Segment AC := Segment(A, C)
 
--- Prove:
-Goal_Collinear(A, B, C)
+-- Constraints:
+On(B, AC)
+
+-- Labels:
+AutoLabel A, B, C

@@ -1,3 +1,14 @@
 -- Theorem: parallel_through_parallel
-Line l
-Point P
+Point P, lAux1, lAux2, PAux3
+
+Segment l := Segment(lAux1, lAux2)
+Segment line_l_through_P := Segment(P, PAux3)
+
+-- Constraints:
+Parallel(l, line_l_through_P)
+
+-- Labels:
+AutoLabel P
+Label lAux1 " "
+Label lAux2 " "
+Label PAux3 " "

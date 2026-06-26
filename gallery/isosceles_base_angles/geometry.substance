@@ -1,10 +1,14 @@
 -- Theorem: isosceles_base_angles
-Point A
-Point B
-Point C
+Point A, B, C
 
--- Given:
-Isosceles(A, B, C)
+Segment AB := Segment(A, B)
+Segment AC := Segment(A, C)
+Angle ang_A_B_C := InteriorAngle(A, B, C)
+Angle ang_A_C_B := InteriorAngle(A, C, B)
 
--- Prove:
-Goal_AngleCongruent(A, B, C, A, C, B)
+-- Constraints:
+EqualLength(AB, AC)
+EqualAngle(ang_A_B_C, ang_A_C_B)
+
+-- Labels:
+AutoLabel A, B, C

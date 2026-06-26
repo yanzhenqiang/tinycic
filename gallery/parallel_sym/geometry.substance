@@ -1,9 +1,14 @@
 -- Theorem: parallel_sym
-Line l
-Line m
+Point lAux1, lAux2, mAux3, mAux4
 
--- Given:
+Segment l := Segment(lAux1, lAux2)
+Segment m := Segment(mAux3, mAux4)
+
+-- Constraints:
 Parallel(l, m)
 
--- Prove:
-Goal_Parallel(m, l)
+-- Labels:
+Label lAux1 " "
+Label lAux2 " "
+Label mAux3 " "
+Label mAux4 " "

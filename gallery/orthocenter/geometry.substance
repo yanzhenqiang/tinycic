@@ -1,0 +1,27 @@
+-- Theorem: orthocenter
+Point A, B, C, D, E, F, H
+
+Segment BC := Segment(B, C)
+Segment AC := Segment(A, C)
+Segment AB := Segment(A, B)
+Segment AD := Segment(A, D)
+Segment BE := Segment(B, E)
+Segment CF := Segment(C, F)
+Angle ang_A_D_B := InteriorAngle(A, D, B)
+Angle ang_B_E_A := InteriorAngle(B, E, A)
+Angle ang_C_F_A := InteriorAngle(C, F, A)
+Triangle tri_A_B_C := Triangle(A, B, C)
+
+-- Constraints:
+On(D, BC)
+RightMarked(ang_A_D_B)
+On(E, AC)
+RightMarked(ang_B_E_A)
+On(F, AB)
+RightMarked(ang_C_F_A)
+On(H, AD)
+On(H, BE)
+On(H, CF)
+
+-- Labels:
+AutoLabel A, B, C, D, E, F, H

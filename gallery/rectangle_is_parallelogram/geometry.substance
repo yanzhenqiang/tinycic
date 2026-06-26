@@ -1,11 +1,16 @@
 -- Theorem: rectangle_is_parallelogram
-Point A
-Point B
-Point C
-Point D
+Point A, B, C, D
 
--- Given:
-Rectangle(A, B, C, D)
+Segment AB := Segment(A, B)
+Segment CD := Segment(C, D)
+Segment BC := Segment(B, C)
+Segment DA := Segment(D, A)
+Angle ang_D_A_B := InteriorAngle(D, A, B)
 
--- Prove:
-Goal_Parallelogram(A, B, C, D)
+-- Constraints:
+EqualLength(AB, CD)
+EqualLength(BC, DA)
+RightMarked(ang_D_A_B)
+
+-- Labels:
+AutoLabel A, B, C, D

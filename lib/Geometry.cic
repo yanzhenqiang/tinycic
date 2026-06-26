@@ -564,4 +564,219 @@ theorem butterfly : forall (O : Point), forall (R : Point),
   intro Y
   intro h12
   intro h13
-  exact (sorry_prop (midpoint M X Y))
+-- =====================================================================
+-- 25. Thales's Theorem (angle in a semicircle)
+-- =====================================================================
+
+-- If A, B, C are on a circle with center O and AB is a diameter,
+-- then the angle ACB is a right angle.
+theorem thales : forall (O : Point), forall (B : Point),
+  forall (A : Point), forall (C : Point),
+  on_circle A O B -> on_circle C O B ->
+  between A O B ->
+  Not (collinear A B C) ->
+  right_angle A C B := by
+  intro O
+  intro B
+  intro A
+  intro C
+  intro h1
+  intro h2
+  intro h3
+  intro h4
+  exact (sorry_prop (right_angle A C B))
+
+-- =====================================================================
+-- 26. Converse of the Isosceles Triangle Base Angles Theorem
+-- =====================================================================
+
+-- If two angles of a triangle are congruent, the sides opposite them are
+-- congruent (the triangle is isosceles).
+theorem isosceles_converse : forall (A : Point), forall (B : Point), forall (C : Point),
+  angle_congruent A B C A C B -> isosceles A B C := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (sorry_prop (isosceles A B C))
+
+-- =====================================================================
+-- 27. Midpoint of the Hypotenuse is the Circumcenter
+-- =====================================================================
+
+-- In a right triangle ABC with right angle at B, the midpoint M of the
+-- hypotenuse AC is equidistant from all three vertices. In particular,
+-- B lies on the circle with center M and radius MA.
+theorem hypotenuse_midpoint_circle : forall (A : Point), forall (B : Point), forall (C : Point),
+  right_angle A B C ->
+  forall (M : Point),
+  midpoint M A C ->
+  on_circle B M A := by
+  intro A
+  intro B
+  intro C
+  intro h
+  intro M
+  intro h2
+  exact (sorry_prop (on_circle B M A))
+
+-- =====================================================================
+-- 28. Helper definitions for complex theorems
+-- =====================================================================
+
+-- D is the foot of the altitude from A onto BC (so AD is an altitude).
+def altitude_foot (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
+  And (collinear B C D) (right_angle A D B)
+
+-- DE is parallel to BC (using the underlying line parallelism).
+def segment_parallel (D : Point) (E : Point) (B : Point) (C : Point) : Prop :=
+  exists (l : Line), exists (m : Line),
+    And (on_line D l) (And (on_line E l)
+      (And (on_line B m) (And (on_line C m) (parallel l m))))
+
+-- =====================================================================
+-- 29. Midsegment Theorem
+-- =====================================================================
+
+-- The segment joining the midpoints of two sides of a triangle is
+-- parallel to the third side.
+theorem midsegment : forall (A : Point), forall (B : Point), forall (C : Point),
+  forall (D : Point), forall (E : Point),
+  triangle A B C ->
+  midpoint D A B ->
+  midpoint E A C ->
+  segment_parallel D E B C := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro h1
+  intro h2
+  intro h3
+  exact (sorry_prop (segment_parallel D E B C))
+
+-- =====================================================================
+-- 30. Varignon's Theorem
+-- =====================================================================
+
+-- The midpoints of the sides of any quadrilateral form a parallelogram.
+theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), forall (D : Point),
+  forall (E : Point), forall (F : Point), forall (G : Point), forall (H : Point),
+  quadrilateral A B C D ->
+  midpoint E A B ->
+  midpoint F B C ->
+  midpoint G C D ->
+  midpoint H D A ->
+  parallelogram E F G H := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro G
+  intro H
+  intro h1
+  intro h2
+  intro h3
+  intro h4
+  intro h5
+  exact (sorry_prop (parallelogram E F G H))
+
+-- =====================================================================
+-- 31. Centroid Theorem
+-- =====================================================================
+
+-- The three medians of a triangle are concurrent.
+theorem centroid : forall (A : Point), forall (B : Point), forall (C : Point),
+  forall (D : Point), forall (E : Point), forall (F : Point), forall (G : Point),
+  triangle A B C ->
+  midpoint D B C ->
+  midpoint E A C ->
+  midpoint F A B ->
+  And (collinear A G D) (And (collinear B G E) (collinear C G F)) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro G
+  intro h1
+  intro h2
+  intro h3
+  intro h4
+  exact (sorry_prop (And (collinear A G D) (And (collinear B G E) (collinear C G F))))
+
+-- =====================================================================
+-- 32. Circumcenter Theorem
+-- =====================================================================
+
+-- The three perpendicular bisectors of a triangle are concurrent.
+theorem circumcenter : forall (A : Point), forall (B : Point), forall (C : Point),
+  forall (D : Point), forall (E : Point), forall (F : Point), forall (O : Point),
+  triangle A B C ->
+  midpoint D B C ->
+  midpoint E A C ->
+  midpoint F A B ->
+  And (right_angle O D B) (And (right_angle O E A) (right_angle O F A)) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro O
+  intro h1
+  intro h2
+  intro h3
+  intro h4
+  exact (sorry_prop (And (right_angle O D B) (And (right_angle O E A) (right_angle O F A))))
+
+-- =====================================================================
+-- 33. Orthocenter Theorem
+-- =====================================================================
+
+-- The three altitudes of a triangle are concurrent.
+theorem orthocenter : forall (A : Point), forall (B : Point), forall (C : Point),
+  forall (D : Point), forall (E : Point), forall (F : Point), forall (H : Point),
+  triangle A B C ->
+  altitude_foot A B C D ->
+  altitude_foot B A C E ->
+  altitude_foot C A B F ->
+  And (collinear A H D) (And (collinear B H E) (collinear C H F)) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro H
+  intro h1
+  intro h2
+  intro h3
+  intro h4
+  exact (sorry_prop (And (collinear A H D) (And (collinear B H E) (collinear C H F))))
+
+-- =====================================================================
+-- 34. Converse of Thales's Theorem
+-- =====================================================================
+
+-- If A, B, C are on a circle and angle ACB is a right angle,
+-- then AB is a diameter.
+theorem thales_converse : forall (O : Point), forall (B : Point),
+  forall (A : Point), forall (C : Point),
+  on_circle A O B ->
+  on_circle C O B ->
+  right_angle A C B ->
+  between A O B := by
+  intro O
+  intro B
+  intro A
+  intro C
+  intro h1
+  intro h2
+  intro h3
+  exact (sorry_prop (between A O B))
+

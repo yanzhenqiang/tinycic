@@ -2,8 +2,9 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
+import { spawnSync } from 'child_process';
 import config from './gallery-config.mjs';
+import { renderWithRetry } from './render-verify.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -39,29 +40,21 @@ const server = http.createServer(async (req, res) => {
       const subPath = path.join(thDir, 'geometry.substance');
       const stylePath = path.join(thDir, 'geometry.style');
       const domainPath = path.join(thDir, 'geometry.domain');
-      const outPath = path.join(thDir, 'output.svg');
       if (!fs.existsSync(subPath) || !fs.existsSync(stylePath) || !fs.existsSync(domainPath)) {
         continue;
       }
-      const variation = Date.now().toString() + '-' + dir;
-      const child = spawn('node', [
-        'web/penrose-render.mjs', subPath, stylePath, domainPath, outPath, variation,
-      ], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
-
-      let stderr = '';
-      child.stderr.on('data', (d) => { stderr += d; });
-
-      const code = await new Promise(resolve => child.on('close', resolve));
-      results.push({ dir, ok: code === 0, stderr });
+      const render = renderWithRetry(thDir, dir, 'lib/Geometry.cic', 5, root);
+      results.push({ dir, ...render });
     }
 
     const failed = results.filter(r => !r.ok);
     if (failed.length === 0) {
+      const retried = results.filter(r => r.attempt > 0).length;
       res.writeHead(200);
-      res.end('Resampled ' + results.length + ' theorems');
+      res.end('Resampled ' + results.length + ' theorems' + (retried ? ` (${retried} needed retry)` : ''));
     } else {
       res.writeHead(500);
-      res.end('Failed: ' + failed.map(f => f.dir + ': ' + f.stderr).join('; '));
+      res.end('Failed: ' + failed.map(f => f.dir).join('; '));
     }
     return;
   }
@@ -71,7 +64,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', (d) => { body += d; });
     req.on('end', () => {
       try {
-        const { theorem, variation } = JSON.parse(body);
+        const { theorem } = JSON.parse(body);
         if (!theorem) {
           res.writeHead(400); res.end('Missing theorem'); return;
         }
@@ -79,33 +72,21 @@ const server = http.createServer(async (req, res) => {
         const subPath = path.join(thDir, 'geometry.substance');
         const stylePath = path.join(thDir, 'geometry.style');
         const domainPath = path.join(thDir, 'geometry.domain');
-        const outPath = path.join(thDir, 'output.svg');
 
         if (!fs.existsSync(subPath) || !fs.existsSync(stylePath) || !fs.existsSync(domainPath)) {
           res.writeHead(404); res.end('Theorem trio not found'); return;
         }
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        const varArg = variation || Date.now().toString();
-        const child = spawn('node', [
-          'web/penrose-render.mjs',
-          subPath, stylePath, domainPath, outPath, varArg,
-        ], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+        const render = renderWithRetry(thDir, theorem, 'lib/Geometry.cic', 5, root);
 
-        let stdout = '';
-        let stderr = '';
-        child.stdout.on('data', (d) => { stdout += d; });
-        child.stderr.on('data', (d) => { stderr += d; });
-
-        child.on('close', (code) => {
-          if (code === 0) {
-            res.writeHead(200);
-            res.end(stdout || 'OK');
-          } else {
-            res.writeHead(500);
-            res.end(stderr || 'Resample failed');
-          }
-        });
+        if (render.ok) {
+          res.writeHead(200);
+          res.end(render.attempt > 0 ? `OK (retry ${render.attempt + 1})` : 'OK');
+        } else {
+          res.writeHead(500);
+          res.end('Resample failed: could not verify after 5 attempts');
+        }
       } catch (e) {
         res.writeHead(400);
         res.end('Invalid JSON: ' + e.message);

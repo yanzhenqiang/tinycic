@@ -119,34 +119,17 @@ def NatPerm_trans (xs ys zs : List Nat) (h1 : NatPerm xs ys) (h2 : NatPerm ys zs
     (h1 x)
 
 
-def safe_quicksort_fuel (A : Type) (le : A -> A -> Bool) (fuel : Nat) (xs : List A) : List A :=
-  rec.Nat (fun _ => List A -> List A)
-    (fun xs => xs)
-    (fun fuel' ih => fun xs =>
-      rec.List A (fun _ => List A)
-        (nil A)
-        (fun head tail _ =>
-          list_append A (ih (list_filter A (fun x : A => not (le head x)) tail))
-            (cons A head (ih (list_filter A (fun x : A => le head x) tail))))
-        xs)
-    fuel
-    xs
-
-def safe_quicksort (A : Type) (le : A -> A -> Bool) (xs : List A) : List A :=
-  safe_quicksort_fuel A le (list_length A xs) xs
-
-
-def safe_quicksort_fuel_perm (fuel : Nat) (xs : List Nat) : NatPerm xs (safe_quicksort_fuel Nat nat_le fuel xs) :=
-  rec.Nat (fun fuel' => forall (zs : List Nat), NatPerm zs (safe_quicksort_fuel Nat nat_le fuel' zs))
+def quicksort_fuel_perm (fuel : Nat) (xs : List Nat) : NatPerm xs (quicksort_fuel Nat nat_le fuel xs) :=
+  rec.Nat (fun fuel' => forall (zs : List Nat), NatPerm zs (quicksort_fuel Nat nat_le fuel' zs))
     (fun zs => NatPerm_refl zs)
     (fun fuel' ih => fun zs =>
-      rec.List Nat (fun ws => NatPerm ws (safe_quicksort_fuel Nat nat_le (succ fuel') ws))
+      rec.List Nat (fun ws => NatPerm ws (quicksort_fuel Nat nat_le (succ fuel') ws))
         (NatPerm_refl (nil Nat))
         (fun head tail _ =>
           let left := list_filter Nat (fun x : Nat => not (nat_le head x)) tail in
           let right := list_filter Nat (fun x : Nat => nat_le head x) tail in
-          let left_sorted := safe_quicksort_fuel Nat nat_le fuel' left in
-          let right_sorted := safe_quicksort_fuel Nat nat_le fuel' right in
+          let left_sorted := quicksort_fuel Nat nat_le fuel' left in
+          let right_sorted := quicksort_fuel Nat nat_le fuel' right in
           fun x : Nat =>
             let c_tail := list_count Nat nat_eq x tail in
             let c_left := list_count Nat nat_eq x left in
@@ -163,7 +146,6 @@ def safe_quicksort_fuel_perm (fuel : Nat) (xs : List Nat) : NatPerm xs (safe_qui
                 (refl Nat (list_count Nat nat_eq x right_sorted))
                 (nat_eq x head) in
             let eq_partition := count_filter_partition (fun y : Nat => not (nat_le head y)) x tail in
-            let eq_partition_comm := nat_add_comm c_left c_right in
             eq_subst Nat (nat_add c_left c_right) c_tail
               (fun y => Eq Nat (match nat_eq x head : Nat with | true => succ y | false => y)
                                 (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted))))
@@ -199,28 +181,12 @@ def safe_quicksort_fuel_perm (fuel : Nat) (xs : List Nat) : NatPerm xs (safe_qui
     xs
 
 
-theorem safe_quicksort_perm (xs : List Nat) : NatPerm xs (safe_quicksort Nat nat_le xs) :=
-  safe_quicksort_fuel_perm (list_length Nat xs) xs
-
-
-def safe_quicksort_eq_quicksort (xs : List Nat) : Eq (List Nat) (safe_quicksort Nat nat_le xs) (quicksort Nat nat_le xs) :=
-  refl (List Nat) (quicksort Nat nat_le xs)
-
-theorem safe_quicksort_sorted (xs : List Nat) : SortedNat (safe_quicksort Nat nat_le xs) :=
-  eq_subst (List Nat) (quicksort Nat nat_le xs) (safe_quicksort Nat nat_le xs)
-    (fun y : List Nat => SortedNat y)
-    (eq_sym (List Nat) (safe_quicksort Nat nat_le xs) (quicksort Nat nat_le xs) (safe_quicksort_eq_quicksort xs))
-    (quicksort_sorted xs)
-
-theorem safe_quicksort_correct (xs : List Nat)
-  : And (SortedNat (safe_quicksort Nat nat_le xs)) (NatPerm xs (safe_quicksort Nat nat_le xs)) :=
-  conj (SortedNat (safe_quicksort Nat nat_le xs)) (NatPerm xs (safe_quicksort Nat nat_le xs))
-    (safe_quicksort_sorted xs)
-    (safe_quicksort_perm xs)
-
-
 theorem quicksort_perm (xs : List Nat) : NatPerm xs (quicksort Nat nat_le xs) :=
-  eq_subst (List Nat) (safe_quicksort Nat nat_le xs) (quicksort Nat nat_le xs)
-    (fun y : List Nat => NatPerm xs y)
-    (safe_quicksort_eq_quicksort xs)
-    (safe_quicksort_perm xs)
+  quicksort_fuel_perm (list_length Nat xs) xs
+
+
+theorem quicksort_correct (xs : List Nat)
+  : And (SortedNat (quicksort Nat nat_le xs)) (NatPerm xs (quicksort Nat nat_le xs)) :=
+  conj (SortedNat (quicksort Nat nat_le xs)) (NatPerm xs (quicksort Nat nat_le xs))
+    (quicksort_sorted xs)
+    (quicksort_perm xs)

@@ -504,10 +504,12 @@ def list_length (A : Type) (xs : List A) : Nat :=
     (fun x xs ih => succ ih)
     xs
 
--- Fuel-based quicksort: structural recursion on fuel, amenable to induction
+-- Fuel-based quicksort: structural recursion on fuel, amenable to induction.
+-- Fuel exhaustion returns the input list unchanged, which makes permutation
+-- proofs straightforward while remaining correct when fuel >= length xs.
 def quicksort_fuel (A : Type) (le : A -> A -> Bool) (fuel : Nat) (xs : List A) : List A :=
   rec.Nat (fun _ => List A -> List A)
-    (fun xs => nil A)
+    (fun xs => xs)
     (fun fuel' ih => fun xs =>
       rec.List A (fun _ => List A)
         (nil A)

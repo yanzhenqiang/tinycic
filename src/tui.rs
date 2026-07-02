@@ -608,7 +608,7 @@ mod tests {
     fn test_tactic_goals_in_proof_cic() {
         let mut app = setup_app(
             "lib/Proof.cic",
-            &["lib/Nat.cic", "lib/Decimal.cic", "lib/Int.cic", "lib/logic.cic", "lib/Exists.cic", "lib/Eq.cic"],
+            &["lib/Nat.cic", "lib/Decimal.cic", "lib/Int.cic", "lib/Logic.cic", "lib/Exists.cic", "lib/Eq.cic"],
         );
 
         // Line 4: theorem const_nat : forall (n : Nat), Nat -> Nat := by
@@ -634,7 +634,7 @@ mod tests {
     fn test_tactic_goals_in_natproof_cic() {
         let mut app = setup_app(
             "lib/NatProof.cic",
-            &["lib/Nat.cic", "lib/Decimal.cic", "lib/Int.cic", "lib/logic.cic", "lib/Exists.cic", "lib/Eq.cic"],
+            &["lib/Nat.cic", "lib/Decimal.cic", "lib/Int.cic", "lib/Logic.cic", "lib/Exists.cic", "lib/Eq.cic"],
         );
 
         // Find the le_refl theorem line

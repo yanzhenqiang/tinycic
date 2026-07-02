@@ -1,0 +1,35 @@
+import Nat
+import Eq
+import Order
+import Decimal
+
+def factorial : Nat -> Nat :=
+  fix f (n : Nat) measure (fun n : Nat => n) =>
+    match n : Nat with
+    | zero => succ zero
+    | succ n' => nat_mul (succ n') (f n')
+
+def factorial_param (n : Nat) : Nat :=
+  fix f (n : Nat) measure (fun n : Nat => n) =>
+    match n : Nat with
+    | zero => succ zero
+    | succ n' => nat_mul (succ n') (f n')
+
+-- Measure-based recursion on a filtered sublist (not purely structural)
+def remove_all (A : Type) (eq : A -> A -> Bool) (x : A) (xs : List A) : List A :=
+  fix f (xs : List A) measure (list_length A) =>
+    match xs : List A with
+    | nil => nil A
+    | cons y ys =>
+      if eq x y : Bool
+      then f (list_filter A (fun z : A => not (eq x z)) ys)
+      else cons A y (f ys)
+
+def factorial_test : Eq Nat (factorial (succ (succ (succ zero)))) (succ (succ (succ (succ (succ (succ zero)))))) :=
+  refl Nat (succ (succ (succ (succ (succ (succ zero))))))
+
+def factorial_param_test : Eq Nat (factorial_param (succ (succ (succ zero)))) (succ (succ (succ (succ (succ (succ zero)))))) :=
+  refl Nat (succ (succ (succ (succ (succ (succ zero))))))
+
+def remove_all_test : Eq (List Nat) (remove_all Nat nat_eq (succ zero) (cons Nat zero (cons Nat (succ zero) (cons Nat zero (nil Nat))))) (cons Nat zero (cons Nat zero (nil Nat))) :=
+  refl (List Nat) (cons Nat zero (cons Nat zero (nil Nat)))

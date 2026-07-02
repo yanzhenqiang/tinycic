@@ -14,3 +14,6 @@ def gt (m : Nat) (n : Nat) : Prop := lt n m
 
 -- Absolute value on Nat (simple version: since Nat has no negatives, abs is identity)
 def abs_nat (n : Nat) : Nat := n
+
+-- Well-foundedness of the measure mapping into Nat
+axiom wellFounded_measure : forall (A : Type), forall (m : A -> Nat), WellFounded A (fun y : A => fun x : A => lt (m y) (m x))

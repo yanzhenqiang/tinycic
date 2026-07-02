@@ -40,6 +40,15 @@ pub enum ParsedExpr {
     /// Each step is (lhs, rhs, proof). lhs of step i+1 must equal rhs of step i.
     /// Desugars to nested eq_subst calls.
     Calc(Box<ParsedExpr>, Vec<(ParsedExpr, ParsedExpr, ParsedExpr)>),
+    /// Well-founded fixpoint: fix f (x : T) measure m => e
+    /// Desugars to a wellFounded_fix application over a Nat measure.
+    Fix {
+        name: String,
+        param: String,
+        param_ty: Box<ParsedExpr>,
+        measure: Box<ParsedExpr>,
+        body: Box<ParsedExpr>,
+    },
 }
 
 /// Dedicated name-resolution pass.
@@ -216,6 +225,9 @@ impl ParsedExpr {
                 }
                 result
             }
+            ParsedExpr::Fix { name, param, param_ty, measure, body } => {
+                self.desugar_fix(name, param, param_ty, measure, body, env_bindings, env, bound_vars, recursive_fn)
+            }
         }
     }
 
@@ -378,6 +390,156 @@ impl ParsedExpr {
         let scrut_expr = scrutinee.to_expr_with_fn(env_bindings, env, bound_vars, recursive_fn);
         Expr::mk_app(app, scrut_expr)
     }
+
+    fn desugar_fix(
+        &self,
+        name: &str,
+        param: &str,
+        param_ty: &ParsedExpr,
+        measure: &ParsedExpr,
+        body: &ParsedExpr,
+        env_bindings: &HashMap<String, Expr>,
+        env: &Environment,
+        bound_vars: &mut Vec<String>,
+        recursive_fn: Option<&str>,
+    ) -> Expr {
+        let existing_pos = bound_vars.iter().rposition(|v| v == param);
+
+        let a_expr = param_ty.to_expr_with_fn(env_bindings, env, bound_vars, recursive_fn);
+        let m_expr = measure.to_expr_with_fn(env_bindings, env, bound_vars, recursive_fn);
+
+        let c_mvar = Expr::mk_mvar(Name::new(&format!("_fix_C_{}", name)));
+
+        let lt_const = Expr::mk_const(Name::new("lt"), vec![]);
+
+        // R = fun y => fun x => lt (m y) (m x)
+        let r_expr = Expr::mk_lambda(
+            Name::new("y"),
+            a_expr.clone(),
+            Expr::mk_lambda(
+                Name::new("x"),
+                a_expr.clone(),
+                Expr::mk_app(
+                    Expr::mk_app(
+                        lt_const.clone(),
+                        Expr::mk_app(m_expr.clone(), Expr::mk_bvar(1)),
+                    ),
+                    Expr::mk_app(m_expr.clone(), Expr::mk_bvar(0)),
+                ),
+            ),
+        );
+
+        // Push param binder if it is not already bound in the outer context
+        let pushed_param = if existing_pos.is_none() {
+            bound_vars.push(param.to_string());
+            true
+        } else {
+            false
+        };
+
+        // Push the recursive-step binder
+        let rec_name = format!("_fix_rec_{}", name);
+        bound_vars.push(rec_name);
+
+        // Translate the body. Recursive calls to `name` inside nested match
+        // expressions are handled by match desugaring; remaining calls are
+        // replaced by applications of the step binder below.
+        let mut body_expr = body.to_expr_with_fn(env_bindings, env, bound_vars, Some(name));
+
+        // Pop the recursive binder
+        bound_vars.pop();
+
+        // Determine de Bruijn indices of rec and the fix parameter inside body_expr.
+        // rec was the innermost binder, so it is always BVar(0).
+        let rec_bvar_body = 0u64;
+        let param_bvar_body = if pushed_param {
+            1u64
+        } else {
+            (bound_vars.len() - existing_pos.unwrap()) as u64
+        };
+
+        body_expr = replace_fix_rec_calls(&body_expr, name, rec_bvar_body, param_bvar_body, &m_expr);
+
+        if pushed_param {
+            bound_vars.pop();
+        }
+
+        // Build the type of the recursive-step binder.
+        // It lives in the context after popping the rec binder (and the param binder if we pushed it).
+        let param_bvar_rec_ty = if pushed_param {
+            0u64
+        } else {
+            (bound_vars.len() - 1 - existing_pos.unwrap()) as u64
+        };
+
+        let rec_ty = Expr::mk_pi(
+            Name::new("y"),
+            a_expr.clone(),
+            Expr::mk_pi(
+                Name::new("_"),
+                Expr::mk_app(
+                    Expr::mk_app(
+                        lt_const.clone(),
+                        Expr::mk_app(m_expr.clone(), Expr::mk_bvar(1)),
+                    ),
+                    Expr::mk_app(m_expr.clone(), Expr::mk_bvar(param_bvar_rec_ty + 2)),
+                ),
+                Expr::mk_app(c_mvar.clone(), Expr::mk_bvar(1)),
+            ),
+        );
+
+        // Build the step function F
+        let f_expr = if pushed_param {
+            Expr::mk_lambda(
+                Name::new(param),
+                a_expr.clone(),
+                Expr::mk_lambda(
+                    Name::new(&format!("_rec_{}", name)),
+                    rec_ty,
+                    body_expr,
+                ),
+            )
+        } else {
+            Expr::mk_lambda(
+                Name::new(&format!("_rec_{}", name)),
+                rec_ty,
+                body_expr,
+            )
+        };
+
+        // wf = wellFounded_measure A m
+        let wf_expr = Expr::mk_app(
+            Expr::mk_app(Expr::mk_const(Name::new("wellFounded_measure"), vec![]), a_expr.clone()),
+            m_expr.clone(),
+        );
+
+        // Inner application: wellFounded_fix A C R wf F x
+        let fix_app = Expr::mk_app(
+            Expr::mk_app(
+                Expr::mk_app(
+                    Expr::mk_app(
+                        Expr::mk_app(
+                            Expr::mk_app(
+                                Expr::mk_const(Name::new("wellFounded_fix"), vec![]),
+                                a_expr.clone(),
+                            ),
+                            c_mvar,
+                        ),
+                        r_expr,
+                    ),
+                    wf_expr,
+                ),
+                f_expr,
+            ),
+            Expr::mk_bvar(param_bvar_rec_ty),
+        );
+
+        if pushed_param {
+            Expr::mk_lambda(Name::new(param), a_expr, fix_app)
+        } else {
+            fix_app
+        }
+    }
 }
 
 /// Extract constructor name and bound variable names from a pattern.
@@ -488,12 +650,12 @@ fn replace_bvar(expr: &Expr, from: u64, to: u64, depth: u64) -> Expr {
 /// `recursive_pairs` is a list of (pattern_bvar, ih_bvar) for each recursive field.
 /// The minor premise includes the lambda wrappers for pattern variables and ih.
 /// BVar indices in the minor body are already correct (pattern variables reference
-/// their lambda parameters), so no depth offset is needed.
+/// their lambda parameters), so no depth offset is needed at the top level.
 fn replace_recursive_calls(expr: &Expr, fn_name: &str, recursive_pairs: &[(u64, u64)]) -> Expr {
-    replace_recursive_calls_core(expr, fn_name, recursive_pairs)
+    replace_recursive_calls_core(expr, fn_name, recursive_pairs, 0)
 }
 
-fn replace_recursive_calls_core(expr: &Expr, fn_name: &str, recursive_pairs: &[(u64, u64)]) -> Expr {
+fn replace_recursive_calls_core(expr: &Expr, fn_name: &str, recursive_pairs: &[(u64, u64)], depth: u64) -> Expr {
     match expr {
         Expr::App(_, _) => {
             let (head, args) = flatten_app(expr);
@@ -502,17 +664,17 @@ fn replace_recursive_calls_core(expr: &Expr, fn_name: &str, recursive_pairs: &[(
                     for arg in &args {
                         if let Expr::BVar(bv) = arg {
                             for (pattern_bvar, ih_bvar) in recursive_pairs {
-                                if *bv == *pattern_bvar {
-                                    return Expr::mk_bvar(*ih_bvar);
+                                if *bv == *pattern_bvar + depth {
+                                    return Expr::mk_bvar(*ih_bvar + depth);
                                 }
                             }
                         }
                     }
                 }
             }
-            let new_head = replace_recursive_calls_core(head, fn_name, recursive_pairs);
+            let new_head = replace_recursive_calls_core(head, fn_name, recursive_pairs, depth);
             let new_args: Vec<Expr> = args.iter()
-                .map(|a| replace_recursive_calls_core(a, fn_name, recursive_pairs))
+                .map(|a| replace_recursive_calls_core(a, fn_name, recursive_pairs, depth))
                 .collect();
             rebuild_app(new_head, new_args)
         }
@@ -520,32 +682,129 @@ fn replace_recursive_calls_core(expr: &Expr, fn_name: &str, recursive_pairs: &[(
             Expr::Lambda(
                 name.clone(),
                 *bi,
-                Rc::new(replace_recursive_calls_core(ty, fn_name, recursive_pairs)),
-                Rc::new(replace_recursive_calls_core(body, fn_name, recursive_pairs)),
+                Rc::new(replace_recursive_calls_core(ty, fn_name, recursive_pairs, depth)),
+                Rc::new(replace_recursive_calls_core(body, fn_name, recursive_pairs, depth + 1)),
             )
         }
         Expr::Pi(name, bi, ty, body) => {
             Expr::Pi(
                 name.clone(),
                 *bi,
-                Rc::new(replace_recursive_calls_core(ty, fn_name, recursive_pairs)),
-                Rc::new(replace_recursive_calls_core(body, fn_name, recursive_pairs)),
+                Rc::new(replace_recursive_calls_core(ty, fn_name, recursive_pairs, depth)),
+                Rc::new(replace_recursive_calls_core(body, fn_name, recursive_pairs, depth + 1)),
             )
         }
         Expr::Let(name, ty, value, body, nondep) => {
             Expr::Let(
                 name.clone(),
-                Rc::new(replace_recursive_calls_core(ty, fn_name, recursive_pairs)),
-                Rc::new(replace_recursive_calls_core(value, fn_name, recursive_pairs)),
-                Rc::new(replace_recursive_calls_core(body, fn_name, recursive_pairs)),
+                Rc::new(replace_recursive_calls_core(ty, fn_name, recursive_pairs, depth)),
+                Rc::new(replace_recursive_calls_core(value, fn_name, recursive_pairs, depth)),
+                Rc::new(replace_recursive_calls_core(body, fn_name, recursive_pairs, depth + 1)),
                 *nondep,
             )
         }
         Expr::MData(d, e) => {
-            Expr::MData(d.clone(), Rc::new(replace_recursive_calls_core(e, fn_name, recursive_pairs)))
+            Expr::MData(d.clone(), Rc::new(replace_recursive_calls_core(e, fn_name, recursive_pairs, depth)))
         }
         Expr::Proj(s, i, e) => {
-            Expr::Proj(s.clone(), *i, Rc::new(replace_recursive_calls_core(e, fn_name, recursive_pairs)))
+            Expr::Proj(s.clone(), *i, Rc::new(replace_recursive_calls_core(e, fn_name, recursive_pairs, depth)))
+        }
+        _ => expr.clone(),
+    }
+}
+
+/// Replace remaining recursive function calls inside a `fix` body with applications
+/// of the well-founded step binder. Each call `f a` becomes `rec a (sorry_prop (lt (m a) (m x)))`.
+fn replace_fix_rec_calls(
+    expr: &Expr,
+    fn_name: &str,
+    rec_bvar: u64,
+    x_bvar: u64,
+    measure: &Expr,
+) -> Expr {
+    let lt_const = Expr::mk_const(Name::new("lt"), vec![]);
+    let sorry_const = Expr::mk_const(Name::new("sorry_prop"), vec![]);
+    replace_fix_rec_calls_core(expr, fn_name, rec_bvar, x_bvar, measure, &lt_const, &sorry_const)
+}
+
+fn replace_fix_rec_calls_core(
+    expr: &Expr,
+    fn_name: &str,
+    rec_bvar: u64,
+    x_bvar: u64,
+    measure: &Expr,
+    lt_const: &Expr,
+    sorry_const: &Expr,
+) -> Expr {
+    match expr {
+        Expr::App(_, _) => {
+            let (head, args) = flatten_app(expr);
+            if let Expr::Const(name, _) = head {
+                if name.to_string() == fn_name && !args.is_empty() {
+                    let rec_arg = replace_fix_rec_calls_core(
+                        args[0], fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const
+                    );
+                    let proof = Expr::mk_app(
+                        sorry_const.clone(),
+                        Expr::mk_app(
+                            Expr::mk_app(
+                                lt_const.clone(),
+                                Expr::mk_app(measure.clone(), rec_arg.clone()),
+                            ),
+                            Expr::mk_app(measure.clone(), Expr::mk_bvar(x_bvar)),
+                        ),
+                    );
+                    let mut result = Expr::mk_app(Expr::mk_bvar(rec_bvar), rec_arg);
+                    result = Expr::mk_app(result, proof);
+                    for arg in &args[1..] {
+                        let new_arg = replace_fix_rec_calls_core(
+                            arg, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const
+                        );
+                        result = Expr::mk_app(result, new_arg);
+                    }
+                    return result;
+                }
+            }
+            let new_head = replace_fix_rec_calls_core(
+                head, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const
+            );
+            let new_args: Vec<Expr> = args.iter()
+                .map(|a| replace_fix_rec_calls_core(
+                    a, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const
+                ))
+                .collect();
+            rebuild_app(new_head, new_args)
+        }
+        Expr::Lambda(name, bi, ty, body) => {
+            Expr::Lambda(
+                name.clone(),
+                *bi,
+                Rc::new(replace_fix_rec_calls_core(ty, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const)),
+                Rc::new(replace_fix_rec_calls_core(body, fn_name, rec_bvar + 1, x_bvar + 1, measure, lt_const, sorry_const)),
+            )
+        }
+        Expr::Pi(name, bi, ty, body) => {
+            Expr::Pi(
+                name.clone(),
+                *bi,
+                Rc::new(replace_fix_rec_calls_core(ty, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const)),
+                Rc::new(replace_fix_rec_calls_core(body, fn_name, rec_bvar + 1, x_bvar + 1, measure, lt_const, sorry_const)),
+            )
+        }
+        Expr::Let(name, ty, value, body, nondep) => {
+            Expr::Let(
+                name.clone(),
+                Rc::new(replace_fix_rec_calls_core(ty, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const)),
+                Rc::new(replace_fix_rec_calls_core(value, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const)),
+                Rc::new(replace_fix_rec_calls_core(body, fn_name, rec_bvar + 1, x_bvar + 1, measure, lt_const, sorry_const)),
+                *nondep,
+            )
+        }
+        Expr::MData(d, e) => {
+            Expr::MData(d.clone(), Rc::new(replace_fix_rec_calls_core(e, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const)))
+        }
+        Expr::Proj(s, i, e) => {
+            Expr::Proj(s.clone(), *i, Rc::new(replace_fix_rec_calls_core(e, fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const)))
         }
         _ => expr.clone(),
     }
@@ -1600,6 +1859,8 @@ impl Parser {
                     self.parse_have()
                 } else if self.starts_with_keyword("match") {
                     self.parse_match()
+                } else if self.starts_with_keyword("fix") {
+                    self.parse_fix()
                 } else if self.starts_with_keyword("if") {
                     self.parse_if()
                 } else if self.starts_with_keyword("forall") {
@@ -1831,6 +2092,60 @@ impl Parser {
         }
 
         Ok(ParsedExpr::Match(Box::new(scrutinee), Box::new(motive), branches))
+    }
+
+    /// Parse a well-founded fixpoint: fix f (x : T) measure m => e
+    fn parse_fix(&mut self) -> Result<ParsedExpr, String> {
+        self.advance_by(3); // consume "fix"
+        self.skip_whitespace();
+
+        let name = self.parse_ident_raw()?;
+        self.skip_whitespace();
+
+        if self.peek() != Some('(') {
+            return Err("Expected '(' after fix function name".to_string());
+        }
+        self.advance(); // consume '('
+        let param = self.parse_ident_raw()?;
+        self.skip_whitespace();
+
+        if self.peek() != Some(':') {
+            return Err("Expected ':' in fix parameter".to_string());
+        }
+        self.advance(); // consume ':'
+        let param_ty = self.parse_pi_or_arrow()?;
+        self.skip_whitespace();
+
+        if self.peek() != Some(')') {
+            return Err("Expected ')' after fix parameter".to_string());
+        }
+        self.advance(); // consume ')'
+        self.skip_whitespace();
+
+        if !self.starts_with_keyword("measure") {
+            return Err("Expected 'measure' after fix parameter".to_string());
+        }
+        self.advance_by(7); // consume "measure"
+        self.skip_whitespace();
+
+        let measure = self.parse_expr()?;
+        self.skip_whitespace();
+
+        if !self.starts_with_keyword("=>") {
+            return Err("Expected '=>' after fix measure".to_string());
+        }
+        self.advance_by(2); // consume "=>"
+        self.skip_whitespace();
+
+        let body = self.parse_expr()?;
+
+        Ok(ParsedExpr::Fix {
+            name,
+            param,
+            param_ty: Box::new(param_ty),
+            measure: Box::new(measure),
+            body: Box::new(body),
+        })
     }
 
     /// Parse if/then/else: if c : T then t else e
@@ -2593,5 +2908,29 @@ mod tests {
         // Quot.mk is a primitive (QuotInfo), not a ConstructorInfo,
         // so resolve_ctor_name only sees Frac.mk and resolves unambiguously.
         assert_eq!(env.resolve_ctor_name("mk"), Some(Name::new("Frac").extend("mk")));
+    }
+
+    #[test]
+    fn test_parse_fix_measure() {
+        let src = "fix f (n : Nat) measure (fun n : Nat => n) => n";
+        let mut p = Parser::new(src);
+        let e = p.parse_expr().unwrap();
+        assert!(matches!(e, ParsedExpr::Fix { name, param, .. } if name == "f" && param == "n"));
+    }
+
+    #[test]
+    fn test_fix_measure_factorial() {
+        use crate::repl::Repl;
+        let mut repl = Repl::new();
+        repl.set_quiet(true);
+        repl.check_files(&["lib/Nat.cic", "lib/Eq.cic", "lib/Order.cic", "lib/test_fix.cic"]).unwrap();
+    }
+
+    #[test]
+    fn test_match_structural_recursion() {
+        use crate::repl::Repl;
+        let mut repl = Repl::new();
+        repl.set_quiet(true);
+        repl.check_files(&["lib/Nat.cic", "lib/Eq.cic", "lib/Decimal.cic", "lib/test_match_structural.cic"]).unwrap();
     }
 }

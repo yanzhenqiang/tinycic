@@ -1,0 +1,19 @@
+import Nat
+import Eq
+import Decimal
+
+def length (A : Type) (xs : List A) : Nat :=
+  match xs : Nat with
+  | nil => zero
+  | cons _ xs' => succ (length A xs')
+
+def length_test : Eq Nat (length Nat (cons Nat zero (cons Nat zero (nil Nat)))) (succ (succ zero)) :=
+  refl Nat (succ (succ zero))
+
+def map (A B : Type) (f : A -> B) (xs : List A) : List B :=
+  match xs : List B with
+  | nil => nil B
+  | cons x xs' => cons B (f x) (map A B f xs')
+
+def map_test : Eq (List Nat) (map Nat Nat succ (cons Nat zero (cons Nat (succ zero) (nil Nat)))) (cons Nat (succ zero) (cons Nat (succ (succ zero)) (nil Nat))) :=
+  refl (List Nat) (cons Nat (succ zero) (cons Nat (succ (succ zero)) (nil Nat)))

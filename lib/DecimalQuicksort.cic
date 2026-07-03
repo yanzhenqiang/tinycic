@@ -119,70 +119,64 @@ def NatPerm_trans (xs ys zs : List Nat) (h1 : NatPerm xs ys) (h2 : NatPerm ys zs
     (h1 x)
 
 
-def quicksort_fuel_perm (fuel : Nat) (xs : List Nat) : NatPerm xs (quicksort_fuel Nat nat_le fuel xs) :=
-  rec.Nat (fun fuel' => forall (zs : List Nat), NatPerm zs (quicksort_fuel Nat nat_le fuel' zs))
-    (fun zs => NatPerm_refl zs)
-    (fun fuel' ih => fun zs =>
-      rec.List Nat (fun ws => NatPerm ws (quicksort_fuel Nat nat_le (succ fuel') ws))
-        (NatPerm_refl (nil Nat))
-        (fun head tail _ =>
-          let left := list_filter Nat (fun x : Nat => not (nat_le head x)) tail in
-          let right := list_filter Nat (fun x : Nat => nat_le head x) tail in
-          let left_sorted := quicksort_fuel Nat nat_le fuel' left in
-          let right_sorted := quicksort_fuel Nat nat_le fuel' right in
-          fun x : Nat =>
-            let c_tail := list_count Nat nat_eq x tail in
-            let c_left := list_count Nat nat_eq x left in
-            let c_right := list_count Nat nat_eq x right in
-            let c_head := match nat_eq x head : Nat with | true => succ zero | false => zero in
-            let c_append := list_count Nat nat_eq x (list_append Nat left_sorted (cons Nat head right_sorted)) in
-            let eq_ih_left := ih left x in
-            let eq_ih_right := ih right x in
-            let eq_append := count_append x left_sorted (cons Nat head right_sorted) in
-            let eq_cons :=
-              rec.Bool (fun b => Eq Nat (list_count Nat nat_eq x (cons Nat head right_sorted))
-                                       (nat_add (match b : Nat with | true => succ zero | false => zero) (list_count Nat nat_eq x right_sorted)))
-                (refl Nat (succ (list_count Nat nat_eq x right_sorted)))
-                (refl Nat (list_count Nat nat_eq x right_sorted))
-                (nat_eq x head) in
-            let eq_partition := count_filter_partition (fun y : Nat => not (nat_le head y)) x tail in
-            eq_subst Nat (nat_add c_left c_right) c_tail
-              (fun y => Eq Nat (match nat_eq x head : Nat with | true => succ y | false => y)
-                                (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted))))
-              (eq_sym Nat c_tail (nat_add c_left c_right) eq_partition)
-              (eq_subst Nat (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted))) (nat_add c_left (nat_add c_head c_right))
-                (fun y => Eq Nat (match nat_eq x head : Nat with | true => succ (nat_add c_left c_right) | false => nat_add c_left c_right) y)
-                (eq_subst Nat (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted)))
-                  (nat_add c_left (nat_add c_head c_right))
+def quicksort_perm_def (xs : List Nat) : NatPerm xs (quicksort Nat nat_le xs) :=
+  fix proof (xs : List Nat) measure (list_length Nat) =>
+    match xs : NatPerm xs (quicksort Nat nat_le xs) with
+    | nil => NatPerm_refl (nil Nat)
+    | cons head tail =>
+        let left := list_filter Nat (fun x : Nat => not (nat_le head x)) tail in
+        let right := list_filter Nat (fun x : Nat => nat_le head x) tail in
+        let left_sorted := quicksort Nat nat_le left in
+        let right_sorted := quicksort Nat nat_le right in
+        fun x : Nat =>
+          let c_tail := list_count Nat nat_eq x tail in
+          let c_left := list_count Nat nat_eq x left in
+          let c_right := list_count Nat nat_eq x right in
+          let c_head := match nat_eq x head : Nat with | true => succ zero | false => zero in
+          let eq_ih_left := proof (list_filter Nat (fun x : Nat => not (nat_le head x)) tail) x in
+          let eq_ih_right := proof (list_filter Nat (fun x : Nat => nat_le head x) tail) x in
+          let eq_append := count_append x left_sorted (cons Nat head right_sorted) in
+          let eq_cons :=
+            rec.Bool (fun b => Eq Nat (list_count Nat nat_eq x (cons Nat head right_sorted))
+                                     (nat_add (match b : Nat with | true => succ zero | false => zero) (list_count Nat nat_eq x right_sorted)))
+              (refl Nat (succ (list_count Nat nat_eq x right_sorted)))
+              (refl Nat (list_count Nat nat_eq x right_sorted))
+              (nat_eq x head) in
+          let eq_partition := count_filter_partition (fun y : Nat => not (nat_le head y)) x tail in
+          eq_subst Nat (nat_add c_left c_right) c_tail
+            (fun y => Eq Nat (match nat_eq x head : Nat with | true => succ y | false => y)
+                              (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted))))
+            (eq_sym Nat c_tail (nat_add c_left c_right) eq_partition)
+            (eq_subst Nat (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted))) (nat_add c_left (nat_add c_head c_right))
+              (fun y => Eq Nat (match nat_eq x head : Nat with | true => succ (nat_add c_left c_right) | false => nat_add c_left c_right) y)
+              (eq_subst Nat (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted)))
+                (nat_add c_left (nat_add c_head c_right))
+                (fun y => Eq Nat y (nat_add c_left (nat_add c_head c_right)))
+                (eq_subst Nat (list_count Nat nat_eq x (list_append Nat left_sorted (cons Nat head right_sorted)))
+                  (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted)))
                   (fun y => Eq Nat y (nat_add c_left (nat_add c_head c_right)))
-                  (eq_subst Nat (list_count Nat nat_eq x (list_append Nat left_sorted (cons Nat head right_sorted)))
-                    (nat_add (list_count Nat nat_eq x left_sorted) (list_count Nat nat_eq x (cons Nat head right_sorted)))
-                    (fun y => Eq Nat y (nat_add c_left (nat_add c_head c_right)))
-                    eq_append
-                    (eq_subst Nat (list_count Nat nat_eq x left_sorted) c_left
-                      (fun y => Eq Nat (nat_add y (list_count Nat nat_eq x (cons Nat head right_sorted))) (nat_add c_left (nat_add c_head c_right)))
-                      eq_ih_left
-                      (eq_subst Nat (list_count Nat nat_eq x (cons Nat head right_sorted)) (nat_add c_head (list_count Nat nat_eq x right_sorted))
-                        (fun y => Eq Nat (nat_add c_left y) (nat_add c_left (nat_add c_head c_right)))
-                        eq_cons
-                        (eq_subst Nat (list_count Nat nat_eq x right_sorted) c_right
-                          (fun y => Eq Nat (nat_add c_left (nat_add c_head y)) (nat_add c_left (nat_add c_head c_right)))
-                          eq_ih_right
-                          (refl Nat (nat_add c_left (nat_add c_head c_right)))))))
-                  (refl Nat (nat_add c_left (nat_add c_head c_right))))
-                (match nat_eq x head : Eq Nat (match nat_eq x head : Nat with | true => succ (nat_add c_left c_right) | false => nat_add c_left c_right) (nat_add c_left (match nat_eq x head : Nat with | true => succ c_right | false => c_right)) with
-                 | true => eq_subst Nat (succ (nat_add c_left c_right)) (nat_add c_left (succ c_right))
-                     (fun y => Eq Nat (succ (nat_add c_left c_right)) y)
-                     (eq_sym Nat (nat_add c_left (succ c_right)) (succ (nat_add c_left c_right)) (nat_add_succ_r c_left c_right))
-                     (refl Nat (succ (nat_add c_left c_right)))
-                 | false => refl Nat (nat_add c_left c_right))))
-          zs)
-    fuel
-    xs
+                  eq_append
+                  (eq_subst Nat (list_count Nat nat_eq x left_sorted) c_left
+                    (fun y => Eq Nat (nat_add y (list_count Nat nat_eq x (cons Nat head right_sorted))) (nat_add c_left (nat_add c_head c_right)))
+                    eq_ih_left
+                    (eq_subst Nat (list_count Nat nat_eq x (cons Nat head right_sorted)) (nat_add c_head (list_count Nat nat_eq x right_sorted))
+                      (fun y => Eq Nat (nat_add c_left y) (nat_add c_left (nat_add c_head c_right)))
+                      eq_cons
+                      (eq_subst Nat (list_count Nat nat_eq x right_sorted) c_right
+                        (fun y => Eq Nat (nat_add c_left (nat_add c_head y)) (nat_add c_left (nat_add c_head c_right)))
+                        eq_ih_right
+                        (refl Nat (nat_add c_left (nat_add c_head c_right)))))))
+                (refl Nat (nat_add c_left (nat_add c_head c_right))))
+              (match nat_eq x head : Eq Nat (match nat_eq x head : Nat with | true => succ (nat_add c_left c_right) | false => nat_add c_left c_right) (nat_add c_left (match nat_eq x head : Nat with | true => succ c_right | false => c_right)) with
+               | true => eq_subst Nat (succ (nat_add c_left c_right)) (nat_add c_left (succ c_right))
+                   (fun y => Eq Nat (succ (nat_add c_left c_right)) y)
+                   (eq_sym Nat (nat_add c_left (succ c_right)) (succ (nat_add c_left c_right)) (nat_add_succ_r c_left c_right))
+                   (refl Nat (succ (nat_add c_left c_right)))
+               | false => refl Nat (nat_add c_left c_right)))
 
 
 theorem quicksort_perm (xs : List Nat) : NatPerm xs (quicksort Nat nat_le xs) :=
-  quicksort_fuel_perm (list_length Nat xs) xs
+  quicksort_perm_def xs
 
 
 theorem quicksort_correct (xs : List Nat)

@@ -714,7 +714,8 @@ fn replace_recursive_calls_core(expr: &Expr, fn_name: &str, recursive_pairs: &[(
 }
 
 /// Replace remaining recursive function calls inside a `fix` body with applications
-/// of the well-founded step binder. Each call `f a` becomes `rec a (sorry_prop (lt (m a) (m x)))`.
+/// of the well-founded step binder. Each call `f a` becomes `rec a proof`, where
+/// `proof` is a real termination proof when we can synthesize one.
 fn replace_fix_rec_calls(
     expr: &Expr,
     fn_name: &str,
@@ -725,6 +726,79 @@ fn replace_fix_rec_calls(
     let lt_const = Expr::mk_const(Name::new("lt"), vec![]);
     let sorry_const = Expr::mk_const(Name::new("sorry_prop"), vec![]);
     replace_fix_rec_calls_core(expr, fn_name, rec_bvar, x_bvar, measure, &lt_const, &sorry_const)
+}
+
+/// Try to synthesize a real termination proof `lt (m rec_arg) (m x)`.
+/// Currently supports the common pattern where the measure is `list_length A`
+/// and the recursive argument is `list_filter A p tail`.
+fn try_mk_termination_proof(rec_arg: &Expr, measure: &Expr) -> Option<Expr> {
+    // Recognize measure = list_length A
+    let (measure_head, measure_args) = flatten_app(measure);
+    if let Expr::Const(name, _) = measure_head {
+        if name.to_string() != "list_length" {
+            return None;
+        }
+    } else {
+        return None;
+    }
+    if measure_args.len() != 1 {
+        return None;
+    }
+    let a_expr = measure_args[0].clone();
+
+    // Recognize rec_arg = list_filter A p tail
+    let (arg_head, arg_args) = flatten_app(rec_arg);
+    if let Expr::Const(name, _) = arg_head {
+        if name.to_string() != "list_filter" {
+            return None;
+        }
+    } else {
+        return None;
+    }
+    if arg_args.len() != 3 {
+        return None;
+    }
+    let filter_a = arg_args[0];
+    let filter_p = arg_args[1].clone();
+    let filter_tail = arg_args[2].clone();
+
+    if &a_expr != filter_a {
+        return None;
+    }
+
+    let list_length = Expr::mk_const(Name::new("list_length"), vec![]);
+    let list_filter = Expr::mk_const(Name::new("list_filter"), vec![]);
+    let list_filter_length_le = Expr::mk_const(Name::new("list_filter_length_le"), vec![]);
+    let le_succ = Expr::mk_const(Name::new("le_succ"), vec![]);
+
+    let len_filter_tail = Expr::mk_app(
+        Expr::mk_app(list_length.clone(), a_expr.clone()),
+        Expr::mk_app(
+            Expr::mk_app(
+                Expr::mk_app(list_filter.clone(), a_expr.clone()),
+                filter_p.clone(),
+            ),
+            filter_tail.clone(),
+        ),
+    );
+
+    let len_tail = Expr::mk_app(
+        Expr::mk_app(list_length.clone(), a_expr.clone()),
+        filter_tail.clone(),
+    );
+
+    let filter_le = Expr::mk_app(
+        Expr::mk_app(
+            Expr::mk_app(list_filter_length_le, a_expr.clone()),
+            filter_p.clone(),
+        ),
+        filter_tail.clone(),
+    );
+
+    Some(Expr::mk_app(
+        Expr::mk_app(Expr::mk_app(le_succ, len_filter_tail), len_tail),
+        filter_le,
+    ))
 }
 
 fn replace_fix_rec_calls_core(
@@ -744,16 +818,19 @@ fn replace_fix_rec_calls_core(
                     let rec_arg = replace_fix_rec_calls_core(
                         args[0], fn_name, rec_bvar, x_bvar, measure, lt_const, sorry_const
                     );
-                    let proof = Expr::mk_app(
-                        sorry_const.clone(),
-                        Expr::mk_app(
+                    let proof = try_mk_termination_proof(&rec_arg, measure)
+                        .unwrap_or_else(|| {
                             Expr::mk_app(
-                                lt_const.clone(),
-                                Expr::mk_app(measure.clone(), rec_arg.clone()),
-                            ),
-                            Expr::mk_app(measure.clone(), Expr::mk_bvar(x_bvar)),
-                        ),
-                    );
+                                sorry_const.clone(),
+                                Expr::mk_app(
+                                    Expr::mk_app(
+                                        lt_const.clone(),
+                                        Expr::mk_app(measure.clone(), rec_arg.clone()),
+                                    ),
+                                    Expr::mk_app(measure.clone(), Expr::mk_bvar(x_bvar)),
+                                ),
+                            )
+                        });
                     let mut result = Expr::mk_app(Expr::mk_bvar(rec_bvar), rec_arg);
                     result = Expr::mk_app(result, proof);
                     for arg in &args[1..] {

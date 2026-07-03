@@ -302,6 +302,10 @@ impl Repl {
             return self.handle_axiom(&input[7..]).map(|_| false);
         }
 
+        if input.starts_with(":trace ") {
+            return self.handle_trace(&input[7..]).map(|_| false);
+        }
+
         if input.starts_with(":def ") {
             return self.handle_def(&input[5..]).map(|_| false);
         }
@@ -336,7 +340,8 @@ impl Repl {
 
         // Default: try to infer and reduce the expression
         let expr = self.parse_and_convert(input)?;
-        let mut tc = TypeChecker::with_local_ctx(&mut self.tc_state, super::local_ctx::LocalCtx::new());
+        let mut tc = TypeChecker::with_local_ctx(
+            &mut self.tc_state, super::local_ctx::LocalCtx::new());
         match tc.infer(&expr) {
             Ok(ty) => {
                 println!("  type: {}", format_expr(&ty));
@@ -346,6 +351,44 @@ impl Repl {
             Err(e) => println!("  type error: {}", e),
         }
         Ok(false)
+    }
+
+    fn handle_trace(&mut self, rest: &str) -> Result<(), String> {
+        // Try to parse as a declaration first (def/theorem)
+        let mut parser = ReplParser::new_with_state(rest, self.infix_ops.clone(), self.notations.clone());
+        match parser.parse_file() {
+            Ok(decls) if decls.len() == 1 => {
+                match &decls[0] {
+                    ParsedDecl::Def { name, params, ret_ty, value } => {
+                        println!("[trace] definition {}", name);
+                        return self.process_def_or_theorem(
+                            name.clone(), params.clone(), ret_ty.clone(), value.clone(), false, true
+                        );
+                    }
+                    ParsedDecl::Theorem { name, params, ret_ty, value } => {
+                        println!("[trace] theorem {}", name);
+                        return self.process_def_or_theorem(
+                            name.clone(), params.clone(), Some(ret_ty.clone()), value.clone(), true, true
+                        );
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+
+        // Otherwise treat as expression
+        println!("[trace] expression");
+        let expr = self.parse_and_convert(rest)?;
+        let mut tc = TypeChecker::with_local_ctx(
+            &mut self.tc_state, super::local_ctx::LocalCtx::new());
+        let ty = tc.infer(&expr).map_err(|e| format!("type error: {}", e))?;
+        println!("  type: {}", format_expr(&ty));
+        tc.set_trace(true);
+        tc.set_trace_file(std::path::Path::new(".test-out/trace.log"));
+        let reduced = tc.whnf(&expr);
+        println!("  whnf: {}", format_expr(&reduced));
+        Ok(())
     }
 
     fn parse_and_convert(&self, input: &str) -> Result<Expr, String> {
@@ -475,10 +518,10 @@ impl Repl {
                 Ok(())
             }
             ParsedDecl::Def { name, params, ret_ty, value } => {
-                self.process_def_or_theorem(name, params, ret_ty, value, false)
+                self.process_def_or_theorem(name, params, ret_ty, value, false, false)
             }
             ParsedDecl::Theorem { name, params, ret_ty, value } => {
-                self.process_def_or_theorem(name, params, Some(ret_ty), value, true)
+                self.process_def_or_theorem(name, params, Some(ret_ty), value, true, false)
             }
             ParsedDecl::Solve { name, params, ret_ty, value } => {
                 self.process_solve(name, params, ret_ty, value)
@@ -875,6 +918,7 @@ impl Repl {
         ret_ty: Option<super::repl_parser::ParsedExpr>,
         value: super::repl_parser::ParsedExpr,
         is_theorem: bool,
+        trace: bool,
     ) -> Result<(), String> {
         // Prepend file-scoped variables to params
         let mut all_params = self.file_variables.clone();
@@ -955,6 +999,8 @@ impl Repl {
         if is_theorem {
             // Type-check in relaxed mode (allows unassigned metavariables during solving)
             let mut tc = TypeChecker::with_allow_unassigned_mvar(&mut self.tc_state, super::local_ctx::LocalCtx::new());
+            tc.set_trace(trace);
+            tc.set_trace_file(std::path::Path::new(".test-out/trace.log"));
             tc.check(&final_value, &final_ty)
                 .map_err(|e| format!("Proof does not match theorem type: {}", e))?;
 
@@ -1739,3 +1785,46 @@ pub fn execute_tactic(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    /// Verify every `.cic` file in the project `lib/` directory.
+    /// `Geometry.cic` is skipped because it contains an unfinished theorem.
+    #[test]
+    fn check_all_cic_files() {
+        let lib_dir = std::path::Path::new("lib");
+        let mut paths: Vec<_> = fs::read_dir(lib_dir)
+            .expect("Cannot read lib directory")
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let path = entry.path();
+                if path.extension()?.to_str()? == "cic" {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        paths.sort();
+
+        let mut failures = Vec::new();
+        for path in paths {
+            let path_str = path.to_string_lossy().to_string();
+            let mut repl = Repl::new();
+            repl.set_quiet(true);
+            if let Err(e) = repl.check_files(&[&path_str]) {
+                failures.push(format!("{}: {}", path_str, e));
+            }
+        }
+
+        if !failures.is_empty() {
+            panic!(
+                "{} .cic file(s) failed verification:\n{}",
+                failures.len(),
+                failures.join("\n")
+            );
+        }
+    }
+}

@@ -3,6 +3,7 @@ use super::declaration::*;
 use super::environment::*;
 use super::expr::*;
 use super::local_ctx::*;
+use std::io::Write;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -113,6 +114,12 @@ pub struct TypeChecker<'a> {
     lctx: LocalCtx,
     /// When true, unassigned metavariables are allowed in expressions (solve mode)
     allow_unassigned_mvar: bool,
+    /// When true, log every reduction step to stderr.
+    trace: bool,
+    /// Current recursion depth for indentation.
+    trace_depth: usize,
+    /// Optional trace output file.
+    trace_writer: Option<std::fs::File>,
 }
 
 impl<'a> TypeChecker<'a> {
@@ -121,15 +128,81 @@ impl<'a> TypeChecker<'a> {
             st,
             lctx: LocalCtx::new(),
             allow_unassigned_mvar: false,
+            trace: false,
+            trace_depth: 0,
+            trace_writer: None,
         }
     }
 
     pub fn with_local_ctx(st: &'a mut TypeCheckerState, lctx: LocalCtx) -> Self {
-        TypeChecker { st, lctx, allow_unassigned_mvar: false }
+        TypeChecker { st, lctx, allow_unassigned_mvar: false, trace: false, trace_depth: 0, trace_writer: None }
     }
 
     pub fn with_allow_unassigned_mvar(st: &'a mut TypeCheckerState, lctx: LocalCtx) -> Self {
-        TypeChecker { st, lctx, allow_unassigned_mvar: true }
+        TypeChecker { st, lctx, allow_unassigned_mvar: true, trace: false, trace_depth: 0, trace_writer: None }
+    }
+
+    /// Enable or disable step-by-step reduction tracing.
+    pub fn set_trace(&mut self, trace: bool) {
+        self.trace = trace;
+        if trace {
+            // Clear WHNF cache so reductions are recomputed and traced.
+            self.st.whnf_cache.clear();
+        }
+    }
+
+    /// Set a fixed file to receive trace output.
+    pub fn set_trace_file(&mut self, path: &std::path::Path) {
+        match std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            Ok(file) => self.trace_writer = Some(file),
+            Err(e) => eprintln!("Warning: cannot open trace file '{}': {}", path.display(), e),
+        }
+    }
+
+    fn trace_step(&mut self, rule: &str, before: &Expr, after: &Expr) {
+        if !self.trace {
+            return;
+        }
+        let indent = "  ".repeat(self.trace_depth);
+        let lines = format!(
+            "{}[{}]\n{}  {}\n{}  ~> {}\n",
+            indent,
+            rule,
+            indent,
+            self.trace_expr_to_string(before),
+            indent,
+            self.trace_expr_to_string(after)
+        );
+        eprint!("{}", lines);
+        if let Some(ref mut w) = self.trace_writer {
+            let _ = w.write_all(lines.as_bytes());
+        }
+    }
+
+    fn trace_expr_to_string(&self, e: &Expr) -> String {
+        let s = self.expr_to_string(e);
+        if s.len() > 80 {
+            format!("{}...(truncated)", &s[..80])
+        } else {
+            s
+        }
+    }
+
+    fn trace_rule<F, R>(&mut self, rule: &str, before: &Expr, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        if !self.trace {
+            return f(self);
+        }
+        self.trace_depth += 1;
+        let result = f(self);
+        self.trace_depth -= 1;
+        result
     }
 
     /// Infer the type of an expression
@@ -383,7 +456,11 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::MVar(name) => {
                 if let Some(val) = self.st.get_mvar_assignment(name).cloned() {
-                    self.whnf_core(&val)
+                    let result = self.whnf_core(&val);
+                    if self.trace && !matches!(result, Expr::MVar(_)) {
+                        self.trace_step("mvar", e, &result);
+                    }
+                    result
                 } else {
                     e.clone()
                 }
@@ -393,19 +470,39 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::FVar(name) => {
                 if let Some(value) = self.lctx.get_value(&Expr::FVar(name.clone())).cloned() {
-                    self.whnf_core(&value)
+                    let result = self.whnf_core(&value);
+                    if self.trace {
+                        self.trace_step("fvar", e, &result);
+                    }
+                    result
                 } else {
                     e.clone()
                 }
             }
             Expr::Const(name, levels) => {
-                if let Some(info) = self.st.env().find(name) {
+                let (should_expand, rule, instantiated) = if let Some(info) = self.st.env().find(name) {
                     if info.is_definition() || info.is_theorem() {
                         if let Some(val) = info.get_value(false) {
                             let instantiated = self.instantiate_univ_params(val, info.get_level_params(), levels);
-                            return self.whnf_core(&instantiated);
+                            let rule = if info.is_theorem() { "δ-theorem" } else { "δ-def" };
+                            (true, rule, Some(instantiated))
+                        } else {
+                            (false, "", None)
                         }
+                    } else {
+                        (false, "", None)
                     }
+                } else {
+                    (false, "", None)
+                };
+
+                if should_expand {
+                    let instantiated = instantiated.unwrap();
+                    let result = self.whnf_core(&instantiated);
+                    if self.trace {
+                        self.trace_step(rule, e, &result);
+                    }
+                    return result;
                 }
                 e.clone()
             }
@@ -414,16 +511,36 @@ impl<'a> TypeChecker<'a> {
                 match f_whnf {
                     Expr::Lambda(_, _, _, body) => {
                         let reduced = body.instantiate(a);
-                        self.whnf_core(&reduced)
+                        let result = self.whnf_core(&reduced);
+                        if self.trace {
+                            self.trace_step("β", e, &result);
+                        }
+                        result
                     }
                     _ => {
+                        // Try wellFounded_fix reduction
+                        if let Some(reduced) = self.reduce_wellfounded_fix(e) {
+                            let result = self.whnf_core(&reduced);
+                            if self.trace {
+                                self.trace_step("wellFounded_fix", e, &result);
+                            }
+                            return result;
+                        }
                         // Try recursor reduction
                         if let Some(reduced) = self.reduce_recursor(e) {
-                            return self.whnf_core(&reduced);
+                            let result = self.whnf_core(&reduced);
+                            if self.trace {
+                                self.trace_step("recursor", e, &result);
+                            }
+                            return result;
                         }
                         // Try quotient reduction
                         if let Some(reduced) = self.reduce_quot(e) {
-                            return self.whnf_core(&reduced);
+                            let result = self.whnf_core(&reduced);
+                            if self.trace {
+                                self.trace_step("quot", e, &result);
+                            }
+                            return result;
                         }
                         Expr::App(Rc::new(f_whnf), a.clone())
                     }
@@ -431,14 +548,22 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::Let(_, _, value, body, _) => {
                 let reduced = body.instantiate(value);
-                self.whnf_core(&reduced)
+                let result = self.whnf_core(&reduced);
+                if self.trace {
+                    self.trace_step("let", e, &result);
+                }
+                result
             }
             Expr::MData(_, inner) => {
                 self.whnf_core(inner)
             }
             Expr::Proj(_struct_name, idx, e) => {
                 if let Some(reduced) = self.reduce_proj(e, *idx) {
-                    return self.whnf_core(&reduced);
+                    let result = self.whnf_core(&reduced);
+                    if self.trace {
+                        self.trace_step("proj", e, &result);
+                    }
+                    return result;
                 }
                 let e_whnf = self.whnf_core(e);
                 Expr::Proj(_struct_name.clone(), *idx, Rc::new(e_whnf))
@@ -504,6 +629,83 @@ impl<'a> TypeChecker<'a> {
         } else {
             None
         }
+    }
+
+    /// Reduce a `wellFounded_fix` application.
+    ///
+    /// wellFounded_fix A C R hwf F x  ~>  F x (fun (y : A) (_ : R y x) => wellFounded_fix A C R hwf F y)
+    fn reduce_wellfounded_fix(&mut self, e: &Expr) -> Option<Expr> {
+        let (fn_expr, args) = e.get_app_args();
+        let fn_expr = fn_expr?;
+
+        if let Expr::Const(name, _) = fn_expr {
+            if name.to_string() != "wellFounded_fix" {
+                return None;
+            }
+        } else {
+            return None;
+        }
+
+        // wellFounded_fix takes 6 explicit arguments before the recursive input: A, C, R, hwf, F, x
+        if args.len() < 6 {
+            return None;
+        }
+
+        let a_expr = args[0].clone();
+        let c_expr = args[1].clone();
+        let r_expr = args[2].clone();
+        let hwf_expr = args[3].clone();
+        let f_expr = args[4].clone();
+        let x_expr = args[5].clone();
+
+        // Inside the two new binders (y and the accessibility proof), lift all free bound variables by 2.
+        let a_lifted = a_expr.lift_loose_bvars(2, 0);
+        let c_lifted = c_expr.lift_loose_bvars(2, 0);
+        let r_lifted = r_expr.lift_loose_bvars(2, 0);
+        let hwf_lifted = hwf_expr.lift_loose_bvars(2, 0);
+        let f_lifted = f_expr.lift_loose_bvars(2, 0);
+        let x_lifted = x_expr.lift_loose_bvars(2, 0);
+
+        // y is the innermost binder (BVar 0)
+        let y_bvar = Expr::mk_bvar(0);
+
+        // Inner recursive call: wellFounded_fix A C R hwf F y
+        let inner_fix = Expr::mk_app(
+            Expr::mk_app(
+                Expr::mk_app(
+                    Expr::mk_app(
+                        Expr::mk_app(
+                            Expr::mk_app(
+                                Expr::mk_const(Name::new("wellFounded_fix"), vec![]),
+                                a_lifted.clone(),
+                            ),
+                            c_lifted.clone(),
+                        ),
+                        r_lifted.clone(),
+                    ),
+                    hwf_lifted.clone(),
+                ),
+                f_lifted.clone(),
+            ),
+            y_bvar.clone(),
+        );
+
+        // Accessibility proof binder: (_ : R y x)
+        let acc_ty = Expr::mk_app(Expr::mk_app(r_lifted, y_bvar.clone()), x_lifted.clone());
+        let acc_lambda = Expr::mk_lambda(Name::new("_"), acc_ty, inner_fix);
+
+        // Step function argument: fun (y : A) (_ : R y x) => inner_fix
+        let step = Expr::mk_lambda(Name::new("y"), a_lifted, acc_lambda);
+
+        // F x step
+        let mut result = Expr::mk_app(Expr::mk_app(f_expr, x_expr), step);
+
+        // Append any trailing arguments after x
+        for arg in &args[6..] {
+            result = Expr::mk_app(result, (*arg).clone());
+        }
+
+        Some(result)
     }
 
     fn is_constructor_app(&self, e: &Expr, ctor_name: &Name) -> bool {
@@ -1679,6 +1881,123 @@ mod tests {
         let app = Expr::mk_app(lam, zero.clone());
         let result = tc.nf(&app);
         assert_eq!(result, zero);
+    }
+
+    #[test]
+    fn test_wellfounded_fix_reduction() {
+        let mut env = Environment::new();
+
+        // Nat : Type 0
+        env.add(Declaration::Axiom(AxiomVal {
+            constant_val: ConstantVal {
+                name: Name::new("Nat"),
+                level_params: vec![],
+                ty: Expr::mk_type(),
+            },
+            is_unsafe: false,
+        })).unwrap();
+
+        // zero : Nat
+        env.add(Declaration::Axiom(AxiomVal {
+            constant_val: ConstantVal {
+                name: Name::new("zero"),
+                level_params: vec![],
+                ty: Expr::mk_const(Name::new("Nat"), vec![]),
+            },
+            is_unsafe: false,
+        })).unwrap();
+
+        // R : Nat -> Nat -> Prop
+        let nat = Expr::mk_const(Name::new("Nat"), vec![]);
+        let prop = Expr::mk_prop();
+        let r_ty = Expr::mk_arrow(nat.clone(), Expr::mk_arrow(nat.clone(), prop.clone()));
+        env.add(Declaration::Axiom(AxiomVal {
+            constant_val: ConstantVal {
+                name: Name::new("R"),
+                level_params: vec![],
+                ty: r_ty,
+            },
+            is_unsafe: false,
+        })).unwrap();
+
+        // hwf : WellFounded Nat R
+        env.add(Declaration::Axiom(AxiomVal {
+            constant_val: ConstantVal {
+                name: Name::new("hwf"),
+                level_params: vec![],
+                ty: Expr::mk_app(Expr::mk_app(Expr::mk_const(Name::new("WellFounded"), vec![]), nat.clone()), Expr::mk_const(Name::new("R"), vec![])),
+            },
+            is_unsafe: false,
+        })).unwrap();
+
+        // F : forall (x : Nat), (forall (y : Nat), R y x -> Nat) -> Nat
+        let f_ty = Expr::mk_pi(
+            Name::new("x"),
+            nat.clone(),
+            Expr::mk_arrow(
+                Expr::mk_pi(
+                    Name::new("y"),
+                    nat.clone(),
+                    Expr::mk_arrow(
+                        Expr::mk_app(Expr::mk_app(Expr::mk_const(Name::new("R"), vec![]), Expr::mk_bvar(0)), Expr::mk_bvar(1)),
+                        nat.clone(),
+                    ),
+                ),
+                nat.clone(),
+            ),
+        );
+        env.add(Declaration::Axiom(AxiomVal {
+            constant_val: ConstantVal {
+                name: Name::new("F"),
+                level_params: vec![],
+                ty: f_ty,
+            },
+            is_unsafe: false,
+        })).unwrap();
+
+        let mut st = TypeCheckerState::new(env);
+        let mut tc = TypeChecker::new(&mut st);
+
+        // wellFounded_fix Nat (fun _ => Nat) R hwf F zero
+        let c_ty = Expr::mk_lambda(Name::new("_"), nat.clone(), nat.clone());
+        let wf_fix = Expr::mk_app(
+            Expr::mk_app(
+                Expr::mk_app(
+                    Expr::mk_app(
+                        Expr::mk_app(
+                            Expr::mk_app(
+                                Expr::mk_const(Name::new("wellFounded_fix"), vec![]),
+                                nat.clone(),
+                            ),
+                            c_ty,
+                        ),
+                        Expr::mk_const(Name::new("R"), vec![]),
+                    ),
+                    Expr::mk_const(Name::new("hwf"), vec![]),
+                ),
+                Expr::mk_const(Name::new("F"), vec![]),
+            ),
+            Expr::mk_const(Name::new("zero"), vec![]),
+        );
+
+        let result = tc.whnf(&wf_fix);
+
+        // Should reduce to F zero (fun y _ => wellFounded_fix Nat (fun _ => Nat) R hwf F y)
+        let (head, args) = result.get_app_args();
+        assert!(head.is_some());
+        let head = head.unwrap();
+        assert_eq!(head, &Expr::mk_const(Name::new("F"), vec![]));
+        assert_eq!(args.len(), 2, "F should be applied to zero and the step function");
+        assert_eq!(args[0], &Expr::mk_const(Name::new("zero"), vec![]));
+
+        // The step argument should be a lambda
+        let step = args[1];
+        if let Expr::Lambda(_, _, _, body) = step {
+            // Inner lambda should be a lambda too
+            assert!(matches!(body.as_ref(), Expr::Lambda(_, _, _, _)), "Step should be a nested lambda");
+        } else {
+            panic!("Step argument should be a lambda, got {:?}", step);
+        }
     }
 
     #[test]

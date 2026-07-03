@@ -1,6 +1,8 @@
 import Nat
 import Eq
 import Logic
+import Order
+import WellFounded
 
 -- =====================================================================
 -- Decimal integer system (Decimal: most significant digit first, intuitive notation)
@@ -504,25 +506,28 @@ def list_length (A : Type) (xs : List A) : Nat :=
     (fun x xs ih => succ ih)
     xs
 
--- Fuel-based quicksort: structural recursion on fuel, amenable to induction.
--- Fuel exhaustion returns the input list unchanged, which makes permutation
--- proofs straightforward while remaining correct when fuel >= length xs.
-def quicksort_fuel (A : Type) (le : A -> A -> Bool) (fuel : Nat) (xs : List A) : List A :=
-  rec.Nat (fun _ => List A -> List A)
-    (fun xs => xs)
-    (fun fuel' ih => fun xs =>
-      rec.List A (fun _ => List A)
-        (nil A)
-        (fun head tail _ =>
-          list_append A (ih (list_filter A (fun x => not (le head x)) tail))
-            (cons A head (ih (list_filter A (fun x => le head x) tail))))
-        xs)
-    fuel
+-- Filter does not increase list length
+def list_filter_length_le (A : Type) (p : A -> Bool) (xs : List A)
+  : le (list_length A (list_filter A p xs)) (list_length A xs) :=
+  rec.List A (fun zs => le (list_length A (list_filter A p zs)) (list_length A zs))
+    (le_zero zero)
+    (fun x xs ih =>
+      rec.Bool (fun b : Bool =>
+        le (list_length A (match b : List A with
+                            | true => cons A x (list_filter A p xs)
+                            | false => list_filter A p xs))
+           (succ (list_length A xs)))
+        (le_succ (list_length A (list_filter A p xs)) (list_length A xs) ih)
+        (le_succ (list_length A (list_filter A p xs)) (list_length A xs) ih)
+        (p x))
     xs
 
--- Wrapper: use list length as fuel (sufficient for correct computation)
+-- Well-founded quicksort using fix/measure on list length.
 def quicksort (A : Type) (le : A -> A -> Bool) (xs : List A) : List A :=
-  quicksort_fuel A le (list_length A xs) xs
+  fix qsort (xs : List A) measure (list_length A) =>
+    match xs : List A with
+    | nil => nil A
+    | cons head tail => list_append A (qsort (list_filter A (fun x => not (le head x)) tail)) (cons A head (qsort (list_filter A (fun x => le head x)) tail))
 
 -- Nat less-than-or-equal
 def nat_le (m n : Nat) : Bool := not (nat_gt m n)
@@ -759,81 +764,67 @@ def append_sorted_cons (xs : List Nat) (pivot : Nat) (ys : List Nat)
     xs
     sorted_xs
     le_xs
-
 -- quicksort_preserves_all_le: quicksort preserves AllLeNat
-def quicksort_preserves_all_le (pivot : Nat) (fuel : Nat) (xs : List Nat)
-  (h : AllLeNat pivot xs) : AllLeNat pivot (quicksort_fuel Nat nat_le fuel xs) :=
-  rec.Nat (fun fuel' : Nat => forall (zs : List Nat), AllLeNat pivot zs -> AllLeNat pivot (quicksort_fuel Nat nat_le fuel' zs))
-    (fun zs : List Nat => fun _ : AllLeNat pivot zs => trivial)
-    (fun fuel' : Nat => fun ih : forall (zs : List Nat), AllLeNat pivot zs -> AllLeNat pivot (quicksort_fuel Nat nat_le fuel' zs) => fun zs : List Nat => fun h_zs : AllLeNat pivot zs =>
-      rec.List Nat (fun ws : List Nat => AllLeNat pivot ws -> AllLeNat pivot (quicksort_fuel Nat nat_le (succ fuel') ws))
-        (fun _ : AllLeNat pivot (nil Nat) => trivial)
-        (fun head : Nat => fun tail : List Nat => fun _ : AllLeNat pivot tail -> AllLeNat pivot (quicksort_fuel Nat nat_le (succ fuel') tail) => fun h_tail : AllLeNat pivot (cons Nat head tail) =>
-          let left := quicksort_fuel Nat nat_le fuel' (list_filter Nat (fun x => nat_le x head) tail) in
-          let right := quicksort_fuel Nat nat_le fuel' (list_filter Nat (fun x => nat_le head x) tail) in
-          let h_left := filter_all_le head tail in
-          let h_right := filter_preserves_all_le pivot (fun x => nat_le head x) tail h_tail in
-          let sorted_left := ih (list_filter Nat (fun x => nat_le x head) tail) (filter_preserves_all_le pivot (fun x => nat_le x head) tail h_tail) in
-          let sorted_right := ih (list_filter Nat (fun x => nat_le head x) tail) h_right in
-          let h_head_le := and_fst (Eq Bool (nat_le head pivot) true) (AllLeNat pivot tail) h_tail in
-          all_le_append pivot left (cons Nat head right)
-            sorted_left
-            (conj (Eq Bool (nat_le head pivot) true) (AllLeNat pivot right)
-              h_head_le
-              sorted_right))
-        zs
-        h_zs)
-    fuel
-    xs
-    h
+def quicksort_preserves_all_le (pivot : Nat) (xs : List Nat)
+  (h : AllLeNat pivot xs) : AllLeNat pivot (quicksort Nat nat_le xs) :=
+  fix proof (xs : List Nat) measure (list_length Nat) =>
+    match xs : AllLeNat pivot (quicksort Nat nat_le xs) with
+    | nil => trivial
+    | cons head tail =>
+      let left := list_filter Nat (fun x => nat_le x head) tail in
+      let right := list_filter Nat (fun x => nat_le head x) tail in
+      let h_tail := and_snd (Eq Bool (nat_le head pivot) true) (AllLeNat pivot tail) h in
+      let h_left := filter_all_le head tail in
+      let h_right := filter_preserves_all_le pivot (fun x => nat_le head x) tail h_tail in
+      let sorted_left := proof (list_filter Nat (fun x => nat_le x head) tail) in
+      let sorted_right := proof (list_filter Nat (fun x => nat_le head x) tail) in
+      let h_head_le := and_fst (Eq Bool (nat_le head pivot) true) (AllLeNat pivot tail) h in
+      all_le_append pivot (quicksort Nat nat_le left) (cons Nat head (quicksort Nat nat_le right))
+        sorted_left
+        (conj (Eq Bool (nat_le head pivot) true) (AllLeNat pivot (quicksort Nat nat_le right))
+          h_head_le
+          sorted_right)
 
 -- quicksort_preserves_all_ge: quicksort preserves AllGeNat
-def quicksort_preserves_all_ge (pivot : Nat) (fuel : Nat) (xs : List Nat)
-  (h : AllGeNat pivot xs) : AllGeNat pivot (quicksort_fuel Nat nat_le fuel xs) :=
-  rec.Nat (fun fuel' : Nat => forall (zs : List Nat), AllGeNat pivot zs -> AllGeNat pivot (quicksort_fuel Nat nat_le fuel' zs))
-    (fun zs : List Nat => fun _ : AllGeNat pivot zs => trivial)
-    (fun fuel' : Nat => fun ih : forall (zs : List Nat), AllGeNat pivot zs -> AllGeNat pivot (quicksort_fuel Nat nat_le fuel' zs) => fun zs : List Nat => fun h_zs : AllGeNat pivot zs =>
-      rec.List Nat (fun ws : List Nat => AllGeNat pivot ws -> AllGeNat pivot (quicksort_fuel Nat nat_le (succ fuel') ws))
-        (fun _ : AllGeNat pivot (nil Nat) => trivial)
-        (fun head : Nat => fun tail : List Nat => fun _ : AllGeNat pivot tail -> AllGeNat pivot (quicksort_fuel Nat nat_le (succ fuel') tail) => fun h_tail : AllGeNat pivot (cons Nat head tail) =>
-          let left := quicksort_fuel Nat nat_le fuel' (list_filter Nat (fun x => nat_le x head) tail) in
-          let right := quicksort_fuel Nat nat_le fuel' (list_filter Nat (fun x => nat_le head x) tail) in
-          let h_left := filter_preserves_all_ge pivot (fun x => nat_le x head) tail h_tail in
-          let h_right := filter_all_ge head tail in
-          let sorted_left := ih (list_filter Nat (fun x => nat_le x head) tail) h_left in
-          let sorted_right := ih (list_filter Nat (fun x => nat_le head x) tail) h_right in
-          let h_head_ge := and_fst (Eq Bool (nat_le pivot head) true) (AllGeNat pivot tail) h_tail in
-          all_ge_append pivot left (cons Nat head right)
-            sorted_left
-            (conj (Eq Bool (nat_le pivot head) true) (AllGeNat pivot right)
-              h_head_ge
-              sorted_right))
-        zs
-        h_zs)
-    fuel
-    xs
-    h
+def quicksort_preserves_all_ge (pivot : Nat) (xs : List Nat)
+  (h : AllGeNat pivot xs) : AllGeNat pivot (quicksort Nat nat_le xs) :=
+  fix proof (xs : List Nat) measure (list_length Nat) =>
+    match xs : AllGeNat pivot (quicksort Nat nat_le xs) with
+    | nil => trivial
+    | cons head tail =>
+      let left := list_filter Nat (fun x => nat_le x head) tail in
+      let right := list_filter Nat (fun x => nat_le head x) tail in
+      let h_tail := and_snd (Eq Bool (nat_le pivot head) true) (AllGeNat pivot tail) h in
+      let h_left := filter_preserves_all_ge pivot (fun x => nat_le x head) tail h_tail in
+      let h_right := filter_all_ge head tail in
+      let sorted_left := proof (list_filter Nat (fun x => nat_le x head) tail) in
+      let sorted_right := proof (list_filter Nat (fun x => nat_le head x) tail) in
+      let h_head_ge := and_fst (Eq Bool (nat_le pivot head) true) (AllGeNat pivot tail) h in
+      all_ge_append pivot (quicksort Nat nat_le left) (cons Nat head (quicksort Nat nat_le right))
+        sorted_left
+        (conj (Eq Bool (nat_le pivot head) true) (AllGeNat pivot (quicksort Nat nat_le right))
+          h_head_ge
+          sorted_right)
 
--- Core theorem: quicksort_fuel always returns a sorted list
-def quicksort_fuel_sorted (fuel : Nat) (xs : List Nat) : SortedNat (quicksort_fuel Nat nat_le fuel xs) :=
-  rec.Nat (fun fuel' : Nat => forall (zs : List Nat), SortedNat (quicksort_fuel Nat nat_le fuel' zs))
-    (fun zs : List Nat => trivial)
-    (fun fuel' : Nat => fun ih : forall (zs : List Nat), SortedNat (quicksort_fuel Nat nat_le fuel' zs) => fun zs : List Nat =>
-      rec.List Nat (fun ws : List Nat => SortedNat (quicksort_fuel Nat nat_le (succ fuel') ws))
-        (fun _ : SortedNat (quicksort_fuel Nat nat_le (succ fuel') (nil Nat)) => trivial)
-        (fun head : Nat => fun tail : List Nat => fun _ : SortedNat (quicksort_fuel Nat nat_le (succ fuel') tail) => fun _ : SortedNat (quicksort_fuel Nat nat_le (succ fuel') (cons Nat head tail)) =>
-          let left := quicksort_fuel Nat nat_le fuel' (list_filter Nat (fun x => nat_le x head) tail) in
-          let right := quicksort_fuel Nat nat_le fuel' (list_filter Nat (fun x => nat_le head x) tail) in
-          let sorted_left := ih (list_filter Nat (fun x => nat_le x head) tail) in
-          let sorted_right := ih (list_filter Nat (fun x => nat_le head x) tail) in
-          let le_left := quicksort_preserves_all_le head fuel' (list_filter Nat (fun x => nat_le x head) tail) (filter_all_le head tail) in
-          let ge_right := quicksort_preserves_all_ge head fuel' (list_filter Nat (fun x => nat_le head x) tail) (filter_all_ge head tail) in
-          append_sorted_cons left head right sorted_left (sorted_cons_ge head right sorted_right ge_right) ge_right le_left)
-        zs)
-    fuel
-    xs
+-- Core theorem: quicksort always returns a sorted list
+def quicksort_sorted_def (xs : List Nat) : SortedNat (quicksort Nat nat_le xs) :=
+  fix proof (xs : List Nat) measure (list_length Nat) =>
+    match xs : SortedNat (quicksort Nat nat_le xs) with
+    | nil => trivial
+    | cons head tail =>
+      let left := list_filter Nat (fun x => nat_le x head) tail in
+      let right := list_filter Nat (fun x => nat_le head x) tail in
+      let sorted_left := proof (list_filter Nat (fun x => nat_le x head) tail) in
+      let sorted_right := proof (list_filter Nat (fun x => nat_le head x) tail) in
+      let le_left := quicksort_preserves_all_le head left (filter_all_le head tail) in
+      let ge_right := quicksort_preserves_all_ge head right (filter_all_ge head tail) in
+      append_sorted_cons (quicksort Nat nat_le left) head (quicksort Nat nat_le right)
+        sorted_left
+        (sorted_cons_ge head (quicksort Nat nat_le right) sorted_right ge_right)
+        ge_right
+        le_left
 
--- Top-level wrapper theorem
 theorem quicksort_sorted (xs : List Nat) : SortedNat (quicksort Nat nat_le xs) :=
-  quicksort_fuel_sorted (list_length Nat xs) xs
+  quicksort_sorted_def xs
+
 

@@ -449,6 +449,11 @@ impl<'a> TypeChecker<'a> {
         result
     }
 
+    fn whnf_let_step(&mut self, value: &Expr, body: &Expr) -> Expr {
+        let reduced = body.instantiate(value);
+        self.whnf_core(&reduced)
+    }
+
     fn whnf_core(&mut self, e: &Expr) -> Expr {
         match e {
             Expr::BVar(_) | Expr::Sort(_) | Expr::Pi(_, _, _, _) => {
@@ -481,11 +486,13 @@ impl<'a> TypeChecker<'a> {
             }
             Expr::Const(name, levels) => {
                 let (should_expand, rule, instantiated) = if let Some(info) = self.st.env().find(name) {
-                    if info.is_definition() || info.is_theorem() {
+                    // Theorems are opaque: do not expand their proof bodies during
+                    // WHNF. This is essential to avoid exponential blow-up when
+                    // proofs contain large witnesses (e.g. geometry existence proofs).
+                    if info.is_definition() {
                         if let Some(val) = info.get_value(false) {
                             let instantiated = self.instantiate_univ_params(val, info.get_level_params(), levels);
-                            let rule = if info.is_theorem() { "δ-theorem" } else { "δ-def" };
-                            (true, rule, Some(instantiated))
+                            (true, "δ-def", Some(instantiated))
                         } else {
                             (false, "", None)
                         }
@@ -547,8 +554,14 @@ impl<'a> TypeChecker<'a> {
                 }
             }
             Expr::Let(_, _, value, body, _) => {
-                let reduced = body.instantiate(value);
-                let result = self.whnf_core(&reduced);
+                // Only expand dependent let-bindings. If the body does not
+                // reference the bound variable, keep the Let in WHNF. This
+                // avoids exponential witness duplication when many large
+                // have-bindings are stacked.
+                if !body.has_loose_bvar(0) {
+                    return e.clone();
+                }
+                let result = self.whnf_let_step(value, body);
                 if self.trace {
                     self.trace_step("let", e, &result);
                 }

@@ -1,5 +1,6 @@
 use std::hash::Hash;
 use std::rc::Rc;
+use std::collections::HashSet;
 
 /// Lean names are hierarchical, e.g., `Nat.add`, `_root_.Foo.bar`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -683,6 +684,37 @@ impl Expr {
             Expr::MData(_, e) => e.has_fvar(),
             Expr::Proj(_, _, e) => e.has_fvar(),
             _ => false,
+        }
+    }
+
+    /// Collect all free variable names in this expression.
+    pub fn collect_fvars(&self, out: &mut HashSet<Name>) {
+        match self {
+            Expr::FVar(name) => { out.insert(name.clone()); }
+            Expr::App(f, a) => { f.collect_fvars(out); a.collect_fvars(out); }
+            Expr::Lambda(_, _, ty, body) => { ty.collect_fvars(out); body.collect_fvars(out); }
+            Expr::Pi(_, _, ty, body) => { ty.collect_fvars(out); body.collect_fvars(out); }
+            Expr::Let(_, ty, value, body, _) => {
+                ty.collect_fvars(out);
+                value.collect_fvars(out);
+                body.collect_fvars(out);
+            }
+            Expr::MData(_, e) => e.collect_fvars(out),
+            Expr::Proj(_, _, e) => e.collect_fvars(out),
+            _ => {}
+        }
+    }
+
+    /// Approximate AST node count.
+    pub fn size(&self) -> usize {
+        match self {
+            Expr::App(f, a) => 1 + f.size() + a.size(),
+            Expr::Lambda(_, _, ty, body) => 1 + ty.size() + body.size(),
+            Expr::Pi(_, _, ty, body) => 1 + ty.size() + body.size(),
+            Expr::Let(_, ty, value, body, _) => 1 + ty.size() + value.size() + body.size(),
+            Expr::MData(_, e) => 1 + e.size(),
+            Expr::Proj(_, _, e) => 1 + e.size(),
+            _ => 1,
         }
     }
 

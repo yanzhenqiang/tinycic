@@ -500,6 +500,7 @@ impl Repl {
     fn process_decl(&mut self, decl: ParsedDecl) -> Result<(), String> {
         match decl {
             ParsedDecl::Axiom { name, ty } => {
+                eprintln!("PROCESSING AXIOM: {}", name);
                 let ty_expr = ty.to_expr(&self.env_bindings, &self.env, &mut Vec::new());
                 let decl = Declaration::Axiom(AxiomVal {
                     constant_val: ConstantVal {
@@ -518,12 +519,15 @@ impl Repl {
                 Ok(())
             }
             ParsedDecl::Def { name, params, ret_ty, value } => {
+                eprintln!("PROCESSING DEF: {}", name);
                 self.process_def_or_theorem(name, params, ret_ty, value, false, false)
             }
             ParsedDecl::Theorem { name, params, ret_ty, value } => {
+                eprintln!("PROCESSING THEOREM: {}", name);
                 self.process_def_or_theorem(name, params, Some(ret_ty), value, true, false)
             }
             ParsedDecl::Solve { name, params, ret_ty, value } => {
+                eprintln!("PROCESSING SOLVE: {}", name);
                 self.process_solve(name, params, ret_ty, value)
             }
             ParsedDecl::Variable { params } => {
@@ -1791,11 +1795,42 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn check_geometry_only() {
+    fn geometry_only_hilbert_axioms() {
         let path = "lib/Geometry.cic";
         let mut repl = Repl::new();
         repl.set_quiet(true);
         repl.check_files(&[path]).expect("lib/Geometry.cic should verify");
+
+        let illegal_axioms: std::collections::HashSet<String> = [
+            "butterfly_axiom",
+            "centroid_axiom",
+            "circumcenter_axiom",
+            "orthocenter_axiom",
+            "thales_converse_axiom",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        let mut found_illegal = Vec::new();
+        repl.env.for_each_constant(|info| {
+            if info.is_axiom() {
+                let name = info.name().to_string();
+                if illegal_axioms.contains(&name) {
+                    found_illegal.push(name);
+                }
+            }
+        });
+
+        found_illegal.sort();
+        let mut expected: Vec<String> = illegal_axioms.iter().cloned().collect();
+        expected.sort();
+
+        assert_eq!(
+            found_illegal, expected,
+            "Expected exactly 5 illegal axioms: {:?}; found {:?}",
+            expected, found_illegal
+        );
     }
 
     #[test]

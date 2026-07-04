@@ -3,6 +3,7 @@ use super::expr::*;
 use super::local_ctx::{LocalCtx, LocalDecl};
 use super::type_checker::{TypeChecker, TypeCheckerState};
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Classification of a subgoal. Distinguishes plain proof goals from
@@ -112,18 +113,24 @@ impl<'a> TacticEngine<'a> {
     /// Only wraps let-bindings (LDecls) into the proof term.
     /// Lambda abstractions for CDecls are added at the top level after build_proof.
     fn wrap_proof_with_lets(proof: &Expr, lctx: &LocalCtx) -> Expr {
+        let mut used_fvars: HashSet<Name> = HashSet::new();
+        proof.collect_fvars(&mut used_fvars);
+
         let mut result = proof.clone();
         let decls: Vec<_> = lctx.iter_decls().collect();
         for decl in decls.iter().rev() {
             if let LocalDecl::LDecl { name, user_name, ty, value, .. } = decl {
-                result = result.abstract_fvar(name, 0);
-                result = Expr::Let(
-                    user_name.clone(),
-                    Rc::new(ty.clone()),
-                    Rc::new(value.clone()),
-                    Rc::new(result),
-                    false,
-                );
+                if used_fvars.contains(name) {
+                    result = result.abstract_fvar(name, 0);
+                    result = Expr::Let(
+                        user_name.clone(),
+                        Rc::new(ty.clone()),
+                        Rc::new(value.clone()),
+                        Rc::new(result),
+                        false,
+                    );
+                    value.collect_fvars(&mut used_fvars);
+                }
             }
         }
         result

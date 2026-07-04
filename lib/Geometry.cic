@@ -1834,6 +1834,90 @@ def midsegment_pair (D : Point) (F : Point) (B : Point) (C : Point) (l : Line) (
   And (on_line D l) (And (on_line F l)
     (And (on_line B m) (And (on_line C m) (parallel l m))))
 
+-- Projection helpers for midsegment_pair, avoiding repeated have-bindings.
+theorem midsegment_pair_D (D F B C : Point) (l m : Line) (h : midsegment_pair D F B C l m) : on_line D l := by
+  intro D
+  intro F
+  intro B
+  intro C
+  intro l
+  intro m
+  intro h
+  exact (and_fst (on_line D l) (And (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))) h)
+
+theorem midsegment_pair_F (D F B C : Point) (l m : Line) (h : midsegment_pair D F B C l m) : on_line F l := by
+  intro D
+  intro F
+  intro B
+  intro C
+  intro l
+  intro m
+  intro h
+  exact (and_fst (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))
+    (and_snd (on_line D l) (And (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))) h))
+
+theorem midsegment_pair_B (D F B C : Point) (l m : Line) (h : midsegment_pair D F B C l m) : on_line B m := by
+  intro D
+  intro F
+  intro B
+  intro C
+  intro l
+  intro m
+  intro h
+  exact (and_fst (on_line B m) (And (on_line C m) (parallel l m))
+    (and_snd (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))
+      (and_snd (on_line D l) (And (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))) h)))
+
+theorem midsegment_pair_C (D F B C : Point) (l m : Line) (h : midsegment_pair D F B C l m) : on_line C m := by
+  intro D
+  intro F
+  intro B
+  intro C
+  intro l
+  intro m
+  intro h
+  exact (and_fst (on_line C m) (parallel l m)
+    (and_snd (on_line B m) (And (on_line C m) (parallel l m))
+      (and_snd (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))
+        (and_snd (on_line D l) (And (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))) h))))
+
+theorem midsegment_pair_parallel (D F B C : Point) (l m : Line) (h : midsegment_pair D F B C l m) : parallel l m := by
+  intro D
+  intro F
+  intro B
+  intro C
+  intro l
+  intro m
+  intro h
+  exact (and_snd (on_line C m) (parallel l m)
+    (and_snd (on_line B m) (And (on_line C m) (parallel l m))
+      (and_snd (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))
+        (and_snd (on_line D l) (And (on_line F l) (And (on_line B m) (And (on_line C m) (parallel l m)))) h))))
+
+-- Extract the two parallel lines witnessing a segment_parallel fact.
+theorem extract_midsegment_lines : forall (D F B C : Point),
+  segment_parallel D F B C ->
+  exists (l : Line), exists (m : Line),
+    And (on_line D l) (And (on_line F l)
+      (And (on_line B m) (And (on_line C m) (parallel l m)))) := by
+  intro D
+  intro F
+  intro B
+  intro C
+  intro h_spg
+  have h_l_ex : exists (l : Line), midsegment_line D F B C l := h_spg
+  have l : Line := choice Line (midsegment_line D F B C) h_l_ex
+  have h_l : midsegment_line D F B C l :=
+    choice_spec Line (midsegment_line D F B C) h_l_ex
+  have m : Line := choice Line (fun m : Line => midsegment_pair D F B C l m) h_l
+  have h_m : midsegment_pair D F B C l m :=
+    choice_spec Line (fun m : Line => midsegment_pair D F B C l m) h_l
+  exact (Exists.intro Line (fun l' : Line => exists (m' : Line),
+    And (on_line D l') (And (on_line F l') (And (on_line B m') (And (on_line C m') (parallel l' m'))))) l
+    (Exists.intro Line (fun m' : Line =>
+      And (on_line D l) (And (on_line F l) (And (on_line B m') (And (on_line C m') (parallel l m'))))) m h_m))
+
+
 def collinear_line (D : Point) (E : Point) (F : Point) (l : Line) : Prop :=
   And (on_line D l) (And (on_line E l) (on_line F l))
 
@@ -2095,25 +2179,6 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
   have m_AC1 : Line := choice Line (fun m : Line => midsegment_pair E F A C l_EF m) h_l_EF
   have h_m_AC1 : midsegment_pair E F A C l_EF m_AC1 :=
     choice_spec Line (fun m : Line => midsegment_pair E F A C l_EF m) h_l_EF
-  have h_EF_E_l : on_line E l_EF :=
-    and_fst (on_line E l_EF) (And (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))) h_m_AC1
-  have h_EF_F_l : on_line F l_EF :=
-    and_fst (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))
-      (and_snd (on_line E l_EF) (And (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))) h_m_AC1)
-  have h_EF_A_m : on_line A m_AC1 :=
-    and_fst (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1))
-      (and_snd (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))
-        (and_snd (on_line E l_EF) (And (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))) h_m_AC1))
-  have h_EF_C_m : on_line C m_AC1 :=
-    and_fst (on_line C m_AC1) (parallel l_EF m_AC1)
-      (and_snd (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1))
-        (and_snd (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))
-          (and_snd (on_line E l_EF) (And (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))) h_m_AC1)))
-  have h_EF_para : parallel l_EF m_AC1 :=
-    and_snd (on_line C m_AC1) (parallel l_EF m_AC1)
-      (and_snd (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1))
-        (and_snd (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))
-          (and_snd (on_line E l_EF) (And (on_line F l_EF) (And (on_line A m_AC1) (And (on_line C m_AC1) (parallel l_EF m_AC1)))) h_m_AC1)))
   -- Extract the line through G,H and the (same) line through A,C.
   have h_l_GH_ex : exists (l : Line), midsegment_line G H A C l := h_GH_AC
   have l_GH : Line := choice Line (midsegment_line G H A C) h_l_GH_ex
@@ -2122,31 +2187,17 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
   have m_AC2 : Line := choice Line (fun m : Line => midsegment_pair G H A C l_GH m) h_l_GH
   have h_m_AC2 : midsegment_pair G H A C l_GH m_AC2 :=
     choice_spec Line (fun m : Line => midsegment_pair G H A C l_GH m) h_l_GH
-  have h_GH_G_l : on_line G l_GH :=
-    and_fst (on_line G l_GH) (And (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))) h_m_AC2
-  have h_GH_H_l : on_line H l_GH :=
-    and_fst (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))
-      (and_snd (on_line G l_GH) (And (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))) h_m_AC2)
-  have h_GH_A_m : on_line A m_AC2 :=
-    and_fst (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2))
-      (and_snd (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))
-        (and_snd (on_line G l_GH) (And (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))) h_m_AC2))
-  have h_GH_C_m : on_line C m_AC2 :=
-    and_fst (on_line C m_AC2) (parallel l_GH m_AC2)
-      (and_snd (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2))
-        (and_snd (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))
-          (and_snd (on_line G l_GH) (And (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))) h_m_AC2)))
-  have h_GH_para : parallel l_GH m_AC2 :=
-    and_snd (on_line C m_AC2) (parallel l_GH m_AC2)
-      (and_snd (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2))
-        (and_snd (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))
-          (and_snd (on_line G l_GH) (And (on_line H l_GH) (And (on_line A m_AC2) (And (on_line C m_AC2) (parallel l_GH m_AC2)))) h_m_AC2)))
   -- The two lines through A,C coincide.
   have h_mAC1_eq_mAC2 : Eq Line m_AC1 m_AC2 :=
-    line_unique A C m_AC1 m_AC2 h_AC h_EF_A_m h_EF_C_m h_GH_A_m h_GH_C_m
+    line_unique A C m_AC1 m_AC2 h_AC
+      (midsegment_pair_C E F A C l_EF m_AC1 h_m_AC1)
+      (midsegment_pair_B E F A C l_EF m_AC1 h_m_AC1)
+      (midsegment_pair_C G H A C l_GH m_AC2 h_m_AC2)
+      (midsegment_pair_B G H A C l_GH m_AC2 h_m_AC2)
   have h_GH_para_mAC1 : parallel l_GH m_AC1 :=
     eq_subst Line m_AC2 m_AC1 (fun x : Line => parallel l_GH x)
-      (eq_sym Line m_AC1 m_AC2 h_mAC1_eq_mAC2) h_GH_para
+      (eq_sym Line m_AC1 m_AC2 h_mAC1_eq_mAC2)
+      (midsegment_pair_parallel G H A C l_GH m_AC2 h_m_AC2)
   -- Extract the line through E,H and the line through B,D.
   have h_l_EH_ex : exists (l : Line), midsegment_line E H B D l := h_EH_BD
   have l_EH : Line := choice Line (midsegment_line E H B D) h_l_EH_ex
@@ -2155,25 +2206,6 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
   have m_BD1 : Line := choice Line (fun m : Line => midsegment_pair E H B D l_EH m) h_l_EH
   have h_m_BD1 : midsegment_pair E H B D l_EH m_BD1 :=
     choice_spec Line (fun m : Line => midsegment_pair E H B D l_EH m) h_l_EH
-  have h_EH_E_l : on_line E l_EH :=
-    and_fst (on_line E l_EH) (And (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))) h_m_BD1
-  have h_EH_H_l : on_line H l_EH :=
-    and_fst (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))
-      (and_snd (on_line E l_EH) (And (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))) h_m_BD1)
-  have h_EH_B_m : on_line B m_BD1 :=
-    and_fst (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1))
-      (and_snd (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))
-        (and_snd (on_line E l_EH) (And (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))) h_m_BD1))
-  have h_EH_D_m : on_line D m_BD1 :=
-    and_fst (on_line D m_BD1) (parallel l_EH m_BD1)
-      (and_snd (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1))
-        (and_snd (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))
-          (and_snd (on_line E l_EH) (And (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))) h_m_BD1)))
-  have h_EH_para : parallel l_EH m_BD1 :=
-    and_snd (on_line D m_BD1) (parallel l_EH m_BD1)
-      (and_snd (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1))
-        (and_snd (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))
-          (and_snd (on_line E l_EH) (And (on_line H l_EH) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel l_EH m_BD1)))) h_m_BD1)))
   -- Extract the line through F,G and the (same) line through B,D.
   have h_l_FG_ex : exists (l : Line), midsegment_line F G B D l := h_FG_BD
   have l_FG : Line := choice Line (midsegment_line F G B D) h_l_FG_ex
@@ -2182,31 +2214,17 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
   have m_BD2 : Line := choice Line (fun m : Line => midsegment_pair F G B D l_FG m) h_l_FG
   have h_m_BD2 : midsegment_pair F G B D l_FG m_BD2 :=
     choice_spec Line (fun m : Line => midsegment_pair F G B D l_FG m) h_l_FG
-  have h_FG_F_l : on_line F l_FG :=
-    and_fst (on_line F l_FG) (And (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))) h_m_BD2
-  have h_FG_G_l : on_line G l_FG :=
-    and_fst (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))
-      (and_snd (on_line F l_FG) (And (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))) h_m_BD2)
-  have h_FG_B_m : on_line B m_BD2 :=
-    and_fst (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2))
-      (and_snd (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))
-        (and_snd (on_line F l_FG) (And (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))) h_m_BD2))
-  have h_FG_D_m : on_line D m_BD2 :=
-    and_fst (on_line D m_BD2) (parallel l_FG m_BD2)
-      (and_snd (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2))
-        (and_snd (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))
-          (and_snd (on_line F l_FG) (And (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))) h_m_BD2)))
-  have h_FG_para : parallel l_FG m_BD2 :=
-    and_snd (on_line D m_BD2) (parallel l_FG m_BD2)
-      (and_snd (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2))
-        (and_snd (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))
-          (and_snd (on_line F l_FG) (And (on_line G l_FG) (And (on_line B m_BD2) (And (on_line D m_BD2) (parallel l_FG m_BD2)))) h_m_BD2)))
   -- The two lines through B,D coincide.
   have h_mBD1_eq_mBD2 : Eq Line m_BD1 m_BD2 :=
-    line_unique B D m_BD1 m_BD2 h_BD h_EH_B_m h_EH_D_m h_FG_B_m h_FG_D_m
+    line_unique B D m_BD1 m_BD2 h_BD
+      (midsegment_pair_B E H B D l_EH m_BD1 h_m_BD1)
+      (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1)
+      (midsegment_pair_B F G B D l_FG m_BD2 h_m_BD2)
+      (midsegment_pair_D F G B D l_FG m_BD2 h_m_BD2)
   have h_FG_para_mBD1 : parallel l_FG m_BD1 :=
     eq_subst Line m_BD2 m_BD1 (fun x : Line => parallel l_FG x)
-      (eq_sym Line m_BD1 m_BD2 h_mBD1_eq_mBD2) h_FG_para
+      (eq_sym Line m_BD1 m_BD2 h_mBD1_eq_mBD2)
+      (midsegment_pair_parallel F G B D l_FG m_BD2 h_m_BD2)
   -- F and G cannot coincide: otherwise F would be a midpoint of both B C and C D,
   -- forcing B = D by reflection uniqueness, contradicting the quadrilateral.
   have h_F_ne_G : Not (Eq Point F G) := fun h_eq : Eq Point F G =>
@@ -2224,71 +2242,109 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
   -- The two diagonal lines are distinct, otherwise A,B,C,D would be collinear.
   have h_mAC_ne_mBD : Not (Eq Line m_AC1 m_BD1) := fun h_eq : Eq Line m_AC1 m_BD1 =>
     let h_A_mBD : on_line A m_BD1 :=
-      eq_subst Line m_AC1 m_BD1 (fun x : Line => on_line A x) h_eq h_EF_A_m in
+      eq_subst Line m_AC1 m_BD1 (fun x : Line => on_line A x) h_eq
+        (midsegment_pair_B E F A C l_EF m_AC1 h_m_AC1) in
     let h_C_mBD : on_line C m_BD1 :=
-      eq_subst Line m_AC1 m_BD1 (fun x : Line => on_line C x) h_eq h_EF_C_m in
+      eq_subst Line m_AC1 m_BD1 (fun x : Line => on_line C x) h_eq
+        (midsegment_pair_C E F A C l_EF m_AC1 h_m_AC1) in
     let h_col_ABC : collinear A B C :=
       Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) m_BD1
         (And.conj (on_line A m_BD1) (And (on_line B m_BD1) (on_line C m_BD1))
           h_A_mBD
-          (And.conj (on_line B m_BD1) (on_line C m_BD1) h_EH_B_m h_C_mBD)) in
+          (And.conj (on_line B m_BD1) (on_line C m_BD1)
+            (midsegment_pair_B E H B D l_EH m_BD1 h_m_BD1) h_C_mBD)) in
     h_tri_ABC h_col_ABC
   -- If EF and GH coincided, the diagonals A C and B D would be parallel.
   have h_lEF_ne_lGH : Not (Eq Line l_EF l_GH) := fun h_eq : Eq Line l_EF l_GH =>
     let h_G_lEF : on_line G l_EF :=
-      eq_subst Line l_GH l_EF (fun x : Line => on_line G x) (eq_sym Line l_EF l_GH h_eq) h_GH_G_l in
+      eq_subst Line l_GH l_EF (fun x : Line => on_line G x) (eq_sym Line l_EF l_GH h_eq)
+        (midsegment_pair_D G H A C l_GH m_AC2 h_m_AC2) in
     let h_lFG_eq_lEF : Eq Line l_FG l_EF :=
-      line_unique F G l_FG l_EF h_F_ne_G h_FG_F_l h_G_lEF h_FG_F_l h_EF_F_l in
+      line_unique F G l_FG l_EF h_F_ne_G
+        (midsegment_pair_D F G B D l_FG m_BD2 h_m_BD2)
+        h_G_lEF
+        (midsegment_pair_F F G B D l_FG m_BD2 h_m_BD2)
+        (midsegment_pair_F E F A C l_EF m_AC1 h_m_AC1) in
     let h_lEF_para_mBD : parallel l_EF m_BD1 :=
       eq_subst Line l_FG l_EF (fun x : Line => parallel x m_BD1)
-        (eq_sym Line l_EF l_FG h_lFG_eq_lEF) h_FG_para_mBD1 in
+        (eq_sym Line l_EF l_FG h_lFG_eq_lEF)
+        h_FG_para_mBD1 in
     let h_mAC_para_mBD : parallel m_AC1 m_BD1 :=
-      parallel_trans m_AC1 l_EF m_BD1 (parallel_sym l_EF m_AC1 h_EF_para) h_lEF_para_mBD h_mAC_ne_mBD in
+      parallel_trans m_AC1 l_EF m_BD1
+        (parallel_sym l_EF m_AC1 (midsegment_pair_parallel E F A C l_EF m_AC1 h_m_AC1))
+        h_lEF_para_mBD h_mAC_ne_mBD in
     let h_spg : segment_parallel A C B D :=
       Exists.intro Line (fun l : Line => exists (m : Line),
         And (on_line A l) (And (on_line C l) (And (on_line B m) (And (on_line D m) (parallel l m))))) m_AC1
         (Exists.intro Line (fun m : Line =>
           And (on_line A m_AC1) (And (on_line C m_AC1) (And (on_line B m) (And (on_line D m) (parallel m_AC1 m))))) m_BD1
           (And.conj (on_line A m_AC1) (And (on_line C m_AC1) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel m_AC1 m_BD1))))
-            h_EF_A_m
+            (midsegment_pair_B E F A C l_EF m_AC1 h_m_AC1)
             (And.conj (on_line C m_AC1) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel m_AC1 m_BD1)))
-              h_EF_C_m
+              (midsegment_pair_C E F A C l_EF m_AC1 h_m_AC1)
               (And.conj (on_line B m_BD1) (And (on_line D m_BD1) (parallel m_AC1 m_BD1))
-                h_EH_B_m
-                (And.conj (on_line D m_BD1) (parallel m_AC1 m_BD1) h_EH_D_m h_mAC_para_mBD))))) in
+                (midsegment_pair_B E H B D l_EH m_BD1 h_m_BD1)
+                (And.conj (on_line D m_BD1) (parallel m_AC1 m_BD1)
+                  (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1) h_mAC_para_mBD))))) in
     h_nospg h_spg
   have h_EF_GH : parallel l_EF l_GH :=
-    parallel_trans l_EF m_AC1 l_GH h_EF_para (parallel_sym l_GH m_AC1 h_GH_para_mAC1) h_lEF_ne_lGH
+    parallel_trans l_EF m_AC1 l_GH
+      (midsegment_pair_parallel E F A C l_EF m_AC1 h_m_AC1)
+      (parallel_sym l_GH m_AC1 h_GH_para_mAC1)
+      h_lEF_ne_lGH
   -- If EH and FG coincided, the diagonals A C and B D would be parallel.
   have h_lEH_ne_lFG : Not (Eq Line l_EH l_FG) := fun h_eq : Eq Line l_EH l_FG =>
     let h_F_lEH : on_line F l_EH :=
-      eq_subst Line l_FG l_EH (fun x : Line => on_line F x) (eq_sym Line l_EH l_FG h_eq) h_FG_F_l in
+      eq_subst Line l_FG l_EH (fun x : Line => on_line F x) (eq_sym Line l_EH l_FG h_eq)
+        (midsegment_pair_D F G B D l_FG m_BD2 h_m_BD2) in
     let h_lEF_eq_lEH : Eq Line l_EF l_EH :=
-      line_unique E F l_EF l_EH h_E_ne_F h_EF_E_l h_F_lEH h_EF_E_l h_EH_E_l in
+      line_unique E F l_EF l_EH h_E_ne_F
+        (midsegment_pair_D E F A C l_EF m_AC1 h_m_AC1)
+        h_F_lEH
+        (midsegment_pair_F E F A C l_EF m_AC1 h_m_AC1)
+        (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1) in
     let h_lEH_para_mAC : parallel l_EH m_AC1 :=
       eq_subst Line l_EF l_EH (fun x : Line => parallel x m_AC1)
-        (eq_sym Line l_EH l_EF h_lEF_eq_lEH) h_EF_para in
+        (eq_sym Line l_EH l_EF h_lEF_eq_lEH)
+        (midsegment_pair_parallel E F A C l_EF m_AC1 h_m_AC1) in
     let h_mAC_para_mBD : parallel m_AC1 m_BD1 :=
-      parallel_trans m_AC1 l_EH m_BD1 (parallel_sym l_EH m_AC1 h_lEH_para_mAC) h_EH_para h_mAC_ne_mBD in
+      parallel_trans m_AC1 l_EH m_BD1
+        (parallel_sym l_EH m_AC1 h_lEH_para_mAC)
+        (midsegment_pair_parallel E H B D l_EH m_BD1 h_m_BD1)
+        h_mAC_ne_mBD in
     let h_spg : segment_parallel A C B D :=
       Exists.intro Line (fun l : Line => exists (m : Line),
         And (on_line A l) (And (on_line C l) (And (on_line B m) (And (on_line D m) (parallel l m))))) m_AC1
         (Exists.intro Line (fun m : Line =>
           And (on_line A m_AC1) (And (on_line C m_AC1) (And (on_line B m) (And (on_line D m) (parallel m_AC1 m))))) m_BD1
           (And.conj (on_line A m_AC1) (And (on_line C m_AC1) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel m_AC1 m_BD1))))
-            h_EF_A_m
+            (midsegment_pair_B E F A C l_EF m_AC1 h_m_AC1)
             (And.conj (on_line C m_AC1) (And (on_line B m_BD1) (And (on_line D m_BD1) (parallel m_AC1 m_BD1)))
-              h_EF_C_m
+              (midsegment_pair_C E F A C l_EF m_AC1 h_m_AC1)
               (And.conj (on_line B m_BD1) (And (on_line D m_BD1) (parallel m_AC1 m_BD1))
-                h_EH_B_m
-                (And.conj (on_line D m_BD1) (parallel m_AC1 m_BD1) h_EH_D_m h_mAC_para_mBD))))) in
+                (midsegment_pair_B E H B D l_EH m_BD1 h_m_BD1)
+                (And.conj (on_line D m_BD1) (parallel m_AC1 m_BD1)
+                  (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1) h_mAC_para_mBD))))) in
     h_nospg h_spg
   have h_EH_FG : parallel l_EH l_FG :=
-    parallel_trans l_EH m_BD1 l_FG h_EH_para (parallel_sym l_FG m_BD1 h_FG_para_mBD1) h_lEH_ne_lFG
+    parallel_trans l_EH m_BD1 l_FG
+      (midsegment_pair_parallel E H B D l_EH m_BD1 h_m_BD1)
+      (parallel_sym l_FG m_BD1 h_FG_para_mBD1)
+      h_lEH_ne_lFG
   -- Finish via segment-parallel witnesses built from the extracted lines.
   exact (And.conj (segment_parallel E F G H) (segment_parallel F G H E)
-    (segment_parallel_from_lines E F G H l_EF l_GH h_EF_E_l h_EF_F_l h_GH_G_l h_GH_H_l h_EF_GH)
-    (segment_parallel_from_lines F G H E l_FG l_EH h_FG_F_l h_FG_G_l h_EH_H_l h_EH_E_l h_EH_FG))
+    (segment_parallel_from_lines E F G H l_EF l_GH
+      (midsegment_pair_D E F A C l_EF m_AC1 h_m_AC1)
+      (midsegment_pair_F E F A C l_EF m_AC1 h_m_AC1)
+      (midsegment_pair_D G H A C l_GH m_AC2 h_m_AC2)
+      (midsegment_pair_F G H A C l_GH m_AC2 h_m_AC2)
+      h_EF_GH)
+    (segment_parallel_from_lines F G H E l_FG l_EH
+      (midsegment_pair_D F G B D l_FG m_BD2 h_m_BD2)
+      (midsegment_pair_F F G B D l_FG m_BD2 h_m_BD2)
+      (midsegment_pair_F E H B D l_EH m_BD1 h_m_BD1)
+      (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1)
+      h_EH_FG))
 -- 31. Centroid Theorem
 -- =====================================================================
 

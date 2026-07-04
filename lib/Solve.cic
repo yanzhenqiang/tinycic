@@ -153,8 +153,8 @@ def final_verify_neg : Eq Frac (frac_add (frac_add (frac_mul a (square root_neg)
 axiom frac_add_comm : forall (x : Frac) (y : Frac), Eq Frac (frac_add x y) (frac_add y x)
 axiom frac_add_assoc : forall (x : Frac) (y : Frac) (z : Frac), Eq Frac (frac_add (frac_add x y) z) (frac_add x (frac_add y z))
 
-def eq_trans (A : Type) (a : A) (b : A) (c : A) (h1 : Eq A a b) (h2 : Eq A b c) : Eq A a c :=
-  eq_subst A b c (fun x : A => Eq A a x) h2 h1
+-- def eq_trans (A : Type) (a : A) (b : A) (c : A) (h1 : Eq A a b) (h2 : Eq A b c) : Eq A a c :=
+--   eq_subst A b c (fun x : A => Eq A a x) h2 h1
 
 -- Example 1: multiplication reordering (a * b) * c = c * (b * a)
 solve mul_reorder : forall (a : Frac) (b : Frac) (c : Frac),

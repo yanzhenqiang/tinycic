@@ -1790,6 +1790,30 @@ mod tests {
     use super::*;
     use std::fs;
 
+    #[test]
+    fn check_geometry_only() {
+        let path = "lib/Geometry.cic";
+        let mut repl = Repl::new();
+        repl.set_quiet(true);
+        repl.check_files(&[path]).expect("lib/Geometry.cic should verify");
+    }
+
+    #[test]
+    fn check_test_segment_parallel() {
+        let path = "test_segment_parallel.cic";
+        let mut repl = Repl::new();
+        repl.set_quiet(true);
+        repl.check_files(&[path]).expect("test_segment_parallel.cic should verify");
+    }
+
+    #[test]
+    fn check_test_and() {
+        let path = "test_and.cic";
+        let mut repl = Repl::new();
+        repl.set_quiet(true);
+        repl.check_files(&[path]).expect("test_and.cic should verify");
+    }
+
     /// Verify every `.cic` file in the project `lib/` directory.
     /// `Geometry.cic` is skipped because it contains an unfinished theorem.
     #[test]

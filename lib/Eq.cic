@@ -6,3 +6,6 @@ def eq_subst (A : Type) (a : A) (b : A) (P : A -> Prop) (h : Eq A a b) (pa : P a
 
 def eq_sym (A : Type) (a : A) (b : A) (h : Eq A a b) : Eq A b a :=
   eq_subst A a b (fun y : A => Eq A y a) h (refl A a)
+
+def eq_trans (A : Type) (a : A) (b : A) (c : A) (h_ab : Eq A a b) (h_bc : Eq A b c) : Eq A a c :=
+  eq_subst A b c (fun y : A => Eq A a y) h_bc h_ab

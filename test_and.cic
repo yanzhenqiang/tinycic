@@ -1,0 +1,11 @@
+inductive True : Prop where
+| trivial : True
+
+inductive And (P : Prop) (Q : Prop) : Prop where
+| conj : P -> Q -> And P Q
+
+def A : Prop := True
+def B : Prop := True
+
+theorem test_and : And A B := by
+  exact (And.conj A B trivial trivial)

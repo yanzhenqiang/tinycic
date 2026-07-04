@@ -1,0 +1,52 @@
+import Exists
+import Logic
+
+import Exists
+import Logic
+
+axiom Point : Type
+axiom Line : Type
+axiom on_line : Point -> Line -> Prop
+axiom parallel : Line -> Line -> Prop
+
+theorem segment_parallel_from_lines : forall (A B C D : Point) (l m : Line),
+  on_line A l -> on_line B l -> on_line C m -> on_line D m -> parallel l m ->
+  exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l) (And (on_line C m) (And (on_line D m) (parallel l m)))) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro l
+  intro m
+  intro h_A
+  intro h_B
+  intro h_C
+  intro h_D
+  intro h_p
+  exact (Exists.intro Line (fun l' : Line => exists (m' : Line),
+    And (on_line A l') (And (on_line B l') (And (on_line C m') (And (on_line D m') (parallel l' m'))))) l
+    (Exists.intro Line (fun m' : Line =>
+      And (on_line A l) (And (on_line B l) (And (on_line C m') (And (on_line D m') (parallel l m'))))) m
+      (And.conj (on_line A l) (And (on_line B l) (And (on_line C m) (And (on_line D m) (parallel l m))))
+        h_A
+        (And.conj (on_line B l) (And (on_line C m) (And (on_line D m) (parallel l m))) h_B
+          (And.conj (on_line C m) (And (on_line D m) (parallel l m)) h_C
+            (And.conj (on_line D m) (parallel l m) h_D h_p))))))
+
+axiom P1 : Point
+axiom P2 : Point
+axiom P3 : Point
+axiom P4 : Point
+axiom l1 : Line
+axiom l2 : Line
+axiom h1 : on_line P1 l1
+axiom h2 : on_line P2 l1
+axiom h3 : on_line P3 l2
+axiom h4 : on_line P4 l2
+axiom h5 : parallel l1 l2
+
+theorem test_segment_parallel_from_lines :
+  exists (l : Line), exists (m : Line),
+    And (on_line P1 l) (And (on_line P2 l) (And (on_line P3 m) (And (on_line P4 m) (parallel l m)))) := by
+  exact (segment_parallel_from_lines P1 P2 P3 P4 l1 l2 h1 h2 h3 h4 h5)

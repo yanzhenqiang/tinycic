@@ -1011,6 +1011,42 @@ impl Parser {
         0
     }
 
+    /// Column of the current position (0-based, measured as chars from line start).
+    fn current_col(&self) -> usize {
+        self.pos - self.line_start(self.pos)
+    }
+
+    /// Line number of the current position (1-based).
+    fn current_line(&self) -> usize {
+        let mut line = 1;
+        for i in 0..self.pos {
+            if self.input.get(i) == Some(&'\n') {
+                line += 1;
+            }
+        }
+        line
+    }
+
+    /// Peek the column of the next non-whitespace, non-comment token without
+    /// advancing the parser. Returns (column, keyword_if_any).
+    fn peek_next_token_col(&self) -> (usize, Option<&'static str>) {
+        let mut tmp = Parser {
+            input: self.input.clone(),
+            pos: self.pos,
+            infix_ops: self.infix_ops.clone(),
+            notations: self.notations.clone(),
+        };
+        tmp.skip_whitespace_and_comments();
+        let col = tmp.current_col();
+        let kw = ["def", "theorem", "solve", "inductive", "structure", "axiom",
+                  "intro", "intros", "exact", "apply", "refl", "reflexivity", "rfl",
+                  "assumption", "rewrite", "rw", "induction", "cases", "have", "exists"]
+            .iter()
+            .find(|kw| tmp.starts_with_keyword(kw))
+            .copied();
+        (col, kw)
+    }
+
     pub fn parse_expr(&mut self) -> Result<ParsedExpr, String> {
         self.parse_pi_or_arrow()
     }
@@ -1023,7 +1059,9 @@ impl Parser {
             if self.peek().is_none() {
                 break;
             }
-            let decl = self.parse_decl()?;
+            let decl = self.parse_decl().map_err(|e| {
+                format!("line {} col {}: {}", self.current_line(), self.current_col(), e)
+            })?;
             decls.push(decl);
         }
         Ok(decls)
@@ -1738,6 +1776,11 @@ impl Parser {
                 break;
             }
 
+            // Indentation column where this tactic starts. Continuation lines must
+            // be indented strictly more than this; lines at this column (or less)
+            // that begin with a tactic keyword start a new tactic.
+            let tactic_start_col = self.current_col();
+
             // Parse a single tactic command (everything until ';' or block end)
             let mut tactic_str = String::new();
             let mut paren_depth = 0;
@@ -1759,6 +1802,7 @@ impl Parser {
                 }
 
                 let c = self.peek().unwrap();
+
                 if c == '(' {
                     paren_depth += 1;
                 } else if c == ')' {
@@ -1770,8 +1814,28 @@ impl Parser {
                     self.advance(); // consume ';'
                     break;
                 } else if c == '\n' && paren_depth == 0 {
-                    self.advance(); // consume '\n'
-                    break;
+                    // Append the newline and advance, then inspect the next line.
+                    tactic_str.push(c);
+                    self.advance();
+                    // A new tactic begins when the next token is at the same or
+                    // lower indentation as this tactic and is a known tactic or
+                    // top-level declaration keyword.
+                    let (next_col, next_kw) = self.peek_next_token_col();
+                    if next_col <= tactic_start_col
+                        && (next_kw.is_some()
+                            || self.peek().is_none()
+                            || self.starts_with_keyword("def")
+                            || self.starts_with_keyword("theorem")
+                            || self.starts_with_keyword("solve")
+                            || self.starts_with_keyword("inductive")
+                            || self.starts_with_keyword("structure")
+                            || self.starts_with_keyword("axiom"))
+                    {
+                        break;
+                    }
+                    // Otherwise this is a continuation line: fall through and keep
+                    // appending characters.
+                    continue;
                 }
 
                 tactic_str.push(c);
@@ -2976,15 +3040,52 @@ mod tests {
         repl.check_files(&["lib/Nat.cic", "lib/Int.cic", "lib/Frac.cic"]).unwrap();
         let (env, _tc, bindings, _infix, _notations) = repl.into_state();
 
-        println!("resolve_ctor_name(mk) = {:?}", env.resolve_ctor_name("mk"));
-        println!("resolve_constant_name(mk) = {:?}", env.resolve_constant_name("mk"));
-
         // Check that mk is NOT in env_bindings as bare name
         assert!(bindings.get("mk").is_none(), "bare 'mk' should not be in env_bindings");
 
         // Quot.mk is a primitive (QuotInfo), not a ConstructorInfo,
         // so resolve_ctor_name only sees Frac.mk and resolves unambiguously.
         assert_eq!(env.resolve_ctor_name("mk"), Some(Name::new("Frac").extend("mk")));
+    }
+
+    #[test]
+    fn test_parse_tactic_block_multiline_exact() {
+        let src = "theorem t : Nat := by\n  exact\n    let x : Nat := zero in\n    x\n";
+        let mut p = Parser::new(src);
+        let decls = p.parse_file().unwrap();
+        match &decls[0] {
+            ParsedDecl::Theorem { value, .. } => {
+                match value {
+                    ParsedExpr::TacticBlock(tactics) => {
+                        assert_eq!(tactics.len(), 1, "expected single multiline exact tactic, got {:?}", tactics);
+                        assert!(tactics[0].starts_with("exact"));
+                        assert!(tactics[0].contains("let x"));
+                    }
+                    _ => panic!("Expected TacticBlock"),
+                }
+            }
+            _ => panic!("Expected theorem"),
+        }
+    }
+
+    #[test]
+    fn test_parse_tactic_block_have_no_in() {
+        let src = "theorem t : Nat := by\n  have h : Nat := zero\n  exact h\n";
+        let mut p = Parser::new(src);
+        let decls = p.parse_file().unwrap();
+        match &decls[0] {
+            ParsedDecl::Theorem { value, .. } => {
+                match value {
+                    ParsedExpr::TacticBlock(tactics) => {
+                        assert_eq!(tactics.len(), 2, "expected two tactics, got {:?}", tactics);
+                        assert!(tactics[0].starts_with("have"));
+                        assert!(tactics[1].starts_with("exact"));
+                    }
+                    _ => panic!("Expected TacticBlock"),
+                }
+            }
+            _ => panic!("Expected theorem"),
+        }
     }
 
     #[test]

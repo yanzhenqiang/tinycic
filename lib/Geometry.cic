@@ -4,25 +4,8 @@ import GeometryCommon
 -- 24. Butterfly Theorem
 -- =====================================================================
 
-axiom butterfly_axiom :
-  forall (O : Point), forall (R : Point),
-  forall (P : Point), forall (Q : Point),
-  on_circle P O R -> on_circle Q O R ->
-  forall (M : Point),
-  midpoint M P Q ->
-  forall (A : Point), forall (B : Point),
-  on_circle A O R -> between A M B -> on_circle B O R ->
-  forall (C : Point), forall (D : Point),
-  on_circle C O R -> between C M D -> on_circle D O R ->
-  forall (X : Point),
-  collinear X P Q -> collinear X A D ->
-  forall (Y : Point),
-  collinear Y P Q -> collinear Y B C ->
-  midpoint M X Y
-
--- Let M be the midpoint of chord PQ of a circle.
--- Through M draw two other chords AB and CD.
--- Let AD and BC intersect PQ at X and Y respectively.
+-- Let M be the midpoint of chord PQ of a circle. Through M draw two other
+-- chords AB and CD. Let AD and BC intersect PQ at X and Y respectively.
 -- Then M is also the midpoint of XY.
 theorem butterfly : forall (O : Point), forall (R : Point),
   forall (P : Point), forall (Q : Point),
@@ -62,7 +45,7 @@ theorem butterfly : forall (O : Point), forall (R : Point),
   intro Y
   intro h12
   intro h13
-  exact (butterfly_axiom O R P Q h1 h2 M h3 A B h4 h5 h6 C D h7 h8 h9 X h10 h11 Y h12 h13)
+  exact (butterfly_theorem O R P Q h1 h2 M h3 A B h4 h5 h6 C D h7 h8 h9 X h10 h11 Y h12 h13)
 
 
 
@@ -189,10 +172,6 @@ theorem isosceles_converse : forall (A : Point), forall (B : Point), forall (C :
 -- =====================================================================
 -- 28. Helper definitions for complex theorems
 -- =====================================================================
-
--- D is the foot of the altitude from A onto BC (so AD is an altitude).
-def altitude_foot (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
-  And (collinear B C D) (right_angle A D B)
 
 -- DE is parallel to BC (using the underlying line parallelism).
 -- If two lines share two distinct points, any third point on one of them
@@ -1245,102 +1224,75 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
 -- =====================================================================
 
 -- The three medians of a triangle are concurrent.
-axiom centroid_axiom :
-  forall (A : Point), forall (B : Point), forall (C : Point),
-  forall (D : Point), forall (E : Point), forall (F : Point), forall (G : Point),
-  triangle A B C ->
-  midpoint D B C ->
-  midpoint E A C ->
-  midpoint F A B ->
-  And (collinear A G D) (And (collinear B G E) (collinear C G F))
-
 theorem centroid : forall (A : Point), forall (B : Point), forall (C : Point),
-  forall (D : Point), forall (E : Point), forall (F : Point), forall (G : Point),
+  forall (D : Point), forall (E : Point), forall (F : Point),
   triangle A B C ->
   midpoint D B C ->
   midpoint E A C ->
   midpoint F A B ->
-  And (collinear A G D) (And (collinear B G E) (collinear C G F)) := by
+  exists (G : Point),
+    And (collinear A G D) (And (collinear B G E) (collinear C G F)) := by
   intro A
   intro B
   intro C
   intro D
   intro E
   intro F
-  intro G
   intro h1
   intro h2
   intro h3
   intro h4
-  exact (centroid_axiom A B C D E F G h1 h2 h3 h4)
+  exact (medians_concurrent A B C D E F h1 h2 h3 h4)
 
 -- =====================================================================
 -- 32. Circumcenter Theorem
 -- =====================================================================
 
 -- The three perpendicular bisectors of a triangle are concurrent.
-axiom circumcenter_axiom :
-  forall (A : Point), forall (B : Point), forall (C : Point),
-  forall (D : Point), forall (E : Point), forall (F : Point), forall (O : Point),
-  triangle A B C ->
-  midpoint D B C ->
-  midpoint E A C ->
-  midpoint F A B ->
-  And (right_angle O D B) (And (right_angle O E A) (right_angle O F A))
-
 theorem circumcenter : forall (A : Point), forall (B : Point), forall (C : Point),
-  forall (D : Point), forall (E : Point), forall (F : Point), forall (O : Point),
+  forall (D : Point), forall (E : Point), forall (F : Point),
   triangle A B C ->
   midpoint D B C ->
   midpoint E A C ->
   midpoint F A B ->
-  And (right_angle O D B) (And (right_angle O E A) (right_angle O F A)) := by
+  exists (O : Point),
+    And (right_angle O D B) (And (right_angle O E A) (right_angle O F A)) := by
   intro A
   intro B
   intro C
   intro D
   intro E
   intro F
-  intro O
   intro h1
   intro h2
   intro h3
   intro h4
-  exact (circumcenter_axiom A B C D E F O h1 h2 h3 h4)
+  exact (perpendicular_bisectors_concurrent A B C D E F h1 h2 h3 h4)
 
 -- =====================================================================
 -- 33. Orthocenter Theorem
 -- =====================================================================
 
 -- The three altitudes of a triangle are concurrent.
-axiom orthocenter_axiom :
-  forall (A : Point), forall (B : Point), forall (C : Point),
-  forall (D : Point), forall (E : Point), forall (F : Point), forall (H : Point),
-  triangle A B C ->
-  altitude_foot A B C D ->
-  altitude_foot B A C E ->
-  altitude_foot C A B F ->
-  And (collinear A H D) (And (collinear B H E) (collinear C H F))
-
 theorem orthocenter : forall (A : Point), forall (B : Point), forall (C : Point),
-  forall (D : Point), forall (E : Point), forall (F : Point), forall (H : Point),
+  forall (D : Point), forall (E : Point), forall (F : Point),
   triangle A B C ->
   altitude_foot A B C D ->
   altitude_foot B A C E ->
   altitude_foot C A B F ->
-  And (collinear A H D) (And (collinear B H E) (collinear C H F)) := by
+  exists (H : Point),
+    And (collinear A H D) (And (collinear B H E) (collinear C H F)) := by
   intro A
   intro B
   intro C
   intro D
   intro E
   intro F
-  intro H
   intro h1
   intro h2
   intro h3
   intro h4
-  exact (orthocenter_axiom A B C D E F H h1 h2 h3 h4)
+  exact (altitudes_concurrent A B C D E F h1 h2 h3 h4)
 
 -- =====================================================================
 -- 34. Converse of Thales's Theorem

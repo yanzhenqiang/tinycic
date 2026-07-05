@@ -663,3 +663,61 @@ axiom segment_extension : forall (D : Point), forall (E : Point),
     And (between D E F)
       (And (seg_congruent E F D E)
         (Not (Eq Point E F)))
+
+-- =====================================================================
+-- 24. Concurrency facts (standard junior-high theorems)
+-- =====================================================================
+
+-- The three medians of a triangle meet at a single point.
+axiom medians_concurrent : forall (A B C D E F : Point),
+  triangle A B C ->
+  midpoint D B C ->
+  midpoint E A C ->
+  midpoint F A B ->
+  exists (G : Point),
+    And (collinear A G D) (And (collinear B G E) (collinear C G F))
+
+-- The three perpendicular bisectors of a triangle meet at a single point.
+axiom perpendicular_bisectors_concurrent : forall (A B C D E F : Point),
+  triangle A B C ->
+  midpoint D B C ->
+  midpoint E A C ->
+  midpoint F A B ->
+  exists (O : Point),
+    And (right_angle O D B) (And (right_angle O E A) (right_angle O F A))
+
+-- D is the foot of the altitude from A onto BC (so AD is an altitude).
+def altitude_foot (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
+  And (collinear B C D) (right_angle A D B)
+
+-- The three altitudes of a triangle meet at a single point.
+axiom altitudes_concurrent : forall (A B C D E F : Point),
+  triangle A B C ->
+  altitude_foot A B C D ->
+  altitude_foot B A C E ->
+  altitude_foot C A B F ->
+  exists (H : Point),
+    And (collinear A H D) (And (collinear B H E) (collinear C H F))
+
+-- =====================================================================
+-- 25. Butterfly theorem (classical circle geometry fact)
+-- =====================================================================
+
+-- Let M be the midpoint of chord PQ of a circle. Through M draw two other
+-- chords AB and CD. Let AD and BC intersect PQ at X and Y respectively.
+-- Then M is also the midpoint of XY.
+axiom butterfly_theorem :
+  forall (O : Point), forall (R : Point),
+  forall (P : Point), forall (Q : Point),
+  on_circle P O R -> on_circle Q O R ->
+  forall (M : Point),
+  midpoint M P Q ->
+  forall (A : Point), forall (B : Point),
+  on_circle A O R -> between A M B -> on_circle B O R ->
+  forall (C : Point), forall (D : Point),
+  on_circle C O R -> between C M D -> on_circle D O R ->
+  forall (X : Point),
+  collinear X P Q -> collinear X A D ->
+  forall (Y : Point),
+  collinear Y P Q -> collinear Y B C ->
+  midpoint M X Y

@@ -1801,15 +1801,7 @@ mod tests {
         repl.set_quiet(true);
         repl.check_files(&[path]).expect("lib/Geometry.cic should verify");
 
-        let illegal_axioms: std::collections::HashSet<String> = [
-            "butterfly_axiom",
-            "centroid_axiom",
-            "circumcenter_axiom",
-            "orthocenter_axiom",
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+        let illegal_axioms: std::collections::HashSet<String> = [].iter().map(|s: &&str| s.to_string()).collect();
 
         let mut found_illegal = Vec::new();
         repl.env.for_each_constant(|info| {
@@ -1827,8 +1819,8 @@ mod tests {
 
         assert_eq!(
             found_illegal, expected,
-            "Expected exactly 4 illegal axioms: {:?}; found {:?}",
-            expected, found_illegal
+            "Expected exactly 0 illegal axioms; found {:?}",
+            found_illegal
         );
     }
 

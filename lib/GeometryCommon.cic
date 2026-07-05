@@ -481,6 +481,84 @@ def rectangle (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
   And (parallelogram A B C D)
     (right_angle D A B)
 
+-- Triangle vertices can be permuted.
+theorem triangle_perm : forall (A B C : Point),
+  triangle A B C -> triangle B A C := by
+  intro A
+  intro B
+  intro C
+  intro h
+  intro h_col
+  exact (h (collinear_perm B A C h_col))
+
+-- Swap first and third vertices of a triangle.
+theorem triangle_perm2 : forall (A B C : Point),
+  triangle A B C -> triangle C B A := by
+  intro A
+  intro B
+  intro C
+  intro h
+  intro h_col
+  exact (h (collinear_perm3 C B A h_col))
+
+-- A quadrilateral contains two non-collinear triangles sharing a diagonal.
+theorem quadrilateral_triangle_ACD : forall (A B C D : Point),
+  quadrilateral A B C D -> triangle A C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_snd (Not (collinear C D A))
+    (Not (collinear D A B))
+    (and_snd (Not (collinear B C D))
+      (And (Not (collinear C D A)) (Not (collinear D A B)))
+      (and_snd (Not (collinear A B C))
+        (And (Not (collinear B C D)) (And (Not (collinear C D A)) (Not (collinear D A B))))
+        h)))
+
+-- Similarly, A, B, C are non-collinear.
+theorem quadrilateral_triangle_ABC : forall (A B C D : Point),
+  quadrilateral A B C D -> triangle A B C := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_fst (Not (collinear A B C))
+    (And (Not (collinear B C D)) (And (Not (collinear C D A)) (Not (collinear D A B))))
+    h)
+
+-- A, B, D are non-collinear.
+theorem quadrilateral_triangle_ABD : forall (A B C D : Point),
+  quadrilateral A B C D -> triangle A B D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_snd (Not (collinear C D A))
+    (Not (collinear D A B))
+    (and_snd (Not (collinear B C D))
+      (And (Not (collinear C D A)) (Not (collinear D A B)))
+      (and_snd (Not (collinear A B C))
+        (And (Not (collinear B C D)) (And (Not (collinear C D A)) (Not (collinear D A B))))
+        h)))
+
+-- B, C, D are non-collinear.
+theorem quadrilateral_triangle_BCD : forall (A B C D : Point),
+  quadrilateral A B C D -> triangle B C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_fst (Not (collinear B C D))
+    (And (Not (collinear C D A)) (Not (collinear D A B)))
+    (and_snd (Not (collinear A B C))
+      (And (Not (collinear B C D)) (And (Not (collinear C D A)) (Not (collinear D A B))))
+      h))
+
 -- Two collinear triples sharing two distinct points merge to one line.
 theorem collinear_shared_merge : forall (A B C D : Point),
   collinear A D B ->
@@ -1030,6 +1108,20 @@ theorem midsegment_diagonal_parallel : forall (A B C D E F : Point),
 -- =====================================================================
 
 -- The three medians of a triangle meet at a single point.
+-- Proof sketch: Let D be the midpoint of BC and E the midpoint of AC.
+-- Extend median AD past D to a point P with AD ≅ DP.  Then ABPC is a
+-- parallelogram (diagonals bisect each other), so its diagonal BP passes
+-- through the midpoint F of AB.  Hence BP is the third median, and all
+-- three meet at D... wait, that makes D the intersection of AD and BP,
+-- but D is on BC, not generally the centroid.
+--
+-- Correct sketch: In triangle ABC, let D, E be midpoints of BC and AC.
+-- Medians AD and BE intersect at G.  By the midsegment theorem, DE ∥ AB
+-- and DE = ½ AB.  Triangles GDE and GAB are similar (AA), with ratio 1:2,
+-- so G divides each median in ratio 2:1.  The same argument applied to
+-- median CF shows it also passes through the same point G.  The key step
+-- (similarity/ratio) is not yet available in our axiom set, so we keep
+-- this as a common-layer axiom for now.
 axiom medians_concurrent : forall (A B C D E F : Point),
   triangle A B C ->
   midpoint D B C ->

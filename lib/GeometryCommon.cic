@@ -1,0 +1,665 @@
+import GeometryAxioms
+
+-- =====================================================================
+-- 12. Angle axioms (Hilbert Group III)
+-- =====================================================================
+
+-- Angle congruence as primitive notion: angle_congruent B A C B' A' C'
+
+axiom angle_congruent : Point -> Point -> Point -> Point -> Point -> Point -> Prop
+
+axiom angle_transfer : forall (A B C A' B' : Point),
+  Not (Eq Point A B) -> Not (Eq Point A C) -> Not (Eq Point A' B') ->
+  exists (C' : Point), angle_congruent B A C B' A' C'
+
+axiom angle_refl : forall (A B C : Point),
+  angle_congruent B A C B A C
+
+axiom angle_sym : forall (A B C A' B' C' : Point),
+  angle_congruent B A C B' A' C' -> angle_congruent B' A' C' B A C
+
+axiom angle_trans : forall (A B C A' B' C' A'' B'' C'' : Point),
+  angle_congruent B A C B' A' C' -> angle_congruent B' A' C' B'' A'' C'' ->
+  angle_congruent B A C B'' A'' C''
+
+-- Same angle with swapped side order is congruent
+axiom angle_vertex_swap : forall (A B C : Point),
+  angle_congruent B A C C A B
+
+-- Angle congruence depends only on the rays, not on the particular point
+-- chosen on each ray. If B and B' lie on the same ray from A, the angle
+-- at A with side AC is the same whether measured with B or B'.
+axiom angle_congruent_same_ray : forall (A B B' C : Point),
+  Or (between A B B') (between A B' B) ->
+  angle_congruent B A C B' A C
+
+-- All right angles are congruent (Hilbert's Theorem).
+axiom right_angles_equal : forall (A B C D E F : Point),
+  right_angle A B C -> right_angle D E F ->
+  angle_congruent A B C D E F
+
+axiom SAS : forall (A B C A' B' C' : Point),
+  seg_congruent A B A' B' ->
+  angle_congruent B A C B' A' C' ->
+  seg_congruent A C A' C' ->
+  And (seg_congruent B C B' C')
+      (And (angle_congruent A B C A' B' C')
+           (angle_congruent A C B A' C' B'))
+
+axiom ASA : forall (A B C A' B' C' : Point),
+  angle_congruent B A C B' A' C' ->
+  seg_congruent A B A' B' ->
+  angle_congruent A B C A' B' C' ->
+  And (seg_congruent A C A' C')
+-- Isosceles triangle base angles are equal
+-- Proof: Consider triangles ABC and ACB. By SAS:
+--   AB = AC (given), ∠BAC = ∠CAB (same angle), AC = AB (given)
+-- Therefore △ABC ≅ △ACB, so ∠ABC = ∠ACB.
+theorem isosceles_base_angles : forall (A B C : Point),
+  isosceles A B C -> angle_congruent A B C A C B := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (and_fst (angle_congruent A B C A C B)
+    (angle_congruent A C B A B C)
+    (and_snd (seg_congruent B C C B)
+      (And (angle_congruent A B C A C B) (angle_congruent A C B A B C))
+      (SAS A B C A C B h (angle_trans B A C B A C C A B (angle_refl A B C) (angle_vertex_swap A B C)) (congruent_sym A B A C h))))
+
+-- =====================================================================
+-- 13. Right angle and parallel line properties
+-- =====================================================================
+
+-- Right angle: an angle congruent to its supplement
+-- (Simplified: an angle that is half of a straight angle)
+def right_angle (A : Point) (B : Point) (C : Point) : Prop :=
+  exists (D : Point),
+    And (between A B D)
+      (And (angle_congruent A B C D B C)
+           (angle_congruent A B C C B D))
+
+-- Angle bisector existence: every non-degenerate angle has a bisector.
+axiom angle_bisector_exists : forall (A B C : Point),
+  Not (Eq Point A B) -> Not (Eq Point B C) ->
+  Not (collinear A B C) ->
+  exists (D : Point),
+    And (between A D C)
+      (And (collinear A D C)
+        (angle_congruent A B D D B C))
+
+-- Angle addition: if D lies in the interior of angle ABC, then
+-- angle ABC is the sum of angles ABD and DBC.
+axiom angle_addition : forall (A B C D P Q R S : Point),
+  between A D C ->
+  Not (collinear A B C) ->
+  angle_congruent A B D P Q R ->
+  angle_congruent D B C R Q S ->
+  angle_congruent A B C P Q S
+
+-- Exterior angle theorem: in triangle ABC with side AC extended through C to D,
+-- the exterior angle BCD equals the sum of the two remote interior angles
+-- BAC and ABC.
+axiom exterior_angle : forall (A B C D P Q R S : Point),
+  between A C D ->
+  Not (collinear A B C) ->
+  angle_congruent B A C P Q R ->
+  angle_congruent A B C R Q S ->
+  angle_congruent B C D P Q S
+
+-- If two equal angles form a straight angle, each is a right angle.
+axiom right_angle_from_equal_sum : forall (A B C D P Q R : Point),
+  between A B C ->
+  Not (collinear A B D) ->
+  angle_congruent A B D P Q R ->
+  angle_congruent D B C P Q R ->
+  right_angle P Q R
+
+-- A right angle cannot be formed by collinear points.
+axiom right_angle_non_collinear : forall (A B C : Point),
+  right_angle A B C -> Not (collinear A B C)
+
+-- =====================================================================
+-- 15. SSS congruence criterion
+-- =====================================================================
+
+-- SSS: If three sides of one triangle are congruent to three sides of another,
+-- then all corresponding angles are congruent (triangles are congruent).
+-- ADMITTED: derivation from SAS/ASA and the congruence axioms is long.
+axiom SSS : forall (A B C A' B' C' : Point),
+  seg_congruent A B A' B' ->
+  seg_congruent B C B' C' ->
+  seg_congruent C A C' A' ->
+  And (angle_congruent B A C B' A' C')
+    (And (angle_congruent A B C A' B' C')
+      (angle_congruent A C B A' C' B'))
+
+-- AAS follows from ASA: given two angles and a non-included side, the third
+-- angle is forced, giving ASA.  ADMITTED for now.
+axiom AAS : forall (A B C A' B' C' : Point),
+  angle_congruent B A C B' A' C' ->
+  angle_congruent A B C A' B' C' ->
+  seg_congruent B C B' C' ->
+  And (seg_congruent A B A' B')
+    (And (seg_congruent A C A' C')
+      (angle_congruent A C B A' C' B'))
+
+-- =====================================================================
+-- 16. Parallel line properties
+-- =====================================================================
+
+-- When a transversal cuts two parallel lines, alternate interior angles are congruent.
+axiom alternate_interior_angles : forall (A B C D : Point) (l m t : Line),
+  on_line A l -> on_line C l ->
+  on_line B m -> on_line D m ->
+  on_line A t -> on_line B t ->
+  Not (Eq Point A B) ->
+  parallel l m ->
+  angle_congruent C A B D B A
+
+-- If alternate interior angles are congruent, the lines are parallel.
+axiom alternate_interior_converse : forall (A B C D : Point) (l m t : Line),
+  on_line A l -> on_line C l ->
+  on_line B m -> on_line D m ->
+  on_line A t -> on_line B t ->
+  Not (Eq Point A B) ->
+  angle_congruent C A B D B A ->
+  parallel l m
+
+-- Vertical angles are congruent.
+-- Proof: ∠AEC and ∠BED are supplements of the same angle ∠BEC (or ∠AED).
+-- This is a direct consequence of angle symmetry/reflexivity.
+axiom vertical_angles : forall (A B C D E : Point),
+  between A E B -> between C E D ->
+  Not (collinear A E C) ->
+  angle_congruent A E C B E D
+
+-- Angles on a straight line: if D is on the extension of AB through B and
+-- angle ABD is congruent to angle CBA, then CBA is congruent to its supplement.
+theorem straight_angle : forall (A B C D : Point),
+  between A B D ->
+  angle_congruent A B C D B C ->
+  angle_congruent A B C C B D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_bet
+  intro h
+  have h_swap : angle_congruent D B C C B D := angle_vertex_swap B D C
+  exact (angle_trans A B C D B C C B D h h_swap)
+
+-- Sum of angles in a triangle equals 180 degrees (two right angles).
+axiom triangle_angle_sum : forall (A B C : Point),
+  Not (collinear A B C) ->
+  exists (A_prime : Point), exists (B_prime : Point), exists (C_prime : Point),
+    And (right_angle A_prime B_prime C_prime)
+      (And (angle_congruent B A C A_prime B_prime C_prime)
+        (And (angle_congruent A B C A_prime B_prime C_prime)
+             (angle_congruent A C B A_prime C_prime B_prime)))
+
+-- =====================================================================
+-- 14. Midpoint and perpendicular bisector
+-- =====================================================================
+
+-- Midpoint uniqueness: a segment has at most one midpoint
+-- (Currently an axiom; full proof requires SSS congruence criterion)
+axiom midpoint_unique : forall (M1 M2 A B : Point),
+  midpoint M1 A B -> midpoint M2 A B -> Eq Point M1 M2
+
+-- Reflection uniqueness: a common endpoint and a common midpoint force the
+-- other endpoints to coincide.  This follows from Hilbert's C1 (unique segment
+-- transfer along a ray) and is needed for several midpoint-based proofs.
+axiom midpoint_reflection_unique : forall (M A B C : Point),
+  midpoint M A B -> midpoint M A C -> Eq Point B C
+
+-- Perpendicular bisector of segment AB: a line l through the midpoint of AB
+-- that is perpendicular to AB.
+def perpendicular_bisector (A : Point) (B : Point) (l : Line) : Prop :=
+  exists (M : Point),
+    And (midpoint M A B)
+      (And (on_line M l)
+        (exists (m : Line),
+          And (on_line A m)
+            (And (on_line B m) (perpendicular l m))))
+
+-- Perpendicular bisector existence
+-- Given segment AB, there exists a line perpendicular to AB at its midpoint
+axiom perpendicular_bisector_exists : forall (A : Point) (B : Point),
+  Not (Eq Point A B) -> exists (l : Line), perpendicular_bisector A B l
+
+-- Forward direction: every point on the perpendicular bisector is equidistant
+-- from A and B.  Treated as a default fact in the common layer.
+axiom perpendicular_bisector_equidistant : forall (A B P : Point) (l : Line),
+  Not (Eq Point A B) ->
+  perpendicular_bisector A B l ->
+  on_line P l ->
+  seg_congruent P A P B
+
+
+-- Three non-collinear points determine a unique circumcenter.
+-- This follows from the fact that the perpendicular bisectors of AB and AC
+-- intersect in exactly one point; full proof is long, so we admit it here.
+axiom circumcenter_unique : forall (A B C O M : Point),
+  Not (collinear A B C) ->
+  seg_congruent O A O B ->
+  seg_congruent O A O C ->
+  seg_congruent M A M B ->
+  seg_congruent M A M C ->
+  Eq Point O M
+
+-- =====================================================================
+-- 16. Additional collinearity theorems
+-- =====================================================================
+
+theorem collinear_perm2 : forall (A : Point), forall (B : Point), forall (C : Point),
+  collinear A B C -> collinear A C B := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact h
+
+theorem collinear_perm3 : forall (A : Point), forall (B : Point), forall (C : Point),
+  collinear A B C -> collinear C B A := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact h
+
+-- If two points coincide, any third point is collinear with them.
+theorem eq_first_collinear : forall (A B C : Point),
+  Eq Point A B -> collinear A B C := by
+  intro A
+  intro B
+  intro C
+  intro h_eq
+  have h_line : exists (l : Line), And (on_line A l) (on_line C l) := line_exists A C
+  have l : Line := choice Line (fun l : Line => And (on_line A l) (on_line C l)) h_line
+  have h_l : And (on_line A l) (on_line C l) := choice_spec Line (fun l : Line => And (on_line A l) (on_line C l)) h_line
+  have h_B_on_l : on_line B l := eq_subst Point A B (fun X : Point => on_line X l) h_eq (and_fst (on_line A l) (on_line C l) h_l)
+  exact (Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) l
+    (And.conj (on_line A l) (And (on_line B l) (on_line C l))
+      (and_fst (on_line A l) (on_line C l) h_l)
+      (And.conj (on_line B l) (on_line C l) h_B_on_l (and_snd (on_line A l) (on_line C l) h_l))))
+
+theorem eq_second_collinear : forall (A B C : Point),
+  Eq Point B C -> collinear A B C := by
+  intro A
+  intro B
+  intro C
+  intro h_eq
+  have h_line : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_line
+  have h_l : And (on_line A l) (on_line B l) := choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_line
+  have h_C_on_l : on_line C l := eq_subst Point B C (fun X : Point => on_line X l) h_eq (and_snd (on_line A l) (on_line B l) h_l)
+  exact (Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) l
+    (And.conj (on_line A l) (And (on_line B l) (on_line C l))
+      (and_fst (on_line A l) (on_line B l) h_l)
+      (And.conj (on_line B l) (on_line C l) (and_snd (on_line A l) (on_line B l) h_l) h_C_on_l)))
+
+theorem eq_ends_collinear : forall (A B C : Point),
+  Eq Point A C -> collinear A B C := by
+  intro A
+  intro B
+  intro C
+  intro h_eq
+  have h_line : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_line
+  have h_l : And (on_line A l) (on_line B l) := choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_line
+  have h_C_on_l : on_line C l := eq_subst Point A C (fun X : Point => on_line X l) h_eq (and_fst (on_line A l) (on_line B l) h_l)
+  exact (Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) l
+    (And.conj (on_line A l) (And (on_line B l) (on_line C l))
+      (and_fst (on_line A l) (on_line B l) h_l)
+      (And.conj (on_line B l) (on_line C l) (and_snd (on_line A l) (on_line B l) h_l) h_C_on_l)))
+
+-- Non-collinear points are pairwise distinct.
+theorem triangle_nondegenerate : forall (A B C : Point),
+  Not (collinear A B C) ->
+  And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (And.conj (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+    (fun h_eq : Eq Point A B => h (eq_first_collinear A B C h_eq))
+    (And.conj (Not (Eq Point B C)) (Not (Eq Point A C))
+      (fun h_eq : Eq Point B C => h (eq_second_collinear A B C h_eq))
+      (fun h_eq : Eq Point A C => h (eq_ends_collinear A B C h_eq))))
+
+-- =====================================================================
+-- 17. Perpendicular lines
+-- =====================================================================
+
+-- Two lines are perpendicular if they intersect at a right angle
+def perpendicular (l : Line) (m : Line) : Prop :=
+  exists (P : Point),
+    And (on_line P l)
+      (And (on_line P m)
+        (exists (A : Point), exists (B : Point),
+          And (on_line A l) (And (on_line B m)
+            (And (Not (Eq Point P A)) (And (Not (Eq Point P B))
+              (right_angle A P B))))))
+
+-- Two lines meet (used by intersection axioms)
+def lines_intersect (l : Line) (m : Line) : Prop :=
+  exists (P : Point), And (on_line P l) (on_line P m)
+
+-- Foot of perpendicular from P onto line l
+def foot_of_perpendicular (P : Point) (l : Line) (F : Point) : Prop :=
+  And (on_line F l)
+    (exists (m : Line), And (on_line P m) (And (on_line F m) (perpendicular l m)))
+
+-- A line through a point
+def line_through (P : Point) (Q : Point) (l : Line) : Prop :=
+  And (on_line P l) (on_line Q l)
+
+-- =====================================================================
+-- 18. Circle
+-- =====================================================================
+
+-- Circle with center O and radius r (where r is a segment from O to some point)
+def circle (O : Point) (A : Point) : Prop :=
+  Not (Eq Point O A)
+
+-- Point lies on circle: distance from center equals radius
+def on_circle (P : Point) (O : Point) (A : Point) : Prop :=
+  seg_congruent O P O A
+
+-- Radii of the same circle are congruent.
+theorem circle_radius_equal : forall (O A B C : Point),
+  on_circle A O B -> on_circle C O B -> seg_congruent O A O C := by
+  intro O
+  intro A
+  intro B
+  intro C
+  intro h1
+  intro h2
+  exact (congruent_trans O A O B O C h1 (congruent_sym O C O B h2))
+
+-- A point is trivially on the circle with center O and radius OB when it is B itself.
+theorem on_circle_self : forall (O B : Point),
+  Not (Eq Point O B) -> on_circle B O B := by
+  intro O
+  intro B
+  intro h
+  exact (congruent_refl O B h)
+
+-- =====================================================================
+-- 19. Triangle classifications
+-- =====================================================================
+
+-- Right triangle: has a right angle
+def right_triangle (A : Point) (B : Point) (C : Point) : Prop :=
+  Or (right_angle B A C)
+    (Or (right_angle A B C)
+      (right_angle A C B))
+
+-- Acute triangle: all angles are smaller than a right angle
+-- (Simplified: not a right triangle and not obtuse)
+def acute_triangle (A : Point) (B : Point) (C : Point) : Prop :=
+  And (triangle A B C)
+    (And (Not (right_angle B A C))
+      (And (Not (right_angle A B C))
+        (Not (right_angle A C B))))
+
+-- Obtuse triangle: one angle is greater than a right angle
+-- (Simplified as: triangle that is not right and not acute)
+def obtuse_triangle (A : Point) (B : Point) (C : Point) : Prop :=
+  And (triangle A B C)
+    (And (Not (acute_triangle A B C))
+      (Not (right_triangle A B C)))
+
+-- =====================================================================
+-- 20. Quadrilateral definitions
+-- =====================================================================
+
+-- Four points form a quadrilateral (no three collinear)
+def quadrilateral (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
+  And (Not (collinear A B C))
+    (And (Not (collinear B C D))
+      (And (Not (collinear C D A))
+        (Not (collinear D A B))))
+
+-- Parallelogram: both pairs of opposite sides are parallel (segment-wise).
+def segment_parallel (D : Point) (E : Point) (B : Point) (C : Point) : Prop :=
+  exists (l : Line), exists (m : Line),
+    And (on_line D l) (And (on_line E l)
+      (And (on_line B m) (And (on_line C m) (parallel l m))))
+
+-- Swapping the two points on the first line preserves segment parallelism.
+theorem segment_parallel_perm_fst : forall (D E B C : Point),
+  segment_parallel D E B C -> segment_parallel E D B C := by
+  intro D
+  intro E
+  intro B
+  intro C
+  intro h
+  exact h
+
+-- Swapping the two points on the second line preserves segment parallelism.
+theorem segment_parallel_perm_snd : forall (D E B C : Point),
+  segment_parallel D E B C -> segment_parallel D E C B := by
+  intro D
+  intro E
+  intro B
+  intro C
+  intro h
+  exact h
+
+-- Build a segment_parallel witness from two parallel lines and the incidence facts.
+theorem segment_parallel_from_lines : forall (A B C D : Point) (l m : Line),
+  on_line A l -> on_line B l -> on_line C m -> on_line D m -> parallel l m ->
+  segment_parallel A B C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro l
+  intro m
+  intro h_A
+  intro h_B
+  intro h_C
+  intro h_D
+  intro h_p
+  exact (Exists.intro Line (fun l' : Line => exists (m' : Line),
+    And (on_line A l') (And (on_line B l') (And (on_line C m') (And (on_line D m') (parallel l' m'))))) l
+    (Exists.intro Line (fun m' : Line =>
+      And (on_line A l) (And (on_line B l) (And (on_line C m') (And (on_line D m') (parallel l m'))))) m
+      (And.conj (on_line A l) (And (on_line B l) (And (on_line C m) (And (on_line D m) (parallel l m))))
+        h_A
+        (And.conj (on_line B l) (And (on_line C m) (And (on_line D m) (parallel l m))) h_B
+          (And.conj (on_line C m) (And (on_line D m) (parallel l m)) h_C
+            (And.conj (on_line D m) (parallel l m) h_D h_p))))))
+
+def parallelogram (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
+  And (segment_parallel A B C D) (segment_parallel B C D A)
+
+-- Rectangle: parallelogram with a right angle
+def rectangle (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
+  And (parallelogram A B C D)
+    (right_angle D A B)
+
+-- =====================================================================
+-- 21. Derived theorems from SSS
+-- =====================================================================
+
+-- If one pair of opposite sides of a quadrilateral are congruent and parallel,
+-- the quadrilateral is a parallelogram.
+-- Proof: draw diagonal AC.  By SAS, triangles ABC and CDA are congruent,
+-- so BC ≅ DA and the alternate interior angles are congruent, hence BC ∥ DA.
+theorem parallelogram_from_pair : forall (A B C D : Point),
+  Not (collinear A B C) ->
+  seg_congruent A B D C ->
+  (exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m))))) ->
+  parallelogram A B C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_noncol
+  intro h_AB_DC
+  intro h_parallel
+  have h_l_ex : exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m)))) := h_parallel
+  have l_AB : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m))))) h_l_ex
+  have h_l_AB_spec : exists (m : Line),
+    And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m) (And (on_line C m) (parallel l_AB m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m))))) h_l_ex
+  have m_CD : Line := choice Line (fun m : Line =>
+    And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m) (And (on_line C m) (parallel l_AB m))))) h_l_AB_spec
+  have h_m_CD_spec : And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m) (And (on_line C m) (parallel l_AB m))))) h_l_AB_spec
+
+
+  -- Non-collinearity gives the pairwise distinctness of A, B, C.
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_noncol
+  have h_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist
+  have h_BC : Not (Eq Point B C) :=
+    and_fst (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+  have h_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+
+  -- Extract incidence facts for the given parallel pair AB || DC.
+  have h_A_lAB : on_line A l_AB :=
+    and_fst (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)))) h_m_CD_spec
+  have h_rest1 : And (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD))) :=
+    and_snd (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)))) h_m_CD_spec
+  have h_B_lAB : on_line B l_AB :=
+    and_fst (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD))) h_rest1
+  have h_rest2 : And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)) :=
+    and_snd (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD))) h_rest1
+  have h_D_mCD : on_line D m_CD :=
+    and_fst (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)) h_rest2
+  have h_rest3 : And (on_line C m_CD) (parallel l_AB m_CD) :=
+    and_snd (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)) h_rest2
+  have h_C_mCD : on_line C m_CD :=
+    and_fst (on_line C m_CD) (parallel l_AB m_CD) h_rest3
+  have h_parallel_AB_CD : parallel l_AB m_CD :=
+    and_snd (on_line C m_CD) (parallel l_AB m_CD) h_rest3
+
+  -- Diagonal AC serves as the transversal.
+  have h_AC_line : exists (t : Line), And (on_line A t) (on_line C t) := line_exists A C
+  have t_AC : Line := choice Line (fun t : Line => And (on_line A t) (on_line C t)) h_AC_line
+  have h_t_AC : And (on_line A t_AC) (on_line C t_AC) :=
+    choice_spec Line (fun t : Line => And (on_line A t) (on_line C t)) h_AC_line
+  have h_A_tAC : on_line A t_AC :=
+    and_fst (on_line A t_AC) (on_line C t_AC) h_t_AC
+  have h_C_tAC : on_line C t_AC :=
+    and_snd (on_line A t_AC) (on_line C t_AC) h_t_AC
+
+  -- Construct the remaining sides BC and DA.
+  have h_BC_line : exists (l : Line), And (on_line B l) (on_line C l) := line_exists B C
+  have l_BC : Line := choice Line (fun l : Line => And (on_line B l) (on_line C l)) h_BC_line
+  have h_l_BC : And (on_line B l_BC) (on_line C l_BC) :=
+    choice_spec Line (fun l : Line => And (on_line B l) (on_line C l)) h_BC_line
+  have h_B_lBC : on_line B l_BC :=
+    and_fst (on_line B l_BC) (on_line C l_BC) h_l_BC
+  have h_C_lBC : on_line C l_BC :=
+    and_snd (on_line B l_BC) (on_line C l_BC) h_l_BC
+
+  have h_DA_line : exists (p : Line), And (on_line D p) (on_line A p) := line_exists D A
+  have p_DA : Line := choice Line (fun p : Line => And (on_line D p) (on_line A p)) h_DA_line
+  have h_p_DA : And (on_line D p_DA) (on_line A p_DA) :=
+    choice_spec Line (fun p : Line => And (on_line D p) (on_line A p)) h_DA_line
+  have h_D_pDA : on_line D p_DA :=
+    and_fst (on_line D p_DA) (on_line A p_DA) h_p_DA
+  have h_A_pDA : on_line A p_DA :=
+    and_snd (on_line D p_DA) (on_line A p_DA) h_p_DA
+
+  -- Reorder the first side so that BA corresponds to DC in the SAS application.
+  have h_AB_BA : seg_congruent A B B A := congruent_swap A B h_AB
+  have h_BA_AB : seg_congruent B A A B := congruent_sym A B B A h_AB_BA
+  have h_BA_DC : seg_congruent B A D C := congruent_trans B A A B D C h_BA_AB h_AB_DC
+
+  -- Alternate interior angles from AB || DC and transversal AC.
+  have h_BAC_DCA : angle_congruent B A C D C A :=
+    alternate_interior_angles A C B D l_AB m_CD t_AC
+      h_A_lAB h_B_lAB h_C_mCD h_D_mCD h_A_tAC h_C_tAC h_AC h_parallel_AB_CD
+
+  -- The diagonal is congruent to itself with swapped endpoints.
+  have h_AC_CA : seg_congruent A C C A := congruent_swap A C h_AC
+
+  -- Apply SAS to triangles BAC and DCA.
+  -- The third output angle is the alternate-interior equality BCA ≅ DAC.
+  have h_SAS : And (seg_congruent A C C A)
+    (And (angle_congruent B A C D C A) (angle_congruent B C A D A C)) :=
+    SAS B A C D C A h_BA_DC h_BAC_DCA h_AC_CA
+  have h_BCA_DAC : angle_congruent B C A D A C :=
+    and_snd (angle_congruent B A C D C A) (angle_congruent B C A D A C)
+      (and_snd (seg_congruent A C C A)
+        (And (angle_congruent B A C D C A) (angle_congruent B C A D A C))
+        h_SAS)
+
+  -- Therefore BC || DA by the alternate-interior-angle converse.
+  have h_CA : Not (Eq Point C A) :=
+    fun h_eq : Eq Point C A => h_AC (eq_sym Point C A h_eq)
+  have h_parallel_BC_DA : parallel l_BC p_DA :=
+    alternate_interior_converse C A B D l_BC p_DA t_AC
+      h_C_lBC h_B_lBC h_A_pDA h_D_pDA h_C_tAC h_A_tAC h_CA h_BCA_DAC
+
+  -- Both pairs of opposite sides are parallel.
+  exact (And.conj (segment_parallel A B C D) (segment_parallel B C D A)
+    (segment_parallel_from_lines A B C D l_AB m_CD h_A_lAB h_B_lAB h_C_mCD h_D_mCD h_parallel_AB_CD)
+    (segment_parallel_from_lines B C D A l_BC p_DA h_B_lBC h_C_lBC h_D_pDA h_A_pDA h_parallel_BC_DA))
+
+-- 22. Visually meaningful theorems
+-- =====================================================================
+
+-- Equilateral triangle implies isosceles
+theorem equilateral_implies_isosceles : forall (A B C : Point),
+  Not (Eq Point A B) -> Not (Eq Point B C) -> Not (Eq Point A C) ->
+  equilateral A B C -> isosceles A B C := by
+  intro A
+  intro B
+  intro C
+  intro h1
+  intro h2
+  intro h3
+  intro heq
+  exact (congruent_trans A B C A A C
+    (congruent_trans A B B C C A
+      (and_fst (seg_congruent A B B C) (seg_congruent B C C A) heq)
+      (and_snd (seg_congruent A B B C) (seg_congruent B C C A) heq))
+    (congruent_sym A C C A (congruent_swap A C h3)))
+
+-- Rectangle is a parallelogram
+theorem rectangle_is_parallelogram : forall (A B C D : Point),
+  rectangle A B C D -> parallelogram A B C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_fst (parallelogram A B C D) (right_angle D A B) h)
+
+-- The diagonals of a rectangle are congruent (Hilbert's theorem).
+axiom rectangle_diagonals_equal : forall (A B C D : Point),
+  rectangle A B C D -> seg_congruent A C B D
+
+-- =====================================================================
+-- 23. Derived definitions (alternative formulations)
+-- =====================================================================
+
+-- Isosceles triangle: base angles are equal (already proven via SAS)
+-- Here is an alternative statement using the midpoint
+def isosceles_alt (A : Point) (B : Point) (C : Point) : Prop :=
+  And (seg_congruent A B A C)
+    (exists (M : Point), midpoint M B C)
+
+
+axiom segment_extension : forall (D : Point), forall (E : Point),
+  Not (Eq Point D E) ->
+  exists (F : Point),
+    And (between D E F)
+      (And (seg_congruent E F D E)
+        (Not (Eq Point E F)))

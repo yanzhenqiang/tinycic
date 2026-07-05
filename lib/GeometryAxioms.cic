@@ -1,0 +1,472 @@
+import Logic
+import Exists
+import Eq
+
+-- =====================================================================
+-- Euclidean Geometry Axiom System (Hilbert-style)
+-- =====================================================================
+-- Primitive notions: Point, Line
+-- Relations: incidence, betweenness, congruence
+
+-- -----------------------------------------------------------------
+-- 1. Primitive types
+-- -----------------------------------------------------------------
+
+axiom Point : Type
+axiom Line : Type
+
+-- -----------------------------------------------------------------
+-- 2. Primitive relations
+-- -----------------------------------------------------------------
+
+-- Incidence: point P lies on line l
+axiom on_line : Point -> Line -> Prop
+
+-- Betweenness: B is between A and C
+axiom between : Point -> Point -> Point -> Prop
+
+-- Segment congruence: AB ≅ CD
+axiom seg_congruent : Point -> Point -> Point -> Point -> Prop
+
+-- Parallel lines: no common point
+def parallel (l : Line) (m : Line) : Prop :=
+  forall (P : Point), Not (And (on_line P l) (on_line P m))
+
+-- -----------------------------------------------------------------
+-- 3. Incidence axioms (I1-I3)
+-- -----------------------------------------------------------------
+
+-- I1: For any two points A, B, there exists a line through them
+axiom line_exists : forall (A : Point), forall (B : Point),
+  exists (l : Line), And (on_line A l) (on_line B l)
+
+-- I2: For any two distinct points A, B, there is at most one line through them
+axiom line_unique : forall (A : Point), forall (B : Point), forall (l1 : Line), forall (l2 : Line),
+  Not (Eq Point A B) -> on_line A l1 -> on_line B l1 -> on_line A l2 -> on_line B l2 -> Eq Line l1 l2
+
+-- I3a: Every line contains at least two points
+axiom line_has_two_points : forall (l : Line),
+  exists (A : Point), exists (B : Point), And (Not (Eq Point A B)) (And (on_line A l) (on_line B l))
+
+-- I3b: There exist three non-collinear points
+axiom three_non_collinear :
+  exists (A : Point), exists (B : Point), exists (C : Point),
+  And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (And (Not (Eq Point A C))
+    (forall (l : Line), on_line A l -> on_line B l -> Not (on_line C l))))
+
+-- -----------------------------------------------------------------
+-- 4. Order axioms (betweenness, O1-O4)
+-- -----------------------------------------------------------------
+
+-- O1: If B is between A and C, then A, B, C are distinct collinear points
+axiom between_collinear : forall (A : Point), forall (B : Point), forall (C : Point),
+  between A B C ->
+  And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (And (Not (Eq Point A C))
+    (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)))))
+
+-- O2: For any two distinct points A, C, there exists B between them
+axiom between_exists : forall (A : Point), forall (C : Point),
+  Not (Eq Point A C) -> exists (B : Point), between A B C
+
+-- O3: Betweenness is symmetric
+axiom between_sym : forall (A : Point), forall (B : Point), forall (C : Point),
+  between A B C -> between C B A
+
+-- O4 (Pasch's axiom)
+axiom pasch : forall (A : Point), forall (B : Point), forall (C : Point), forall (l : Line), forall (D : Point),
+  (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')) ->
+  on_line D l -> between A D B ->
+  exists (E : Point), And (on_line E l) (Or (between A E C) (between B E C))
+
+-- O5: Uniqueness of betweenness on a line
+-- If A, B, C are collinear and distinct, exactly one is between the other two.
+axiom between_unique : forall (A : Point), forall (B : Point), forall (C : Point),
+  Not (Eq Point A B) -> Not (Eq Point B C) -> Not (Eq Point A C) ->
+  collinear A B C ->
+  Or (between A B C)
+    (Or (between B C A) (between B A C))
+
+-- O6: Betweenness excludes endpoints
+axiom between_not_eq : forall (A : Point), forall (B : Point), forall (C : Point),
+  between A B C ->
+  And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+
+-- O7: Transitivity of betweenness on a line
+axiom between_trans : forall (A : Point), forall (B : Point), forall (C : Point), forall (D : Point),
+  between A B C -> between B C D -> between A B D
+
+-- -----------------------------------------------------------------
+-- 5. Congruence axioms (C1-C6)
+-- -----------------------------------------------------------------
+
+-- C1: Segment transfer
+axiom congruent_transfer : forall (A : Point), forall (B : Point), forall (C : Point),
+  Not (Eq Point A B) -> exists (D : Point), seg_congruent A B C D
+
+-- C2: Reflexivity
+axiom congruent_refl : forall (A : Point), forall (B : Point),
+  Not (Eq Point A B) -> seg_congruent A B A B
+
+-- C3: Symmetry
+axiom congruent_sym : forall (A : Point), forall (B : Point), forall (C : Point), forall (D : Point),
+  seg_congruent A B C D -> seg_congruent C D A B
+
+-- C4: Transitivity
+axiom congruent_trans : forall (A : Point), forall (B : Point), forall (C : Point), forall (D : Point), forall (E : Point), forall (F : Point),
+  seg_congruent A B C D -> seg_congruent C D E F -> seg_congruent A B E F
+
+-- Endpoint swap (needed because our formalization uses ordered quadruples)
+axiom congruent_swap : forall (A : Point), forall (B : Point),
+  Not (Eq Point A B) -> seg_congruent A B B A
+
+-- C5: Addition
+axiom congruent_add : forall (A : Point), forall (B : Point), forall (C : Point), forall (A' : Point), forall (B' : Point), forall (C' : Point),
+  between A B C -> between A' B' C' ->
+  seg_congruent A B A' B' -> seg_congruent B C B' C' ->
+  seg_congruent A C A' C'
+
+-- Congruent segments are halved congruently.
+axiom half_congruent_segments : forall (A C B D M N : Point),
+  between A M C -> between B N D ->
+  seg_congruent A M M C -> seg_congruent B N N D ->
+  seg_congruent A C B D ->
+  seg_congruent A M B N
+
+-- -----------------------------------------------------------------
+-- 6. Parallel axiom (Playfair)
+-- -----------------------------------------------------------------
+
+axiom playfair : forall (l : Line), forall (P : Point),
+  Not (on_line P l) ->
+  exists (m : Line),
+    And (on_line P m) (And (parallel l m)
+      (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line m m'))
+
+-- -----------------------------------------------------------------
+-- 7. Continuity axioms (Hilbert Group V)
+-- -----------------------------------------------------------------
+-- These are needed for segment measure, midpoint construction, and
+-- circle intersections.  They complete the Hilbert axiom system.
+
+-- Archimedes' axiom: any segment can be exceeded by a finite multiple
+-- of any smaller segment.
+axiom archimedes : forall (A B C D : Point),
+  Not (Eq Point A B) -> Not (Eq Point C D) ->
+  exists (n : Nat), exists (P : Point), exists (Q : Point),
+    And (between A P Q)
+      (And (collinear A B Q)
+        (And (seg_congruent P Q C D)
+          (seg_congruent A Q A B)))
+
+-- Dedekind completeness: every partition of the points of a line into
+-- two non-empty convex sets has a cut point.
+axiom dedekind : forall (l : Line) (P Q : Point),
+  on_line P l -> on_line Q l -> Not (Eq Point P Q) ->
+  forall (S1 S2 : Point -> Prop),
+    (exists (X : Point), And (on_line X l) (S1 X)) ->
+    (exists (Y : Point), And (on_line Y l) (S2 Y)) ->
+    (forall (X Y : Point), on_line X l -> on_line Y l -> S1 X -> S2 Y ->
+      Or (between X Y P) (between P X Y)) ->
+    exists (O : Point), And (on_line O l)
+      (forall (X : Point), on_line X l ->
+        And (S1 X -> Or (between X O P) (Eq Point X O))
+             (S2 X -> Or (between P O X) (Eq Point X O)))
+
+-- -----------------------------------------------------------------
+-- 8. Foundational existence/intersection axioms
+-- -----------------------------------------------------------------
+-- These follow from the Hilbert axioms above, but full derivations are
+-- long.  They are stated as axioms here to make practical proofs usable.
+-- Eventually they should become theorems proved from continuity.
+
+-- Every segment has a midpoint.
+axiom midpoint_exists : forall (A : Point), forall (B : Point),
+  Not (Eq Point A B) -> exists (M : Point), midpoint M A B
+
+-- Through any point there exists a perpendicular to a given line.
+axiom perpendicular_exists : forall (l : Line), forall (P : Point),
+  exists (m : Line), And (on_line P m) (perpendicular l m)
+
+-- Two distinct lines perpendicular to the same line are parallel
+-- (or coincide).  We phrase it as uniqueness at a point.
+axiom perpendicular_unique : forall (l : Line), forall (P : Point), forall (m1 m2 : Line),
+  on_line P l -> on_line P m1 -> on_line P m2 ->
+  perpendicular l m1 -> perpendicular l m2 -> Eq Line m1 m2
+
+-- Two non-parallel lines meet in a unique point.
+axiom lines_meet : forall (l m : Line),
+  Not (parallel l m) -> exists (P : Point), And (on_line P l) (on_line P m)
+
+-- A line through the interior of a circle meets the circle.
+axiom circle_line_meet : forall (O P Q : Point) (l : Line),
+  on_line P l -> on_line Q l ->
+  on_circle P O Q ->
+  exists (R : Point), And (on_line R l) (And (Not (Eq Point P R)) (on_circle R O Q))
+
+-- Two overlapping circles intersect.
+axiom circle_circle_meet : forall (O1 O2 A B C : Point),
+  Not (Eq Point O1 O2) ->
+  on_circle A O1 B ->
+  on_circle C O1 B ->
+  between O1 C O2 ->
+  exists (P : Point), And (on_circle P O1 B) (on_circle P O2 A)
+
+-- -----------------------------------------------------------------
+-- 9. Definitions
+-- -----------------------------------------------------------------
+
+-- Collinearity
+def collinear (A : Point) (B : Point) (C : Point) : Prop :=
+  exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l))
+
+-- -----------------------------------------------------------------
+-- 8. Basic theorems
+-- -----------------------------------------------------------------
+
+-- Betweenness is preserved under congruent segments on the same line.
+-- This is a direct consequence of the congruent_add axiom.
+theorem between_congruent_preserve : forall (A B C A' B' C' : Point),
+  between A B C -> between A' B' C' ->
+  collinear A B C -> collinear A' B' C' ->
+  seg_congruent A B A' B' -> seg_congruent B C B' C' ->
+  seg_congruent A C A' C' := by
+  intro A
+  intro B
+  intro C
+  intro A'
+  intro B'
+  intro C'
+  intro h1
+  intro h2
+  intro _
+  intro _
+  intro h3
+  intro h4
+  exact (congruent_add A B C A' B' C' h1 h2 h3 h4)
+
+-- Betweenness implies collinearity
+theorem between_implies_collinear : forall (A : Point), forall (B : Point), forall (C : Point),
+  between A B C -> collinear A B C := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (and_snd (Not (Eq Point A C))
+    (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)))
+    (and_snd (Not (Eq Point B C))
+      (And (Not (Eq Point A C)) (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l))))
+      (and_snd (Not (Eq Point A B))
+        (And (Not (Eq Point B C)) (And (Not (Eq Point A C)) (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)))))
+        (between_collinear A B C h))))
+
+-- Extract the three distinctness facts from betweenness.
+theorem between_distinct_first : forall (A B C : Point),
+  between A B C -> Not (Eq Point A B) := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (and_fst (Not (Eq Point A B))
+    (And (Not (Eq Point B C)) (And (Not (Eq Point A C))
+      (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)))))
+    (between_collinear A B C h))
+
+theorem between_distinct_middle : forall (A B C : Point),
+  between A B C -> Not (Eq Point B C) := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (and_fst (Not (Eq Point B C))
+    (And (Not (Eq Point A C))
+      (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l))))
+    (and_snd (Not (Eq Point A B))
+      (And (Not (Eq Point B C)) (And (Not (Eq Point A C))
+        (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)))))
+      (between_collinear A B C h)))
+
+theorem between_distinct_ends : forall (A B C : Point),
+  between A B C -> Not (Eq Point A C) := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (and_fst (Not (Eq Point A C))
+    (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)))
+    (and_snd (Not (Eq Point B C))
+      (And (Not (Eq Point A C))
+        (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l))))
+      (and_snd (Not (Eq Point A B))
+        (And (Not (Eq Point B C)) (And (Not (Eq Point A C))
+          (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)))))
+        (between_collinear A B C h))))
+
+-- And is symmetric in its arguments
+theorem and_swap : forall (P : Prop), forall (Q : Prop), And P Q -> And Q P := by
+  intro P
+  intro Q
+  intro h
+  exact (And.conj Q P (and_snd P Q h) (and_fst P Q h))
+
+-- Parallelism is symmetric
+theorem parallel_sym : forall (l : Line), forall (m : Line),
+  parallel l m -> parallel m l := by
+  intro l
+  intro m
+  intro h
+  intro P
+  intro h2
+  exact (h P (And.conj (on_line P l) (on_line P m)
+    (and_snd (on_line P m) (on_line P l) h2)
+    (and_fst (on_line P m) (on_line P l) h2)))
+
+-- Parallelism is transitive: two lines parallel to a third are parallel to each
+-- other (or coincide). The distinct case follows from Playfair's uniqueness.
+theorem parallel_trans : forall (l : Line), forall (m : Line), forall (n : Line),
+  parallel l m -> parallel m n -> Not (Eq Line l n) -> parallel l n := by
+  intro l
+  intro m
+  intro n
+  intro h_lm
+  intro h_mn
+  intro h_neq
+  intro P
+  intro h_P
+  have h_P_on_l : on_line P l := and_fst (on_line P l) (on_line P n) h_P
+  have h_P_on_n : on_line P n := and_snd (on_line P l) (on_line P n) h_P
+  have h_P_not_m : Not (on_line P m) := fun h_P_m : on_line P m =>
+    h_lm P (And.conj (on_line P l) (on_line P m) h_P_on_l h_P_m)
+  have h_playfair : exists (p : Line),
+    And (on_line P p) (And (parallel m p)
+      (forall (m' : Line), on_line P m' -> parallel m m' -> Eq Line p m')) :=
+    playfair m P h_P_not_m
+  have p : Line := choice Line (fun p : Line =>
+    And (on_line P p) (And (parallel m p)
+      (forall (m' : Line), on_line P m' -> parallel m m' -> Eq Line p m'))) h_playfair
+  have h_p_spec : And (on_line P p) (And (parallel m p)
+    (forall (m' : Line), on_line P m' -> parallel m m' -> Eq Line p m')) :=
+    choice_spec Line (fun p : Line =>
+      And (on_line P p) (And (parallel m p)
+        (forall (m' : Line), on_line P m' -> parallel m m' -> Eq Line p m'))) h_playfair
+  have h_p_uniq : forall (m' : Line), on_line P m' -> parallel m m' -> Eq Line p m' :=
+    and_snd (parallel m p)
+      (forall (m' : Line), on_line P m' -> parallel m m' -> Eq Line p m')
+      (and_snd (on_line P p)
+        (And (parallel m p)
+          (forall (m' : Line), on_line P m' -> parallel m m' -> Eq Line p m'))
+        h_p_spec)
+  have h_l_eq_p : Eq Line p l := h_p_uniq l h_P_on_l (parallel_sym l m h_lm)
+  have h_n_eq_p : Eq Line p n := h_p_uniq n h_P_on_n h_mn
+  have h_l_eq_p_sym : Eq Line l p := eq_sym Line p l h_l_eq_p
+  have h_l_eq_n : Eq Line l n := eq_trans Line l p n h_l_eq_p_sym h_n_eq_p
+  exact (h_neq h_l_eq_n)
+
+-- Segment: two points determine a segment (existence of a line through them)
+def segment (A : Point) (B : Point) : Prop :=
+  exists (l : Line), And (on_line A l) (on_line B l)
+
+-- Triangle: three non-collinear points
+def triangle (A : Point) (B : Point) (C : Point) : Prop :=
+  Not (collinear A B C)
+
+-- -----------------------------------------------------------------
+-- 9. Parallel line construction (using axiom of choice)
+-- -----------------------------------------------------------------
+
+-- Given a line l and a point P not on l, construct the unique parallel line through P
+def parallel_through (l : Line) (P : Point) (h : Not (on_line P l)) : Line :=
+  choice Line
+    (fun m : Line => And (on_line P m) (And (parallel l m)
+      (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line m m')))
+    (playfair l P h)
+
+-- The constructed line passes through P
+theorem parallel_through_on_line : forall (l : Line), forall (P : Point), forall (h : Not (on_line P l)),
+  on_line P (parallel_through l P h) := by
+  intro l
+  intro P
+  intro h
+  exact (and_fst (on_line P (parallel_through l P h))
+    (And (parallel l (parallel_through l P h))
+      (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line (parallel_through l P h) m'))
+    (choice_spec Line
+      (fun m : Line => And (on_line P m) (And (parallel l m)
+        (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line m m')))
+      (playfair l P h)))
+
+-- The constructed line is parallel to l
+theorem parallel_through_parallel : forall (l : Line), forall (P : Point), forall (h : Not (on_line P l)),
+  parallel l (parallel_through l P h) := by
+  intro l
+  intro P
+  intro h
+  exact (and_fst (parallel l (parallel_through l P h))
+    (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line (parallel_through l P h) m')
+    (and_snd (on_line P (parallel_through l P h))
+      (And (parallel l (parallel_through l P h))
+        (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line (parallel_through l P h) m'))
+      (choice_spec Line
+        (fun m : Line => And (on_line P m) (And (parallel l m)
+          (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line m m')))
+        (playfair l P h))))
+
+-- -----------------------------------------------------------------
+-- 10. Additional geometric definitions
+-- -----------------------------------------------------------------
+
+-- Ray from A through B: all points C such that B is between A and C
+def ray (A : Point) (B : Point) : Prop :=
+  exists (C : Point), between A B C
+
+-- Midpoint: M is the midpoint of segment AB if M is between A and B and AM ≅ MB
+-- (Note: this is a relational definition; uniqueness requires additional axioms)
+def midpoint (M : Point) (A : Point) (B : Point) : Prop :=
+  And (between A M B) (seg_congruent A M M B)
+
+-- If M is midpoint of AB, then M is also midpoint of BA.
+theorem midpoint_sym : forall (M A B : Point),
+  midpoint M A B -> midpoint M B A := by
+  intro M
+  intro A
+  intro B
+  intro h
+  have h_bet : between A M B := and_fst (between A M B) (seg_congruent A M M B) h
+  have h_cong : seg_congruent A M M B := and_snd (between A M B) (seg_congruent A M M B) h
+  have h_step : seg_congruent M B A M :=
+    congruent_sym A M M B h_cong
+  have h_swap : seg_congruent M B B M :=
+    congruent_swap M B (between_distinct_first M B A
+      (between_sym A M B h_bet))
+  have h_BM_MB : seg_congruent B M M B :=
+    congruent_sym M B B M h_swap
+  have h_BM_AM : seg_congruent B M A M :=
+    congruent_trans B M M B A M h_BM_MB h_step
+  have h_AM_MA : seg_congruent A M M A :=
+    congruent_swap A M (between_distinct_first A M B h_bet)
+  have h_final : seg_congruent B M M A :=
+    congruent_trans B M A M M A h_BM_AM h_AM_MA
+  exact (And.conj (between B M A) (seg_congruent B M M A)
+    (between_sym A M B h_bet)
+    h_final)
+
+-- Isosceles triangle: two sides are congruent
+def isosceles (A : Point) (B : Point) (C : Point) : Prop :=
+  seg_congruent A B A C
+
+-- Equilateral triangle: all three sides are congruent
+def equilateral (A : Point) (B : Point) (C : Point) : Prop :=
+  And (seg_congruent A B B C) (seg_congruent B C C A)
+
+-- -----------------------------------------------------------------
+-- 11. Derived theorems
+-- -----------------------------------------------------------------
+
+-- Collinearity is preserved under permutation of points
+theorem collinear_perm : forall (A : Point), forall (B : Point), forall (C : Point),
+  collinear A B C -> collinear B A C := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact h
+

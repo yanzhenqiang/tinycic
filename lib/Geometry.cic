@@ -1343,21 +1343,11 @@ theorem orthocenter : forall (A : Point), forall (B : Point), forall (C : Point)
   exact (orthocenter_axiom A B C D E F H h1 h2 h3 h4)
 
 -- =====================================================================
--- 24. Butterfly Theorem
+-- 34. Converse of Thales's Theorem
 -- =====================================================================
 
 -- If A, B, C are on a circle and angle ACB is a right angle,
 -- then AB is a diameter.
-axiom thales_converse_axiom :
-  forall (O : Point), forall (B : Point),
-  forall (A : Point), forall (C : Point),
-  on_circle A O B ->
-  on_circle C O B ->
-  right_angle A C B ->
-  between A O B
-
--- The converse of Thales' theorem follows from the fact that the
--- circumcenter of a right triangle lies at the midpoint of its hypotenuse.
 theorem thales_converse : forall (O : Point), forall (B : Point),
   forall (A : Point), forall (C : Point),
   on_circle A O B ->

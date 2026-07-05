@@ -1806,7 +1806,6 @@ mod tests {
             "centroid_axiom",
             "circumcenter_axiom",
             "orthocenter_axiom",
-            "thales_converse_axiom",
         ]
         .iter()
         .map(|s| s.to_string())
@@ -1828,7 +1827,7 @@ mod tests {
 
         assert_eq!(
             found_illegal, expected,
-            "Expected exactly 5 illegal axioms: {:?}; found {:?}",
+            "Expected exactly 4 illegal axioms: {:?}; found {:?}",
             expected, found_illegal
         );
     }

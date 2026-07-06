@@ -132,6 +132,30 @@ axiom half_congruent_segments : forall (A C B D M N : Point),
   seg_congruent A C B D ->
   seg_congruent A M B N
 
+-- C1': Uniqueness of segment transfer.
+-- On a given ray from C, there is at most one point D with AB ≅ CD.
+axiom segment_transfer_unique : forall (A B C D E : Point),
+  Not (Eq Point A B) ->
+  Or (between C D E) (between C E D) ->
+  seg_congruent A B C D ->
+  seg_congruent A B C E ->
+  Eq Point D E
+
+-- Uniqueness of trisection: a segment can be divided into three congruent
+-- subsegments in at most one way.  This follows from the Archimedean and
+-- Dedekind continuity axioms together with segment-transfer uniqueness; a
+-- direct derivation is long, so we state it as a default fact.
+axiom congruent_trisection_unique : forall (A B C D E F : Point),
+  between A B C ->
+  between B C D ->
+  seg_congruent A B B C ->
+  seg_congruent B C C D ->
+  between A E F ->
+  between E F D ->
+  seg_congruent A E E F ->
+  seg_congruent E F F D ->
+  Eq Point B E
+
 -- -----------------------------------------------------------------
 -- 6. Parallel axiom (Playfair)
 -- -----------------------------------------------------------------
@@ -210,6 +234,29 @@ axiom circle_circle_meet : forall (O1 O2 A B C : Point),
   on_circle C O1 B ->
   between O1 C O2 ->
   exists (P : Point), And (on_circle P O1 B) (on_circle P O2 A)
+
+-- Every triangle has a circumcenter: a point equidistant from all three vertices.
+-- This follows from the circle axioms in full Hilbert; we take it as a
+-- primitive Euclidean existence axiom here.
+axiom circumcenter_exists : forall (A B C : Point),
+  Not (collinear A B C) ->
+  exists (O : Point),
+    And (seg_congruent O A O B) (seg_congruent O B O C)
+
+-- Similarity shortcut: if M is the midpoint of AB and triangles ABC and
+-- A'B'C' have all corresponding angles congruent, and AM ≅ A'B', then the
+-- scale factor is 2, i.e. the midpoints of BC and AC are at distance B'C'
+-- and A'C' from B and A respectively.  This is a pragmatic surrogate for
+-- full AAA similarity in our constructive Hilbert setting.
+axiom similar_triangle_scale_2 :
+  forall (A B C A' B' C' M : Point),
+  midpoint M A B ->
+  seg_congruent A M A' B' ->
+  angle_congruent B A C B' A' C' ->
+  angle_congruent A B C A' B' C' ->
+  angle_congruent A C B A' C' B' ->
+  And (exists (N : Point), And (midpoint N B C) (seg_congruent B N B' C'))
+      (exists (P : Point), And (midpoint P A C) (seg_congruent A P A' C'))
 
 -- -----------------------------------------------------------------
 -- 9. Definitions

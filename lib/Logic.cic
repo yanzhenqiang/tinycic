@@ -22,3 +22,31 @@ def and_fst (P : Prop) (Q : Prop) (h : And P Q) : P :=
 
 def and_snd (P : Prop) (Q : Prop) (h : And P Q) : Q :=
   rec.And P Q (fun _ => Q) (fun p q => q) h
+
+-- Classical logic (Euclidean geometry is developed in classical first-order logic)
+axiom excluded_middle : forall (P : Prop), Or P (Not P)
+
+-- Ex falso quodlibet
+def False_elim (P : Prop) (h : False) : P :=
+  rec.False (fun _ => P) h
+
+-- Case analysis on Or
+def or_elim (P : Prop) (Q : Prop) (R : Prop) (h : Or P Q) (f : P -> R) (g : Q -> R) : R :=
+  rec.Or P Q (fun _ => R) (fun p => f p) (fun q => g q) h
+
+-- Case analysis on excluded middle
+def em_elim (P : Prop) (Q : Prop) (h : Or P (Not P)) (f : P -> Q) (g : Not P -> Q) : Q :=
+  or_elim P (Not P) Q h f g
+
+-- Branches for proof by contradiction (definitions avoid lambda-inference issues in tactics)
+def em_inl_branch (P : Prop) (p : P) : P := p
+
+def em_inr_branch (P : Prop) (h : Not P -> False) (np : Not P) : P :=
+  False_elim P (h np)
+
+-- Proof by contradiction, derived from excluded middle
+theorem by_contradiction : forall (P : Prop), (Not P -> False) -> P := by
+  intro P
+  intro h
+  have h_em : Or P (Not P) := excluded_middle P
+  exact (em_elim P P h_em (em_inl_branch P) (em_inr_branch P h))

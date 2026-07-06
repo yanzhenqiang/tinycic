@@ -211,8 +211,35 @@ axiom midpoint_unique : forall (M1 M2 A B : Point),
 -- Reflection uniqueness: a common endpoint and a common midpoint force the
 -- other endpoints to coincide.  This follows from Hilbert's C1 (unique segment
 -- transfer along a ray) and is needed for several midpoint-based proofs.
-axiom midpoint_reflection_unique : forall (M A B C : Point),
-  midpoint M A B -> midpoint M A C -> Eq Point B C
+theorem midpoint_reflection_unique : forall (M A B C : Point),
+  midpoint M A B -> midpoint M A C -> Eq Point B C := by
+  intro M
+  intro A
+  intro B
+  intro C
+  intro h_MAB
+  intro h_MAC
+  have h_AMB : between A M B := and_fst (between A M B) (seg_congruent A M M B) h_MAB
+  have h_AMC : between A M C := and_fst (between A M C) (seg_congruent A M M C) h_MAC
+  have h_AM_MB : seg_congruent A M M B := and_snd (between A M B) (seg_congruent A M M B) h_MAB
+  have h_AM_MC : seg_congruent A M M C := and_snd (between A M C) (seg_congruent A M M C) h_MAC
+  have h_side : Or (between M B C) (Or (between M C B) (Eq Point B C)) :=
+    between_same_side A M B C h_AMB h_AMC
+  exact (or_elim (between M B C) (Or (between M C B) (Eq Point B C)) (Eq Point B C) h_side
+    (fun h_MBC : between M B C =>
+      segment_transfer_unique A M M B C
+        (between_distinct_first A M B h_AMB)
+        (Or.inl (between M B C) (between M C B) h_MBC)
+        h_AM_MB h_AM_MC)
+    (fun h_rest : Or (between M C B) (Eq Point B C) =>
+      or_elim (between M C B) (Eq Point B C) (Eq Point B C) h_rest
+        (fun h_MCB : between M C B =>
+          eq_sym Point C B
+            (segment_transfer_unique A M M C B
+              (between_distinct_first A M C h_AMC)
+              (Or.inl (between M C B) (between M B C) h_MCB)
+              h_AM_MC h_AM_MB))
+        (fun h_eq : Eq Point B C => h_eq)))
 
 -- Perpendicular bisector of segment AB: a line l through the midpoint of AB
 -- that is perpendicular to AB.

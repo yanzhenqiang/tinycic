@@ -90,6 +90,12 @@ axiom between_unique : forall (A : Point), forall (B : Point), forall (C : Point
   Or (between A B C)
     (Or (between B C A) (between B A C))
 
+-- O5b: Of two points on the same side of a point on a line, one lies between
+-- the other and that point.
+axiom between_same_side : forall (A M B C : Point),
+  between A M B -> between A M C ->
+  Or (between M B C) (Or (between M C B) (Eq Point B C))
+
 -- O6: Betweenness excludes endpoints
 axiom between_not_eq : forall (A : Point), forall (B : Point), forall (C : Point),
   between A B C ->

@@ -1098,12 +1098,40 @@ def isosceles_alt (A : Point) (B : Point) (C : Point) : Prop :=
     (exists (M : Point), midpoint M B C)
 
 
-axiom segment_extension : forall (D : Point), forall (E : Point),
+-- Segment extension: given distinct points D, E, there exists F on the ray
+-- beyond E such that EF ≅ DE.  This follows from the order axioms and
+-- Hilbert's C1 (congruent_transfer along a ray).
+theorem segment_extension : forall (D : Point), forall (E : Point),
   Not (Eq Point D E) ->
   exists (F : Point),
     And (between D E F)
       (And (seg_congruent E F D E)
-        (Not (Eq Point E F)))
+        (Not (Eq Point E F))) := by
+  intro D
+  intro E
+  intro h_DE
+  have h_G : exists (G : Point), between D E G := between_extension D E h_DE
+  have G : Point := choice Point (fun G : Point => between D E G) h_G
+  have h_DEG : between D E G := choice_spec Point (fun G : Point => between D E G) h_G
+  have h_EG : Not (Eq Point E G) := between_distinct_middle D E G h_DEG
+  have h_F_ex : exists (F : Point),
+    And (between E G F) (seg_congruent D E E F) :=
+    congruent_transfer D E E G h_DE h_EG
+  have F : Point := choice Point (fun F : Point =>
+    And (between E G F) (seg_congruent D E E F)) h_F_ex
+  have h_F_spec : And (between E G F) (seg_congruent D E E F) :=
+    choice_spec Point (fun F : Point =>
+      And (between E G F) (seg_congruent D E E F)) h_F_ex
+  have h_EGF : between E G F := and_fst (between E G F) (seg_congruent D E E F) h_F_spec
+  have h_DE_EF : seg_congruent D E E F := and_snd (between E G F) (seg_congruent D E E F) h_F_spec
+  have h_EF_DE : seg_congruent E F D E := congruent_sym D E E F h_DE_EF
+  have h_DEF : between D E F := between_trans D E G F h_DEG h_EGF
+  have h_EF : Not (Eq Point E F) := between_distinct_middle D E F h_DEF
+  exact (Exists.intro Point (fun F : Point =>
+    And (between D E F) (And (seg_congruent E F D E) (Not (Eq Point E F)))) F
+    (And.conj (between D E F) (And (seg_congruent E F D E) (Not (Eq Point E F)))
+      h_DEF
+      (And.conj (seg_congruent E F D E) (Not (Eq Point E F)) h_EF_DE h_EF)))
 
 -- Right angle is symmetric in the two side points.
 theorem right_angle_sym : forall (A B C : Point),
@@ -1191,12 +1219,6 @@ theorem right_angle_sym : forall (A B C : Point),
       (And.conj (angle_congruent C B A Dp B A) (angle_congruent C B A A B Dp)
         h_cba_dba
         h_cba_abdp)))
-
--- If a point F lies on line l and PF is perpendicular to l, then PF is a
--- If a point F lies on line l and PF is perpendicular to l, then PF is a
--- =====================================================================
--- 23b. Midsegment helper lemmas
--- =====================================================================
 
 -- Midpoints of two sides of a triangle are distinct.
 theorem midpoints_distinct : forall (A B C D E : Point),

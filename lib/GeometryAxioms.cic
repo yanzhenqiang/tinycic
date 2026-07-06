@@ -68,6 +68,10 @@ axiom between_collinear : forall (A : Point), forall (B : Point), forall (C : Po
 axiom between_exists : forall (A : Point), forall (C : Point),
   Not (Eq Point A C) -> exists (B : Point), between A B C
 
+-- O2b: For any two distinct points A, B, there exists C with B between A and C
+axiom between_extension : forall (A : Point), forall (B : Point),
+  Not (Eq Point A B) -> exists (C : Point), between A B C
+
 -- O3: Betweenness is symmetric
 axiom between_sym : forall (A : Point), forall (B : Point), forall (C : Point),
   between A B C -> between C B A
@@ -99,9 +103,10 @@ axiom between_trans : forall (A : Point), forall (B : Point), forall (C : Point)
 -- 5. Congruence axioms (C1-C6)
 -- -----------------------------------------------------------------
 
--- C1: Segment transfer
-axiom congruent_transfer : forall (A : Point), forall (B : Point), forall (C : Point),
-  Not (Eq Point A B) -> exists (D : Point), seg_congruent A B C D
+-- C1: Segment transfer along a ray
+axiom congruent_transfer : forall (A : Point), forall (B : Point), forall (C : Point), forall (D : Point),
+  Not (Eq Point A B) -> Not (Eq Point C D) ->
+  exists (E : Point), And (between C D E) (seg_congruent A B C E)
 
 -- C2: Reflexivity
 axiom congruent_refl : forall (A : Point), forall (B : Point),

@@ -1120,3 +1120,125 @@ theorem right_angle_supplement_congruent : forall (A B C D : Point),
     angle_trans A B C C B Dp C B D h_abc_CbDp h_CbDp_CbD
   exact (And.conj (angle_congruent A B C D B C) (angle_congruent A B C C B D)
     h_abc_Dbc h_abc_CbD)
+
+-- Transitivity of ray interiors: if BN is interior to angle ABM and BM is
+-- interior to angle ABC, then BN is interior to angle ABC.
+-- Proof via the crossbar characterisation: convert each interior statement
+-- to the two half-plane conditions, then transfer the conditions across the
+-- common ray BM.
+theorem ray_interior_trans : forall (A B C M N : Point),
+  Not (collinear A B C) ->
+  ray_interior A B C M -> ray_interior A B M N ->
+  ray_interior A B C N := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro N
+  intro h_nc
+  intro h_int_ABC_M
+  intro h_int_ABM_N
+  have h_nc_ABM : Not (collinear A B M) :=
+    ray_interior_not_collinear A B C M h_nc h_int_ABC_M
+  have h_nc_MBC : Not (collinear M B C) :=
+    ray_interior_not_collinear_snd A B C M h_nc h_int_ABC_M
+  have h_lAB_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l_AB : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_lAB_ex
+  have h_lAB : And (on_line A l_AB) (on_line B l_AB) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_lAB_ex
+  have h_A_lAB : on_line A l_AB := and_fst (on_line A l_AB) (on_line B l_AB) h_lAB
+  have h_B_lAB : on_line B l_AB := and_snd (on_line A l_AB) (on_line B l_AB) h_lAB
+  have h_lBC_ex : exists (l : Line), And (on_line B l) (on_line C l) := line_exists B C
+  have l_BC : Line := choice Line (fun l : Line => And (on_line B l) (on_line C l)) h_lBC_ex
+  have h_lBC : And (on_line B l_BC) (on_line C l_BC) :=
+    choice_spec Line (fun l : Line => And (on_line B l) (on_line C l)) h_lBC_ex
+  have h_B_lBC : on_line B l_BC := and_fst (on_line B l_BC) (on_line C l_BC) h_lBC
+  have h_C_lBC : on_line C l_BC := and_snd (on_line B l_BC) (on_line C l_BC) h_lBC
+  have h_lBM_ex : exists (l : Line), And (on_line B l) (on_line M l) := line_exists B M
+  have l_BM : Line := choice Line (fun l : Line => And (on_line B l) (on_line M l)) h_lBM_ex
+  have h_lBM : And (on_line B l_BM) (on_line M l_BM) :=
+    choice_spec Line (fun l : Line => And (on_line B l) (on_line M l)) h_lBM_ex
+  have h_B_lBM : on_line B l_BM := and_fst (on_line B l_BM) (on_line M l_BM) h_lBM
+  have h_M_lBM : on_line M l_BM := and_snd (on_line B l_BM) (on_line M l_BM) h_lBM
+  -- Half-plane conditions from the two interior hypotheses.
+  have h_MC_AB : same_side_line l_AB M C :=
+    ray_interior_same_side_fst A B C M l_AB h_nc h_A_lAB h_B_lAB h_int_ABC_M
+  have h_MA_BC : same_side_line l_BC M A :=
+    ray_interior_same_side_snd A B C M l_BC h_nc h_B_lBC h_C_lBC h_int_ABC_M
+  have h_NM_AB : same_side_line l_AB N M :=
+    ray_interior_same_side_fst A B M N l_AB h_nc_ABM h_A_lAB h_B_lAB h_int_ABM_N
+  have h_NA_BM : same_side_line l_BM N A :=
+    ray_interior_same_side_snd A B M N l_BM h_nc_ABM h_B_lBM h_M_lBM h_int_ABM_N
+  -- N and C are on the same side of AB.
+  have h_NC_AB : same_side_line l_AB N C :=
+    same_side_line_trans l_AB N M C h_NM_AB h_MC_AB
+      (fun h : collinear N M C =>
+        let h_col_BMN : collinear B M N :=
+          Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
+            (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
+              (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
+                (and_fst (on_line N l_BM) (on_line A l_BM)
+                  (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM))))
+        in
+        h_nc_MBC (collinear_perm3 B C N
+          (collinear_shared_merge_fst M N B C
+            (collinear_perm3 B N M h_col_BMN) h (fun h_eq : Eq Point M N =>
+              h_nc_ABM (collinear_perm3 A B N
+                (eq_subst Point M N (fun Z : Point => collinear A B Z) h_eq
+                  (collinear_perm3 A B M (collinear_perm2 A B M h_col_BMN))))))))
+  -- N and A are on the same side of BC.
+  have h_NA_BC : same_side_line l_BC N A :=
+    same_side_line_trans l_BC N M A h_NA_BM h_MA_BC
+      (fun h : collinear N M A =>
+        let h_col_BMN : collinear B M N :=
+          Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
+            (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
+              (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
+                (and_fst (on_line N l_BM) (on_line A l_BM)
+                  (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM))))
+        in
+        h_nc_ABM (collinear_perm3 A B N
+          (collinear_shared_merge_fst M N A B
+            (collinear_perm3 B N M h_col_BMN) h (fun h_eq : Eq Point M N =>
+              h_nc_ABM (collinear_perm3 A B N
+                (eq_subst Point M N (fun Z : Point => collinear A B Z) h_eq
+                  (collinear_perm3 A B M (collinear_perm2 A B M h_col_BMN))))))))
+  exact (crossbar A B C N l_AB l_BC h_nc h_B_lAB h_A_lAB h_B_lBC h_C_lBC h_NC_AB h_NA_BC
+    (fun h : collinear B N C =>
+      h_nc_MBC (collinear_perm3 B C N
+        (collinear_shared_merge_fst M N B C
+          (collinear_perm3 B N M
+            (Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
+              (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
+                (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
+                  (and_fst (on_line N l_BM) (on_line A l_BM)
+                    (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM)))))) h
+          (fun h_eq : Eq Point M N =>
+            h_nc_ABM (collinear_perm3 A B N
+              (eq_subst Point M N (fun Z : Point => collinear A B Z) h_eq
+                (collinear_perm3 A B M
+                  (collinear_perm2 A B M
+                    (Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
+                      (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
+                        (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
+                          (and_fst (on_line N l_BM) (on_line A l_BM)
+                            (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM))))))))))))
+    (fun h : collinear A N C =>
+      h_nc (collinear_perm3 A C N
+        (collinear_shared_merge_fst M N A C
+          (collinear_perm3 B N M
+            (Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
+              (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
+                (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
+                  (and_fst (on_line N l_BM) (on_line A l_BM)
+                    (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM)))))) h
+          (fun h_eq : Eq Point M N =>
+            h_nc_ABM (collinear_perm3 A B N
+              (eq_subst Point M N (fun Z : Point => collinear A B Z) h_eq
+                (collinear_perm3 A B M
+                  (collinear_perm2 A B M
+                    (Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
+                      (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
+                        (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
+                          (and_fst (on_line N l_BM) (on_line A l_BM)
+                            (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM))))))))))))))

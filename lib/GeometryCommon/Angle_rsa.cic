@@ -1,0 +1,450 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+
+-- =====================================================================
+-- 12. Angle axioms (Hilbert Group III)
+-- =====================================================================
+
+-- Angle congruence as primitive notion: angle_congruent B A C B' A' C'
+
+axiom angle_congruent : Point -> Point -> Point -> Point -> Point -> Point -> Prop
+
+axiom angle_transfer : forall (A B C A' B' : Point),
+  Not (Eq Point A B) -> Not (Eq Point A C) -> Not (Eq Point A' B') ->
+  exists (C' : Point), angle_congruent B A C B' A' C'
+
+axiom angle_refl : forall (A B C : Point),
+  angle_congruent B A C B A C
+
+axiom angle_sym : forall (A B C A' B' C' : Point),
+  angle_congruent B A C B' A' C' -> angle_congruent B' A' C' B A C
+
+axiom angle_trans : forall (A B C A' B' C' A'' B'' C'' : Point),
+  angle_congruent B A C B' A' C' -> angle_congruent B' A' C' B'' A'' C'' ->
+  angle_congruent B A C B'' A'' C''
+
+-- Same angle with swapped side order is congruent
+axiom angle_vertex_swap : forall (A B C : Point),
+  angle_congruent B A C C A B
+
+-- Angle congruence depends only on the rays, not on the particular point
+-- chosen on each ray. If B and B' lie on the same ray from A, the angle
+-- at A with side AC is the same whether measured with B or B'.
+axiom angle_congruent_same_ray : forall (A B B' C : Point),
+  Or (between A B B') (between A B' B) ->
+  angle_congruent B A C B' A C
+
+-- All right angles are congruent (Hilbert's Theorem).
+axiom right_angles_equal : forall (A B C D E F : Point),
+  right_angle A B C -> right_angle D E F ->
+  angle_congruent A B C D E F
+
+axiom SAS : forall (A B C A' B' C' : Point),
+  seg_congruent A B A' B' ->
+  angle_congruent B A C B' A' C' ->
+  seg_congruent A C A' C' ->
+  And (seg_congruent B C B' C')
+      (And (angle_congruent A B C A' B' C')
+           (angle_congruent A C B A' C' B'))
+
+axiom ASA : forall (A B C A' B' C' : Point),
+  angle_congruent B A C B' A' C' ->
+  seg_congruent A B A' B' ->
+  angle_congruent A B C A' B' C' ->
+  seg_congruent A C A' C'
+-- Isosceles triangle base angles are equal
+-- Proof: Consider triangles ABC and ACB. By SAS:
+--   AB = AC (given), ∠BAC = ∠CAB (same angle), AC = AB (given)
+-- Therefore △ABC ≅ △ACB, so ∠ABC = ∠ACB.
+theorem isosceles_base_angles : forall (A B C : Point),
+  isosceles A B C -> angle_congruent A B C A C B := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (and_fst (angle_congruent A B C A C B)
+    (angle_congruent A C B A B C)
+    (and_snd (seg_congruent B C C B)
+      (And (angle_congruent A B C A C B) (angle_congruent A C B A B C))
+      (SAS A B C A C B h (angle_trans B A C B A C C A B (angle_refl A B C) (angle_vertex_swap A B C)) (congruent_sym A B A C h))))
+
+-- =====================================================================
+-- 13. Right angle and parallel line properties
+-- =====================================================================
+
+-- Right angle: a non-degenerate angle congruent to its supplement.
+def right_angle (A : Point) (B : Point) (C : Point) : Prop :=
+  And (Not (collinear A B C))
+    (exists (D : Point),
+      And (between A B D)
+        (And (angle_congruent A B C D B C)
+             (angle_congruent A B C C B D)))
+
+-- Angle bisector existence: every non-degenerate angle has a bisector.
+axiom angle_bisector_exists : forall (A B C : Point),
+  Not (Eq Point A B) -> Not (Eq Point B C) ->
+  Not (collinear A B C) ->
+  exists (D : Point),
+    And (between A D C)
+      (And (collinear A D C)
+        (angle_congruent A B D D B C))
+
+-- Angle addition: if D lies in the interior of angle ABC, then
+-- angle ABC is the sum of angles ABD and DBC.
+axiom angle_addition : forall (A B C D P Q R S : Point),
+  between A D C ->
+  Not (collinear A B C) ->
+  angle_congruent A B D P Q R ->
+  angle_congruent D B C R Q S ->
+  angle_congruent A B C P Q S
+
+-- Exterior angle theorem: in triangle ABC with side AC extended through C to D,
+-- the exterior angle BCD equals the sum of the two remote interior angles
+-- BAC and ABC.
+axiom exterior_angle : forall (A B C D P Q R S : Point),
+  between A C D ->
+  Not (collinear A B C) ->
+  angle_congruent B A C P Q R ->
+  angle_congruent A B C R Q S ->
+  angle_congruent B C D P Q S
+
+-- If two equal angles form a straight angle, each is a right angle.
+axiom right_angle_from_equal_sum : forall (A B C D P Q R : Point),
+  between A B C ->
+  Not (collinear A B D) ->
+  Not (collinear P Q R) ->
+  angle_congruent A B D P Q R ->
+  angle_congruent D B C P Q R ->
+  right_angle P Q R
+
+-- A right angle cannot be formed by collinear points; this now follows from
+-- the definition, which requires the three points to be non-collinear.
+theorem right_angle_non_collinear : forall (A B C : Point),
+  right_angle A B C -> Not (collinear A B C) := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (and_fst (Not (collinear A B C))
+    (exists (D : Point),
+      And (between A B D)
+        (And (angle_congruent A B C D B C)
+             (angle_congruent A B C C B D)))
+    h)
+
+
+-- =====================================================================
+-- 15. SSS congruence criterion
+-- =====================================================================
+
+-- SSS: If three sides of one triangle are congruent to three sides of another,
+-- then all corresponding angles are congruent (triangles are congruent).
+-- ADMITTED: derivation from SAS/ASA and the congruence axioms is long.
+axiom SSS : forall (A B C A' B' C' : Point),
+  seg_congruent A B A' B' ->
+  seg_congruent B C B' C' ->
+  seg_congruent C A C' A' ->
+  And (angle_congruent B A C B' A' C')
+    (And (angle_congruent A B C A' B' C')
+      (angle_congruent A C B A' C' B'))
+
+-- AAS follows from ASA: given two angles and a non-included side, the third
+-- angle is forced, giving ASA.  ADMITTED for now.
+axiom AAS : forall (A B C A' B' C' : Point),
+  angle_congruent B A C B' A' C' ->
+  angle_congruent A B C A' B' C' ->
+  seg_congruent B C B' C' ->
+  And (seg_congruent A B A' B')
+    (And (seg_congruent A C A' C')
+      (angle_congruent A C B A' C' B'))
+
+-- =====================================================================
+-- 16. Parallel line properties
+-- =====================================================================
+
+-- When a transversal cuts two parallel lines, alternate interior angles are congruent.
+axiom alternate_interior_angles : forall (A B C D : Point) (l m t : Line),
+  on_line A l -> on_line C l ->
+  on_line B m -> on_line D m ->
+  on_line A t -> on_line B t ->
+  Not (Eq Point A B) ->
+  parallel l m ->
+  angle_congruent C A B D B A
+
+-- If alternate interior angles are congruent, the lines are parallel.
+axiom alternate_interior_converse : forall (A B C D : Point) (l m t : Line),
+  on_line A l -> on_line C l ->
+  on_line B m -> on_line D m ->
+  on_line A t -> on_line B t ->
+  Not (Eq Point A B) ->
+  angle_congruent C A B D B A ->
+  parallel l m
+
+-- Vertical angles are congruent.
+-- Proof: ∠AEC and ∠BED are supplements of the same angle ∠CEB (or ∠AED).
+-- Since A-E-B and C-E-D are straight lines, ∠AEC + ∠CEB = straight and
+-- ∠BED + ∠CEB = straight.  Using angle addition and the fact that equal
+-- supplements are congruent, we get ∠AEC ≅ ∠BED.
+axiom vertical_angles : forall (A B C D E : Point),
+  between A E B -> between C E D ->
+  Not (collinear A E C) ->
+  angle_congruent A E C B E D
+-- Angles on a straight line: if D is on the extension of AB through B and
+-- angle ABD is congruent to angle CBA, then CBA is congruent to its supplement.
+theorem straight_angle : forall (A B C D : Point),
+  between A B D ->
+  angle_congruent A B C D B C ->
+  angle_congruent A B C C B D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_bet
+  intro h
+  have h_swap : angle_congruent D B C C B D := angle_vertex_swap B D C
+  exact (angle_trans A B C D B C C B D h h_swap)
+
+-- The supplement of a right angle is also a right angle.
+theorem right_angle_supplement : forall (A B C D : Point),
+  right_angle A B C ->
+  between A B D ->
+  right_angle D B C := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_r
+  intro h_bet
+  have h_D_ex : exists (D' : Point),
+    And (between A B D')
+      (And (angle_congruent A B C D' B C)
+           (angle_congruent A B C C B D')) :=
+    and_snd (Not (collinear A B C))
+      (exists (D' : Point),
+        And (between A B D')
+          (And (angle_congruent A B C D' B C)
+               (angle_congruent A B C C B D')))
+      h_r
+  have D' : Point := choice Point (fun D' : Point =>
+    And (between A B D')
+      (And (angle_congruent A B C D' B C)
+           (angle_congruent A B C C B D'))) h_D_ex
+  have h_D'_spec : And (between A B D')
+    (And (angle_congruent A B C D' B C)
+         (angle_congruent A B C C B D')) :=
+    choice_spec Point (fun D' : Point =>
+      And (between A B D')
+        (And (angle_congruent A B C D' B C)
+             (angle_congruent A B C C B D'))) h_D_ex
+  have h_bet_ABDp : between A B D' :=
+    and_fst (between A B D')
+      (And (angle_congruent A B C D' B C) (angle_congruent A B C C B D'))
+      h_D'_spec
+  have h_h1 : And (angle_congruent A B C D' B C) (angle_congruent A B C C B D') :=
+    and_snd (between A B D')
+      (And (angle_congruent A B C D' B C) (angle_congruent A B C C B D'))
+      h_D'_spec
+  have h_abc_dbpc : angle_congruent A B C D' B C :=
+    and_fst (angle_congruent A B C D' B C) (angle_congruent A B C C B D') h_h1
+  have h_abc_cbdp : angle_congruent A B C C B D' :=
+    and_snd (angle_congruent A B C D' B C) (angle_congruent A B C C B D') h_h1
+  have h_bet_DBA : between D B A := between_sym A B D h_bet
+  have h_nocol_DBC : Not (collinear D B C) :=
+    fun h_col : collinear D B C =>
+      (right_angle_non_collinear A B C h_r)
+        (collinear_shared_merge_fst B D C A h_col
+          (between_implies_collinear A B D h_bet)
+          (between_distinct_middle A B D h_bet))
+  have h_dbc_dbpc : angle_congruent D B C D' B C := angle_refl D B C
+  have h_dbc_abc : angle_congruent D B C A B C :=
+    angle_trans D B C D' B C A B C h_dbc_dbpc
+      (angle_sym A B C D' B C h_abc_dbpc)
+  have h_dbc_cba : angle_congruent D B C C B A :=
+    angle_trans D B C A B C C B A h_dbc_abc (angle_vertex_swap B A C)
+  exact (And.conj (Not (collinear D B C))
+    (exists (F : Point),
+      And (between D B F)
+        (And (angle_congruent D B C F B C)
+             (angle_congruent D B C C B F)))
+    h_nocol_DBC
+    (Exists.intro Point (fun F : Point =>
+      And (between D B F)
+        (And (angle_congruent D B C F B C)
+             (angle_congruent D B C C B F))) A
+      (And.conj (between D B A)
+        (And (angle_congruent D B C A B C) (angle_congruent D B C C B A))
+        h_bet_DBA
+        (And.conj (angle_congruent D B C A B C) (angle_congruent D B C C B A)
+          h_dbc_abc
+          h_dbc_cba))))
+
+-- Segment extension with congruence (derived from order and C1).
+theorem segment_extension : forall (D : Point), forall (E : Point),
+  Not (Eq Point D E) ->
+  exists (F : Point),
+    And (between D E F)
+      (And (seg_congruent E F D E)
+        (Not (Eq Point E F))) := by
+  intro D
+  intro E
+  intro h_DE
+  have h_G : exists (G : Point), between D E G := between_extension D E h_DE
+  have G : Point := choice Point (fun G : Point => between D E G) h_G
+  have h_DEG : between D E G := choice_spec Point (fun G : Point => between D E G) h_G
+  have h_EG : Not (Eq Point E G) := between_distinct_middle D E G h_DEG
+  have h_F_ex : exists (F : Point),
+    And (between E G F) (seg_congruent D E E F) :=
+    congruent_transfer D E E G h_DE h_EG
+  have F : Point := choice Point (fun F : Point =>
+    And (between E G F) (seg_congruent D E E F)) h_F_ex
+  have h_F_spec : And (between E G F) (seg_congruent D E E F) :=
+    choice_spec Point (fun F : Point =>
+      And (between E G F) (seg_congruent D E E F)) h_F_ex
+  have h_EGF : between E G F := and_fst (between E G F) (seg_congruent D E E F) h_F_spec
+  have h_DE_EF : seg_congruent D E E F := and_snd (between E G F) (seg_congruent D E E F) h_F_spec
+  have h_EF_DE : seg_congruent E F D E := congruent_sym D E E F h_DE_EF
+  have h_DEF : between D E F := between_trans D E G F h_DEG h_EGF
+  have h_EF : Not (Eq Point E F) := between_distinct_middle D E F h_DEF
+  exact (Exists.intro Point (fun F : Point =>
+    And (between D E F) (And (seg_congruent E F D E) (Not (Eq Point E F)))) F
+    (And.conj (between D E F) (And (seg_congruent E F D E) (Not (Eq Point E F)))
+      h_DEF
+      (And.conj (seg_congruent E F D E) (Not (Eq Point E F)) h_EF_DE h_EF)))
+
+-- Right angle is symmetric in the two side points.
+theorem right_angle_sym : forall (A B C : Point),
+  right_angle A B C -> right_angle C B A := by
+  intro A
+  intro B
+  intro C
+  intro h
+  have h_nocol_ABC : Not (collinear A B C) :=
+    and_fst (Not (collinear A B C))
+      (exists (D : Point),
+        And (between A B D)
+          (And (angle_congruent A B C D B C)
+               (angle_congruent A B C C B D)))
+      h
+  have h_D_ex : exists (D : Point),
+    And (between A B D)
+      (And (angle_congruent A B C D B C)
+           (angle_congruent A B C C B D)) :=
+    and_snd (Not (collinear A B C))
+      (exists (D : Point),
+        And (between A B D)
+          (And (angle_congruent A B C D B C)
+               (angle_congruent A B C C B D)))
+      h
+  have D : Point := choice Point (fun D : Point =>
+    And (between A B D)
+      (And (angle_congruent A B C D B C)
+           (angle_congruent A B C C B D))) h_D_ex
+  have h_D_spec : And (between A B D)
+    (And (angle_congruent A B C D B C)
+         (angle_congruent A B C C B D)) :=
+    choice_spec Point (fun D : Point =>
+      And (between A B D)
+        (And (angle_congruent A B C D B C)
+             (angle_congruent A B C C B D))) h_D_ex
+  have h_ABD : between A B D :=
+    and_fst (between A B D)
+      (And (angle_congruent A B C D B C) (angle_congruent A B C C B D)) h_D_spec
+  have h_h1 : And (angle_congruent A B C D B C) (angle_congruent A B C C B D) :=
+    and_snd (between A B D)
+      (And (angle_congruent A B C D B C) (angle_congruent A B C C B D)) h_D_spec
+  have h_abc_dbc : angle_congruent A B C D B C :=
+    and_fst (angle_congruent A B C D B C) (angle_congruent A B C C B D) h_h1
+  have h_BC : Not (Eq Point B C) :=
+    and_fst (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B))
+        (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+        (triangle_nondegenerate A B C h_nocol_ABC))
+  have h_CB : Not (Eq Point C B) :=
+    fun h_eq_CB : Eq Point C B => h_BC (eq_sym Point C B h_eq_CB)
+  have h_Dp_ex : exists (Dp : Point),
+    And (between C B Dp)
+      (And (seg_congruent B Dp C B)
+        (Not (Eq Point B Dp))) := segment_extension C B h_CB
+  have Dp : Point := choice Point (fun Dp : Point =>
+    And (between C B Dp)
+      (And (seg_congruent B Dp C B)
+        (Not (Eq Point B Dp)))) h_Dp_ex
+  have h_Dp_spec : And (between C B Dp)
+    (And (seg_congruent B Dp C B)
+      (Not (Eq Point B Dp))) :=
+    choice_spec Point (fun Dp : Point =>
+      And (between C B Dp)
+        (And (seg_congruent B Dp C B)
+          (Not (Eq Point B Dp)))) h_Dp_ex
+  have h_CBDp : between C B Dp :=
+    and_fst (between C B Dp)
+      (And (seg_congruent B Dp C B) (Not (Eq Point B Dp))) h_Dp_spec
+  have h_DBA : between D B A := between_sym A B D h_ABD
+  have h_nocol_DBC : Not (collinear D B C) :=
+    fun h_col_DBC : collinear D B C =>
+      let h_col_ABD : collinear A B D := between_implies_collinear A B D h_ABD in
+      let h_col_ADB : collinear A D B := collinear_perm2 A B D h_col_ABD in
+      let h_BD : Not (Eq Point B D) := between_distinct_middle A B D h_ABD in
+      let h_DB : Not (Eq Point D B) :=
+        fun h_eq_DB : Eq Point D B => h_BD (eq_sym Point D B h_eq_DB) in
+      h_nocol_ABC (collinear_shared_merge A B D C h_col_ADB h_col_DBC h_DB)
+  have h_vert : angle_congruent D B C A B Dp :=
+    vertical_angles D A C Dp B h_DBA h_CBDp h_nocol_DBC
+  have h_cba_abc : angle_congruent C B A A B C :=
+    angle_sym B A C B C A (angle_vertex_swap B A C)
+  have h_abc_abdp : angle_congruent A B C A B Dp :=
+    angle_trans B A C B D C B A Dp h_abc_dbc h_vert
+  have h_cba_abdp : angle_congruent C B A A B Dp :=
+    angle_trans B C A B A C B A Dp h_cba_abc h_abc_abdp
+  have h_abdp_dba : angle_congruent A B Dp Dp B A := angle_vertex_swap B A Dp
+  have h_cba_dba : angle_congruent C B A Dp B A :=
+    angle_trans B C A B A Dp B Dp A h_cba_abdp h_abdp_dba
+  have h_nocol_CBA : Not (collinear C B A) :=
+    fun h_col_CBA : collinear C B A =>
+      h_nocol_ABC (collinear_perm3 C B A h_col_CBA)
+  exact (And.conj (Not (collinear C B A))
+    (exists (D' : Point),
+      And (between C B D')
+        (And (angle_congruent C B A D' B A)
+             (angle_congruent C B A A B D')))
+    h_nocol_CBA
+    (Exists.intro Point (fun D' : Point =>
+      And (between C B D')
+        (And (angle_congruent C B A D' B A)
+             (angle_congruent C B A A B D'))) Dp
+      (And.conj (between C B Dp)
+        (And (angle_congruent C B A Dp B A) (angle_congruent C B A A B Dp))
+        h_CBDp
+        (And.conj (angle_congruent C B A Dp B A) (angle_congruent C B A A B Dp)
+          h_cba_dba
+          h_cba_abdp))))
+
+-- Two betweenness relations A-B-P and A-P-B cannot both hold.
+theorem between_not_both : forall (A B P : Point),
+  between A B P -> between A P B -> False := by
+  intro A
+  intro B
+  intro P
+  intro h_ABP
+  intro h_APB
+  have h_BPA : between B P A := between_sym A P B h_APB
+  have h_ABA : between A B A := between_trans A B P A h_ABP h_BPA
+  exact (between_distinct_ends A B A h_ABA (refl Point A))
+
+-- If A-B-D and B-A-P, then P-B-D (standard betweenness property on a line).
+theorem between_opposite_extension : forall (A B D P : Point),
+  between A B D ->
+  between B A P ->
+  between P B D := by
+  intro A
+  intro B
+  intro D
+  intro P
+  intro h_ABD
+  intro h_BAP
+  have h_DBA : between D B A := between_sym A B D h_ABD
+  have h_DBP : between D B P := between_trans D B A P h_DBA h_BAP
+  exact (between_sym D B P h_DBP)
+
+-- Helper: right angle transfers to the opposite ray through B.
+

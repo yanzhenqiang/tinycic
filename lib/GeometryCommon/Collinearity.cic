@@ -1,0 +1,375 @@
+import GeometryAxioms
+-- =====================================================================
+-- 16. Additional collinearity theorems
+-- =====================================================================
+
+theorem collinear_perm2 : forall (A : Point), forall (B : Point), forall (C : Point),
+  collinear A B C -> collinear A C B := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (exists_elim_prop Line
+    (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l)))
+    (collinear A C B)
+    (fun l : Line =>
+      fun hl : And (on_line A l) (And (on_line B l) (on_line C l)) =>
+        Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line C m) (on_line B m))) l
+          (And.conj (on_line A l) (And (on_line C l) (on_line B l))
+            (and_fst (on_line A l) (And (on_line B l) (on_line C l)) hl)
+            (And.conj (on_line C l) (on_line B l)
+              (and_snd (on_line B l) (on_line C l)
+                (and_snd (on_line A l) (And (on_line B l) (on_line C l)) hl))
+              (and_fst (on_line B l) (on_line C l)
+                (and_snd (on_line A l) (And (on_line B l) (on_line C l)) hl)))))
+    h)
+
+theorem collinear_perm3 : forall (A : Point), forall (B : Point), forall (C : Point),
+  collinear A B C -> collinear C B A := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (exists_elim_prop Line
+    (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l)))
+    (collinear C B A)
+    (fun l : Line =>
+      fun hl : And (on_line A l) (And (on_line B l) (on_line C l)) =>
+        Exists.intro Line (fun m : Line => And (on_line C m) (And (on_line B m) (on_line A m))) l
+          (And.conj (on_line C l) (And (on_line B l) (on_line A l))
+            (and_snd (on_line B l) (on_line C l)
+              (and_snd (on_line A l) (And (on_line B l) (on_line C l)) hl))
+            (And.conj (on_line B l) (on_line A l)
+              (and_fst (on_line B l) (on_line C l)
+                (and_snd (on_line A l) (And (on_line B l) (on_line C l)) hl))
+              (and_fst (on_line A l) (And (on_line B l) (on_line C l)) hl))))
+    h)
+
+-- If two points coincide, any third point is collinear with them.
+theorem eq_first_collinear : forall (A B C : Point),
+  Eq Point A B -> collinear A B C := by
+  intro A
+  intro B
+  intro C
+  intro h_eq
+  have h_line : exists (l : Line), And (on_line A l) (on_line C l) := line_exists A C
+  have l : Line := choice Line (fun l : Line => And (on_line A l) (on_line C l)) h_line
+  have h_l : And (on_line A l) (on_line C l) := choice_spec Line (fun l : Line => And (on_line A l) (on_line C l)) h_line
+  have h_B_on_l : on_line B l := eq_subst Point A B (fun X : Point => on_line X l) h_eq (and_fst (on_line A l) (on_line C l) h_l)
+  exact (Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) l
+    (And.conj (on_line A l) (And (on_line B l) (on_line C l))
+      (and_fst (on_line A l) (on_line C l) h_l)
+      (And.conj (on_line B l) (on_line C l) h_B_on_l (and_snd (on_line A l) (on_line C l) h_l))))
+
+theorem eq_second_collinear : forall (A B C : Point),
+  Eq Point B C -> collinear A B C := by
+  intro A
+  intro B
+  intro C
+  intro h_eq
+  have h_line : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_line
+  have h_l : And (on_line A l) (on_line B l) := choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_line
+  have h_C_on_l : on_line C l := eq_subst Point B C (fun X : Point => on_line X l) h_eq (and_snd (on_line A l) (on_line B l) h_l)
+  exact (Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) l
+    (And.conj (on_line A l) (And (on_line B l) (on_line C l))
+      (and_fst (on_line A l) (on_line B l) h_l)
+      (And.conj (on_line B l) (on_line C l) (and_snd (on_line A l) (on_line B l) h_l) h_C_on_l)))
+
+theorem eq_ends_collinear : forall (A B C : Point),
+  Eq Point A C -> collinear A B C := by
+  intro A
+  intro B
+  intro C
+  intro h_eq
+  have h_line : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_line
+  have h_l : And (on_line A l) (on_line B l) := choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_line
+  have h_C_on_l : on_line C l := eq_subst Point A C (fun X : Point => on_line X l) h_eq (and_fst (on_line A l) (on_line B l) h_l)
+  exact (Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) l
+    (And.conj (on_line A l) (And (on_line B l) (on_line C l))
+      (and_fst (on_line A l) (on_line B l) h_l)
+      (And.conj (on_line B l) (on_line C l) (and_snd (on_line A l) (on_line B l) h_l) h_C_on_l)))
+
+-- Non-collinear points are pairwise distinct.
+theorem triangle_nondegenerate : forall (A B C : Point),
+  Not (collinear A B C) ->
+  And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) := by
+  intro A
+  intro B
+  intro C
+  intro h
+  exact (And.conj (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+    (fun h_eq : Eq Point A B => h (eq_first_collinear A B C h_eq))
+    (And.conj (Not (Eq Point B C)) (Not (Eq Point A C))
+      (fun h_eq : Eq Point B C => h (eq_second_collinear A B C h_eq))
+      (fun h_eq : Eq Point A C => h (eq_ends_collinear A B C h_eq))))
+
+-- If A-E-B are collinear (with E between A and B) and C is off the line AEB,
+-- then C is also off the line through any two of these points; in particular
+-- B, E, C are non-collinear.  Used to transport non-collinearity across the
+-- two rays of a straight angle.
+theorem noncollinear_opposite_ray : forall (A E B C : Point),
+  between A E B -> Not (collinear A E C) -> Not (collinear B E C) := by
+  intro A
+  intro E
+  intro B
+  intro C
+  intro h_AEB
+  intro h_nc
+  intro h_BEC
+  have h_col_AEB : collinear A E B := between_implies_collinear A E B h_AEB
+  have h_ne_EB : Not (Eq Point E B) := between_distinct_middle A E B h_AEB
+  have l1 : Line := choice Line (fun l : Line => And (on_line A l) (And (on_line E l) (on_line B l))) h_col_AEB
+  have h_l1 : And (on_line A l1) (And (on_line E l1) (on_line B l1)) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (And (on_line E l) (on_line B l))) h_col_AEB
+  have l2 : Line := choice Line (fun l : Line => And (on_line B l) (And (on_line E l) (on_line C l))) h_BEC
+  have h_l2 : And (on_line B l2) (And (on_line E l2) (on_line C l2)) :=
+    choice_spec Line (fun l : Line => And (on_line B l) (And (on_line E l) (on_line C l))) h_BEC
+  have h_A_l1 : on_line A l1 := and_fst (on_line A l1) (And (on_line E l1) (on_line B l1)) h_l1
+  have h_E_l1 : on_line E l1 := and_fst (on_line E l1) (on_line B l1)
+    (and_snd (on_line A l1) (And (on_line E l1) (on_line B l1)) h_l1)
+  have h_B_l1 : on_line B l1 := and_snd (on_line E l1) (on_line B l1)
+    (and_snd (on_line A l1) (And (on_line E l1) (on_line B l1)) h_l1)
+  have h_B_l2 : on_line B l2 := and_fst (on_line B l2) (And (on_line E l2) (on_line C l2)) h_l2
+  have h_E_l2 : on_line E l2 := and_fst (on_line E l2) (on_line C l2)
+    (and_snd (on_line B l2) (And (on_line E l2) (on_line C l2)) h_l2)
+  have h_C_l2 : on_line C l2 := and_snd (on_line E l2) (on_line C l2)
+    (and_snd (on_line B l2) (And (on_line E l2) (on_line C l2)) h_l2)
+  have h_l1eq : Eq Line l1 l2 := line_unique E B l1 l2 h_ne_EB h_E_l1 h_B_l1 h_E_l2 h_B_l2
+  have h_A_l2 : on_line A l2 := eq_subst Line l1 l2 (fun l : Line => on_line A l) h_l1eq h_A_l1
+  have h_AEC : collinear A E C := Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line E l) (on_line C l))) l2
+    (And.conj (on_line A l2) (And (on_line E l2) (on_line C l2)) h_A_l2
+      (And.conj (on_line E l2) (on_line C l2) h_E_l2 h_C_l2))
+  exact (h_nc h_AEC)
+
+-- Triangle vertices can be permuted.
+theorem triangle_perm : forall (A B C : Point),
+  triangle A B C -> triangle B A C := by
+  intro A
+  intro B
+  intro C
+  intro h
+  intro h_col
+  exact (h (collinear_perm B A C h_col))
+
+-- Swap first and third vertices of a triangle.
+theorem triangle_perm2 : forall (A B C : Point),
+  triangle A B C -> triangle C B A := by
+  intro A
+  intro B
+  intro C
+  intro h
+  intro h_col
+  exact (h (collinear_perm3 C B A h_col))
+
+-- =====================================================================
+-- 14. Betweenness helpers
+-- =====================================================================
+
+-- `between_inner` has been moved to GeometryAxioms.cic because it is needed
+-- for the proof of transitivity of segment ordering there.
+
+-- =====================================================================
+-- 15. Midpoint theorems
+-- =====================================================================
+
+-- Midpoint uniqueness: a segment has at most one midpoint.
+-- Proof: Suppose M1 and M2 are both midpoints of AB.  They both lie on AB.
+-- By betweenness uniqueness, either A-M1-M2, M1-M2-A, or M1-A-M2.  In the
+-- first two cases the ordering of the halves contradicts irreflexivity of
+-- segment ordering.  The third case contradicts the uniqueness of betweenness
+-- on AB.
+theorem midpoint_unique : forall (M1 M2 A B : Point),
+  midpoint M1 A B -> midpoint M2 A B -> Eq Point M1 M2 := by
+  intro M1
+  intro M2
+  intro A
+  intro B
+  intro h_M1
+  intro h_M2
+  have h_bet_AM1B : between A M1 B := and_fst (between A M1 B) (seg_congruent A M1 M1 B) h_M1
+  have h_bet_AM2B : between A M2 B := and_fst (between A M2 B) (seg_congruent A M2 M2 B) h_M2
+  have h_AM1_M1B : seg_congruent A M1 M1 B := and_snd (between A M1 B) (seg_congruent A M1 M1 B) h_M1
+  have h_AM2_M2B : seg_congruent A M2 M2 B := and_snd (between A M2 B) (seg_congruent A M2 M2 B) h_M2
+  have h_A_ne_B : Not (Eq Point A B) := between_distinct_ends A M1 B h_bet_AM1B
+  have h_A_ne_M1 : Not (Eq Point A M1) := between_distinct_first A M1 B h_bet_AM1B
+  have h_A_ne_M2 : Not (Eq Point A M2) := between_distinct_first A M2 B h_bet_AM2B
+  have h_col_AM1B : collinear A B M1 :=
+    collinear_perm2 A M1 B (between_implies_collinear A M1 B h_bet_AM1B)
+  have h_col_AM2B : collinear A B M2 :=
+    collinear_perm2 A M2 B (between_implies_collinear A M2 B h_bet_AM2B)
+  have h_col_AM1M2 : collinear A M1 M2 :=
+    let h_l1 : exists (l : Line), And (on_line A l) (And (on_line B l) (on_line M1 l)) := h_col_AM1B in
+    let l1 : Line := choice Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line M1 l))) h_col_AM1B in
+    let h_l1_spec : And (on_line A l1) (And (on_line B l1) (on_line M1 l1)) :=
+      choice_spec Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line M1 l))) h_col_AM1B in
+    let h_l2 : exists (l : Line), And (on_line A l) (And (on_line B l) (on_line M2 l)) := h_col_AM2B in
+    let l2 : Line := choice Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line M2 l))) h_col_AM2B in
+    let h_l2_spec : And (on_line A l2) (And (on_line B l2) (on_line M2 l2)) :=
+      choice_spec Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line M2 l))) h_col_AM2B in
+    let h_A_l1 : on_line A l1 := and_fst (on_line A l1) (And (on_line B l1) (on_line M1 l1)) h_l1_spec in
+    let h_B_l1 : on_line B l1 := and_fst (on_line B l1) (on_line M1 l1)
+      (and_snd (on_line A l1) (And (on_line B l1) (on_line M1 l1)) h_l1_spec) in
+    let h_A_l2 : on_line A l2 := and_fst (on_line A l2) (And (on_line B l2) (on_line M2 l2)) h_l2_spec in
+    let h_B_l2 : on_line B l2 := and_fst (on_line B l2) (on_line M2 l2)
+      (and_snd (on_line A l2) (And (on_line B l2) (on_line M2 l2)) h_l2_spec) in
+    let h_l1_eq_l2 : Eq Line l1 l2 := line_unique A B l1 l2 h_A_ne_B h_A_l1 h_B_l1 h_A_l2 h_B_l2 in
+    let h_M2_l1 : on_line M2 l1 :=
+      eq_subst Line l2 l1 (fun l : Line => on_line M2 l) (eq_sym Line l1 l2 h_l1_eq_l2)
+        (and_snd (on_line B l2) (on_line M2 l2)
+          (and_snd (on_line A l2) (And (on_line B l2) (on_line M2 l2)) h_l2_spec)) in
+    let h_M1_l1 : on_line M1 l1 := and_snd (on_line B l1) (on_line M1 l1)
+      (and_snd (on_line A l1) (And (on_line B l1) (on_line M1 l1)) h_l1_spec) in
+    Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line M1 l) (on_line M2 l))) l1
+      (And.conj (on_line A l1) (And (on_line M1 l1) (on_line M2 l1)) h_A_l1
+        (And.conj (on_line M1 l1) (on_line M2 l1) h_M1_l1 h_M2_l1))
+  exact (or_elim (Eq Point M1 M2) (Not (Eq Point M1 M2)) (Eq Point M1 M2)
+    (excluded_middle (Eq Point M1 M2))
+    (fun h_eq : Eq Point M1 M2 => h_eq)
+    (fun h_ne_M1M2 : Not (Eq Point M1 M2) =>
+      let h_bet_one : Or (between A M1 M2) (Or (between M1 M2 A) (between M1 A M2)) :=
+        between_unique A M1 M2 h_A_ne_M1 h_ne_M1M2 h_A_ne_M2 h_col_AM1M2 in
+      or_elim (between A M1 M2) (Or (between M1 M2 A) (between M1 A M2)) (Eq Point M1 M2) h_bet_one
+    (fun h_bet_AM1M2 : between A M1 M2 =>
+      let h_less_AM1_AM2 : segment_less A M1 A M2 := between_implies_segment_less A M1 M2 h_bet_AM1M2 in
+      let h_less_AM1_M2B : segment_less A M1 M2 B :=
+        segment_less_preserve_congruent A M1 A M2 M2 B h_less_AM1_AM2 h_AM2_M2B in
+      let h_bet_M1M2B : between M1 M2 B := between_inner A M1 M2 B h_bet_AM1M2 h_bet_AM2B in
+      let h_less_M2B_M1B : segment_less M2 B M1 B := between_implies_segment_less M1 M2 B h_bet_M1M2B in
+      let h_M1B_AM1 : seg_congruent M1 B A M1 := congruent_sym A M1 M1 B h_AM1_M1B in
+      let h_less_M2B_AM1 : segment_less M2 B A M1 :=
+        segment_less_preserve_congruent M2 B M1 B A M1 h_less_M2B_M1B h_M1B_AM1 in
+      let h_less_AM1_AM1 : segment_less A M1 A M1 :=
+        segment_less_trans A M1 M2 B A M1 h_less_AM1_M2B h_less_M2B_AM1 in
+      False_elim (Eq Point M1 M2) (segment_less_irrefl A M1 h_less_AM1_AM1))
+    (fun h_rest : Or (between M1 M2 A) (between M1 A M2) =>
+      or_elim (between M1 M2 A) (between M1 A M2) (Eq Point M1 M2) h_rest
+        (fun h_bet_M1M2A : between M1 M2 A =>
+          let h_bet_AM2M1 : between A M2 M1 := between_sym M1 M2 A h_bet_M1M2A in
+          let h_less_AM2_AM1 : segment_less A M2 A M1 := between_implies_segment_less A M2 M1 h_bet_AM2M1 in
+          let h_less_AM2_M1B : segment_less A M2 M1 B :=
+            segment_less_preserve_congruent A M2 A M1 M1 B h_less_AM2_AM1 h_AM1_M1B in
+          let h_bet_M2M1B : between M2 M1 B := between_inner A M2 M1 B h_bet_AM2M1 h_bet_AM1B in
+          let h_less_M1B_M2B : segment_less M1 B M2 B := between_implies_segment_less M2 M1 B h_bet_M2M1B in
+          let h_M2B_AM2 : seg_congruent M2 B A M2 := congruent_sym A M2 M2 B h_AM2_M2B in
+          let h_less_M1B_AM2 : segment_less M1 B A M2 :=
+            segment_less_preserve_congruent M1 B M2 B A M2 h_less_M1B_M2B h_M2B_AM2 in
+          let h_less_AM2_AM2 : segment_less A M2 A M2 :=
+            segment_less_trans A M2 M1 B A M2 h_less_AM2_M1B h_less_M1B_AM2 in
+          False_elim (Eq Point M1 M2) (segment_less_irrefl A M2 h_less_AM2_AM2))
+        (fun h_bet_M1AM2 : between M1 A M2 =>
+          let h_bet_M1AB : between M1 A B := between_trans M1 A M2 B h_bet_M1AM2 h_bet_AM2B in
+          let h_bet_BAM1 : between B A M1 := between_sym M1 A B h_bet_M1AB in
+          let h_contra : between B A B := between_trans B A M1 B h_bet_BAM1 h_bet_AM1B in
+          False_elim (Eq Point M1 M2)
+            (between_distinct_ends B A B h_contra (refl Point B))))))
+
+-- Reflection uniqueness: a common endpoint and a common midpoint force the
+-- other endpoints to coincide.  This follows from Hilbert's C1 (unique segment
+-- transfer along a ray) and is needed for several midpoint-based proofs.
+theorem midpoint_reflection_unique : forall (M A B C : Point),
+  midpoint M A B -> midpoint M A C -> Eq Point B C := by
+  intro M
+  intro A
+  intro B
+  intro C
+  intro h_MAB
+  intro h_MAC
+  have h_AMB : between A M B := and_fst (between A M B) (seg_congruent A M M B) h_MAB
+  have h_AMC : between A M C := and_fst (between A M C) (seg_congruent A M M C) h_MAC
+  have h_AM_MB : seg_congruent A M M B := and_snd (between A M B) (seg_congruent A M M B) h_MAB
+  have h_AM_MC : seg_congruent A M M C := and_snd (between A M C) (seg_congruent A M M C) h_MAC
+  have h_side : Or (between M B C) (Or (between M C B) (Eq Point B C)) :=
+    between_same_side A M B C h_AMB h_AMC
+  exact (or_elim (between M B C) (Or (between M C B) (Eq Point B C)) (Eq Point B C) h_side
+    (fun h_MBC : between M B C =>
+      segment_transfer_unique A M M B C
+        (between_distinct_first A M B h_AMB)
+        (Or.inl (between M B C) (between M C B) h_MBC)
+        h_AM_MB h_AM_MC)
+    (fun h_rest : Or (between M C B) (Eq Point B C) =>
+      or_elim (between M C B) (Eq Point B C) (Eq Point B C) h_rest
+        (fun h_MCB : between M C B =>
+          eq_sym Point C B
+            (segment_transfer_unique A M M C B
+              (between_distinct_first A M C h_AMC)
+              (Or.inl (between M C B) (between M B C) h_MCB)
+              h_AM_MC h_AM_MB))
+        (fun h_eq : Eq Point B C => h_eq)))
+
+-- Two collinear triples sharing two distinct points merge to one line.
+theorem collinear_shared_merge : forall (A B C D : Point),
+  collinear A D B ->
+  collinear D B C ->
+  Not (Eq Point D B) ->
+  collinear A B C := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_col1
+  intro h_col2
+  intro h_DB
+  have h_l1 : exists (l : Line), And (on_line A l) (And (on_line D l) (on_line B l)) := h_col1
+  have l1 : Line := choice Line (fun l : Line => And (on_line A l) (And (on_line D l) (on_line B l))) h_col1
+  have h_l1_spec : And (on_line A l1) (And (on_line D l1) (on_line B l1)) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (And (on_line D l) (on_line B l))) h_col1
+  have h_l2 : exists (l : Line), And (on_line D l) (And (on_line B l) (on_line C l)) := h_col2
+  have l2 : Line := choice Line (fun l : Line => And (on_line D l) (And (on_line B l) (on_line C l))) h_col2
+  have h_l2_spec : And (on_line D l2) (And (on_line B l2) (on_line C l2)) :=
+    choice_spec Line (fun l : Line => And (on_line D l) (And (on_line B l) (on_line C l))) h_col2
+  have h_A_l1 : on_line A l1 := and_fst (on_line A l1) (And (on_line D l1) (on_line B l1)) h_l1_spec
+  have h_rest1 : And (on_line D l1) (on_line B l1) :=
+    and_snd (on_line A l1) (And (on_line D l1) (on_line B l1)) h_l1_spec
+  have h_D_l1 : on_line D l1 := and_fst (on_line D l1) (on_line B l1) h_rest1
+  have h_B_l1 : on_line B l1 := and_snd (on_line D l1) (on_line B l1) h_rest1
+  have h_D_l2 : on_line D l2 := and_fst (on_line D l2) (And (on_line B l2) (on_line C l2)) h_l2_spec
+  have h_rest2 : And (on_line B l2) (on_line C l2) :=
+    and_snd (on_line D l2) (And (on_line B l2) (on_line C l2)) h_l2_spec
+  have h_B_l2 : on_line B l2 := and_fst (on_line B l2) (on_line C l2) h_rest2
+  have h_C_l2 : on_line C l2 := and_snd (on_line B l2) (on_line C l2) h_rest2
+  have h_l1_eq_l2 : Eq Line l1 l2 :=
+    line_unique D B l1 l2 h_DB h_D_l1 h_B_l1 h_D_l2 h_B_l2
+  have h_C_l1 : on_line C l1 :=
+    eq_subst Line l2 l1 (fun l : Line => on_line C l) (eq_sym Line l1 l2 h_l1_eq_l2) h_C_l2
+  exact (Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) l1
+    (And.conj (on_line A l1) (And (on_line B l1) (on_line C l1)) h_A_l1
+      (And.conj (on_line B l1) (on_line C l1) h_B_l1 h_C_l1)))
+
+theorem collinear_shared_merge_fst : forall (A B C D : Point),
+  collinear A B C ->
+  collinear A B D ->
+  Not (Eq Point A B) ->
+  collinear A C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_col1
+  intro h_col2
+  intro h_AB
+  have h_l1 : exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)) := h_col1
+  have l1 : Line := choice Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) h_col1
+  have h_l1_spec : And (on_line A l1) (And (on_line B l1) (on_line C l1)) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) h_col1
+  have h_l2 : exists (l : Line), And (on_line A l) (And (on_line B l) (on_line D l)) := h_col2
+  have l2 : Line := choice Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line D l))) h_col2
+  have h_l2_spec : And (on_line A l2) (And (on_line B l2) (on_line D l2)) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line D l))) h_col2
+  have h_A_l1 : on_line A l1 := and_fst (on_line A l1) (And (on_line B l1) (on_line C l1)) h_l1_spec
+  have h_B_l1 : on_line B l1 := and_fst (on_line B l1) (on_line C l1)
+    (and_snd (on_line A l1) (And (on_line B l1) (on_line C l1)) h_l1_spec)
+  have h_A_l2 : on_line A l2 := and_fst (on_line A l2) (And (on_line B l2) (on_line D l2)) h_l2_spec
+  have h_B_l2 : on_line B l2 := and_fst (on_line B l2) (on_line D l2)
+    (and_snd (on_line A l2) (And (on_line B l2) (on_line D l2)) h_l2_spec)
+  have h_l1_eq_l2 : Eq Line l1 l2 := line_unique A B l1 l2 h_AB h_A_l1 h_B_l1 h_A_l2 h_B_l2
+  have h_D_l1 : on_line D l1 :=
+    eq_subst Line l2 l1 (fun l : Line => on_line D l) (eq_sym Line l1 l2 h_l1_eq_l2)
+      (and_snd (on_line B l2) (on_line D l2)
+        (and_snd (on_line A l2) (And (on_line B l2) (on_line D l2)) h_l2_spec))
+  have h_C_l1 : on_line C l1 := and_snd (on_line B l1) (on_line C l1)
+    (and_snd (on_line A l1) (And (on_line B l1) (on_line C l1)) h_l1_spec)
+  exact (Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line C l) (on_line D l))) l1
+    (And.conj (on_line A l1) (And (on_line C l1) (on_line D l1)) h_A_l1
+      (And.conj (on_line C l1) (on_line D l1) h_C_l1 h_D_l1)))

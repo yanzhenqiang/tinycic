@@ -1,0 +1,234 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+import GeometryCommon.PlaneSeparation
+import GeometryCommon.Crossbar
+import GeometryCommon.Angle
+
+-- =====================================================================
+-- Angle comparison (Hilbert Group III, built on III1/III4/III5 + Group II).
+--
+-- angle_less P Q R A B C : angle PQR is strictly smaller than angle ABC,
+--   witnessed by an interior ray BM of angle ABC with angle PQR congruent
+--   to the proper sub-angle ABM.
+--
+-- These are the order facts Hilbert proves from the congruence axioms;
+-- they sit beneath right_angles_equal and the exterior-angle theorem.
+-- =====================================================================
+
+def angle_less (P Q R A B C : Point) : Prop :=
+  exists (M : Point), And (ray_interior A B C M) (angle_congruent P Q R A B M)
+
+-- An interior ray picks out a strictly smaller angle at the same vertex.
+theorem interior_angle_less : forall (A B C M : Point),
+  ray_interior A B C M -> angle_less A B M A B C := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro h_int
+  exact (Exists.intro Point (fun Z : Point => And (ray_interior A B C Z) (angle_congruent A B M A B Z)) M
+    (And.conj (ray_interior A B C M) (angle_congruent A B M A B M) h_int (angle_refl B A M)))
+
+-- A point M strictly between A and C gives a proper sub-angle: ∠ABM ≇ ∠ABC.
+theorem interior_point_angle_not_congruent : forall (A B C M : Point) (l : Line),
+  on_line A l -> on_line B l ->
+  Not (Eq Point A B) ->
+  Not (collinear A B C) ->
+  between A M C ->
+  angle_congruent A B M A B C ->
+  False := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro l
+  intro h_A_l
+  intro h_B_l
+  intro h_ne_AB
+  intro h_nc
+  intro h_AMC
+  intro h_ABM_ABC
+  have h_same_MC : same_side_line l M C := between_point_same_side A B C M l h_A_l h_B_l h_ne_AB h_nc h_AMC
+  have h_Coff : Not (on_line C l) :=
+    fun h_Cl : on_line C l =>
+      h_nc (Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l
+        (And.conj (on_line A l) (And (on_line B l) (on_line C l)) h_A_l
+          (And.conj (on_line B l) (on_line C l) h_B_l h_Cl)))
+  have h_col_BMC : collinear B M C :=
+    angle_congruent_same_side_collinear A B C M l h_B_l h_A_l h_ne_AB h_Coff h_same_MC h_ABM_ABC
+  have h_col_AMC : collinear A M C := between_implies_collinear A M C h_AMC
+  have h_ne_MC : Not (Eq Point M C) := between_distinct_middle A M C h_AMC
+  exact (exists_elim_prop Line
+    (fun m : Line => And (on_line B m) (And (on_line M m) (on_line C m)))
+    False
+    (fun m : Line =>
+      fun h_m : And (on_line B m) (And (on_line M m) (on_line C m)) =>
+        let h_B_m : on_line B m := and_fst (on_line B m) (And (on_line M m) (on_line C m)) h_m in
+        let h_M_m : on_line M m := and_fst (on_line M m) (on_line C m)
+          (and_snd (on_line B m) (And (on_line M m) (on_line C m)) h_m) in
+        let h_C_m : on_line C m := and_snd (on_line M m) (on_line C m)
+          (and_snd (on_line B m) (And (on_line M m) (on_line C m)) h_m) in
+        exists_elim_prop Line
+          (fun n : Line => And (on_line A n) (And (on_line M n) (on_line C n)))
+          False
+          (fun n : Line =>
+            fun h_n : And (on_line A n) (And (on_line M n) (on_line C n)) =>
+              let h_A_n : on_line A n := and_fst (on_line A n) (And (on_line M n) (on_line C n)) h_n in
+              let h_M_n : on_line M n := and_fst (on_line M n) (on_line C n)
+                (and_snd (on_line A n) (And (on_line M n) (on_line C n)) h_n) in
+              let h_C_n : on_line C n := and_snd (on_line M n) (on_line C n)
+                (and_snd (on_line A n) (And (on_line M n) (on_line C n)) h_n) in
+              let h_eq : Eq Line m n := line_unique M C m n h_ne_MC h_M_m h_C_m h_M_n h_C_n in
+              let h_A_m : on_line A m := eq_subst Line n m (fun l2 : Line => on_line A l2) (eq_sym Line m n h_eq) h_A_n in
+              h_nc (Exists.intro Line (fun l2 : Line => And (on_line A l2) (And (on_line B l2) (on_line C l2))) m
+                (And.conj (on_line A m) (And (on_line B m) (on_line C m)) h_A_m
+                  (And.conj (on_line B m) (on_line C m) h_B_m h_C_m))))
+          h_col_AMC)
+    h_col_BMC)
+
+-- Irreflexivity: an angle is never strictly smaller than itself.
+theorem angle_less_irrefl : forall (A B C : Point),
+  Not (collinear A B C) ->
+  Not (angle_less A B C A B C) := by
+  intro A
+  intro B
+  intro C
+  intro h_nc
+  intro h_lt
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_nc
+  have h_ne_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist
+  have h_l_ex : exists (m : Line), And (on_line A m) (on_line B m) := line_exists A B
+  exact (exists_elim_prop Line (fun m : Line => And (on_line A m) (on_line B m)) False
+    (fun l : Line =>
+      fun h_l : And (on_line A l) (on_line B l) =>
+        let h_A_l : on_line A l := and_fst (on_line A l) (on_line B l) h_l in
+        let h_B_l : on_line B l := and_snd (on_line A l) (on_line B l) h_l in
+        exists_elim_prop Point
+          (fun M : Point => And (ray_interior A B C M) (angle_congruent A B C A B M))
+          False
+          (fun M : Point =>
+            fun h_M : And (ray_interior A B C M) (angle_congruent A B C A B M) =>
+              let h_int : ray_interior A B C M :=
+                and_fst (ray_interior A B C M) (angle_congruent A B C A B M) h_M in
+              let h_ABC_ABM : angle_congruent A B C A B M :=
+                and_snd (ray_interior A B C M) (angle_congruent A B C A B M) h_M in
+              let h_ABM_ABC : angle_congruent A B M A B C := angle_sym A B C A B M h_ABC_ABM in
+              exists_elim_prop Point
+                (fun Y : Point => And (between A Y C) (on_ray B M Y))
+                False
+                (fun Y : Point =>
+                  fun h_Y : And (between A Y C) (on_ray B M Y) =>
+                    let h_AYC : between A Y C := and_fst (between A Y C) (on_ray B M Y) h_Y in
+                    let h_onray : on_ray B M Y := and_snd (between A Y C) (on_ray B M Y) h_Y in
+                    let h_em : Or (Eq Point Y M) (Not (Eq Point Y M)) := excluded_middle (Eq Point Y M) in
+                    or_elim (Eq Point Y M) (Not (Eq Point Y M)) False h_em
+                      (fun h_eq : Eq Point Y M =>
+                        let h_AMC : between A M C :=
+                          eq_subst Point Y M (fun Z : Point => between A Z C) h_eq h_AYC in
+                        interior_point_angle_not_congruent A B C M l h_A_l h_B_l h_ne_AB h_nc h_AMC h_ABM_ABC)
+                      (fun h_ne : Not (Eq Point Y M) =>
+                        let h_strict : Or (between B M Y) (between B Y M) :=
+                          or_elim (between B M Y) (Or (between B Y M) (Eq Point Y M)) (Or (between B M Y) (between B Y M)) h_onray
+                            (fun h : between B M Y =>
+                              Or.inl (between B M Y) (between B Y M) h)
+                            (fun h_rest : Or (between B Y M) (Eq Point Y M) =>
+                              or_elim (between B Y M) (Eq Point Y M) (Or (between B M Y) (between B Y M)) h_rest
+                                (fun h : between B Y M =>
+                                  Or.inr (between B M Y) (between B Y M) h)
+                                (fun h_eq2 : Eq Point Y M =>
+                                  False_elim (Or (between B M Y) (between B Y M)) (h_ne h_eq2))) in
+                        angle_not_congruent_interior A B C M Y l h_A_l h_B_l h_ne_AB h_nc h_AYC h_strict h_ABM_ABC))
+                h_int)
+          h_lt)
+    h_l_ex)
+
+-- Extract ¬opposite from same-side (top-level, keeps callers small).
+theorem same_side_line_not_opposite : forall (l : Line) (P Q : Point),
+  same_side_line l P Q -> Not (opposite_side_line l P Q) := by
+  intro l
+  intro P
+  intro Q
+  intro h
+  exact (and_snd (Not (on_line Q l)) (Not (opposite_side_line l P Q))
+    (and_snd (Not (on_line P l))
+      (And (Not (on_line Q l)) (Not (opposite_side_line l P Q))) h))
+
+-- A point of l strictly between X and F witnesses that X and F are on
+-- opposite sides of l.
+theorem between_opposite_at_point : forall (l : Line) (X E F : Point),
+  on_line E l -> between X E F -> opposite_side_line l X F := by
+  intro l
+  intro X
+  intro E
+  intro F
+  intro h_E_l
+  intro h_XEF
+  exact (Exists.intro Point (fun Z : Point => And (on_line Z l) (between X Z F)) E
+    (And.conj (on_line E l) (between X E F) h_E_l h_XEF))
+
+-- Closed "same ray from E" predicate (def-wrapped so or_elim motives stay a
+-- single def, mirroring on_ray; avoids re-normalizing a primitive Or motive).
+def same_ray (E X F : Point) : Prop := Or (between E X F) (between E F X)
+
+-- Two points X, F off l, on the same side of l, and collinear with a point E
+-- on l, lie on the same closed ray from E (E is not between X and F).
+theorem same_side_collinear_same_ray : forall (E X F : Point) (l : Line),
+  on_line E l -> Not (on_line X l) -> Not (on_line F l) ->
+  same_side_line l X F -> collinear E X F -> Not (Eq Point X F) -> same_ray E X F := by
+  intro E
+  intro X
+  intro F
+  intro l
+  intro h_E_l
+  intro h_X_off
+  intro h_F_off
+  intro h_same
+  intro h_col
+  intro h_ne_XF
+  have h_ne_EX : Not (Eq Point E X) :=
+    fun h_eq : Eq Point E X => h_X_off (eq_subst Point E X (fun Z : Point => on_line Z l) h_eq h_E_l)
+  have h_ne_EF : Not (Eq Point E F) :=
+    fun h_eq : Eq Point E F => h_F_off (eq_subst Point E F (fun Z : Point => on_line Z l) h_eq h_E_l)
+  have h_tri : Or (between E X F) (Or (between X F E) (between X E F)) :=
+    between_unique E X F h_ne_EX h_ne_XF h_ne_EF h_col
+  exact (or_elim (between E X F) (Or (between X F E) (between X E F)) (same_ray E X F) h_tri
+    (fun h_EXF : between E X F =>
+      Or.inl (between E X F) (between E F X) h_EXF)
+    (fun h_rest : Or (between X F E) (between X E F) =>
+      or_elim (between X F E) (between X E F) (same_ray E X F) h_rest
+        (fun h_XFE : between X F E =>
+          Or.inr (between E X F) (between E F X) (between_sym X F E h_XFE))
+        (fun h_XEF : between X E F =>
+          False_elim (same_ray E X F)
+            (same_side_line_not_opposite l X F h_same (between_opposite_at_point l X E F h_E_l h_XEF)))))
+
+-- Congruence transport on the left of angle_less.
+theorem angle_less_congr_left : forall (P Q R P' Q' R' A B C : Point),
+  angle_congruent P' Q' R' P Q R -> angle_less P Q R A B C -> angle_less P' Q' R' A B C := by
+  intro P
+  intro Q
+  intro R
+  intro P'
+  intro Q'
+  intro R'
+  intro A
+  intro B
+  intro C
+  intro h_congrP
+  intro h_lt
+  exact (exists_elim_prop Point
+    (fun M : Point => And (ray_interior A B C M) (angle_congruent P Q R A B M))
+    (angle_less P' Q' R' A B C)
+    (fun M : Point =>
+      fun hM : And (ray_interior A B C M) (angle_congruent P Q R A B M) =>
+        let h_int : ray_interior A B C M :=
+          and_fst (ray_interior A B C M) (angle_congruent P Q R A B M) hM in
+        let h_c : angle_congruent P Q R A B M :=
+          and_snd (ray_interior A B C M) (angle_congruent P Q R A B M) hM in
+        let h_c' : angle_congruent P' Q' R' A B M := angle_trans P' Q' R' P Q R A B M h_congrP h_c in
+        Exists.intro Point (fun Z : Point => And (ray_interior A B C Z) (angle_congruent P' Q' R' A B Z)) M
+          (And.conj (ray_interior A B C M) (angle_congruent P' Q' R' A B M) h_int h_c'))
+    h_lt)
+

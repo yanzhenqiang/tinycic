@@ -2,10 +2,20 @@
 use super::declaration::*;
 use super::environment::*;
 use super::expr::*;
+use super::format::format_expr;
 use super::local_ctx::*;
 use std::io::Write;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+/// Format used for reduction trace output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TraceFormat {
+    /// Internal AST representation (default).
+    Ast,
+    /// Human-readable source-like formatting.
+    Beautiful,
+}
 
 /// A cache key for definitional equality
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -116,6 +126,8 @@ pub struct TypeChecker<'a> {
     allow_unassigned_mvar: bool,
     /// When true, log every reduction step to stderr.
     trace: bool,
+    /// Format used for trace output.
+    trace_format: TraceFormat,
     /// Current recursion depth for indentation.
     trace_depth: usize,
     /// Optional trace output file.
@@ -129,17 +141,18 @@ impl<'a> TypeChecker<'a> {
             lctx: LocalCtx::new(),
             allow_unassigned_mvar: false,
             trace: false,
+            trace_format: TraceFormat::Beautiful,
             trace_depth: 0,
             trace_writer: None,
         }
     }
 
     pub fn with_local_ctx(st: &'a mut TypeCheckerState, lctx: LocalCtx) -> Self {
-        TypeChecker { st, lctx, allow_unassigned_mvar: false, trace: false, trace_depth: 0, trace_writer: None }
+        TypeChecker { st, lctx, allow_unassigned_mvar: false, trace: false, trace_format: TraceFormat::Beautiful, trace_depth: 0, trace_writer: None }
     }
 
     pub fn with_allow_unassigned_mvar(st: &'a mut TypeCheckerState, lctx: LocalCtx) -> Self {
-        TypeChecker { st, lctx, allow_unassigned_mvar: true, trace: false, trace_depth: 0, trace_writer: None }
+        TypeChecker { st, lctx, allow_unassigned_mvar: true, trace: false, trace_format: TraceFormat::Beautiful, trace_depth: 0, trace_writer: None }
     }
 
     /// Enable or disable step-by-step reduction tracing.
@@ -151,8 +164,22 @@ impl<'a> TypeChecker<'a> {
         }
     }
 
+    /// Set the format used for trace output.
+    pub fn set_trace_format(&mut self, format: TraceFormat) {
+        self.trace_format = format;
+    }
+
     /// Set a fixed file to receive trace output.
+    /// Creates the parent directory if it does not exist.
     pub fn set_trace_file(&mut self, path: &std::path::Path) {
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    eprintln!("Warning: cannot create trace directory '{}': {}", parent.display(), e);
+                    return;
+                }
+            }
+        }
         match std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -168,15 +195,21 @@ impl<'a> TypeChecker<'a> {
             return;
         }
         let indent = "  ".repeat(self.trace_depth);
-        let lines = format!(
-            "{}[{}]\n{}  {}\n{}  ~> {}\n",
-            indent,
-            rule,
-            indent,
-            self.trace_expr_to_string(before),
-            indent,
-            self.trace_expr_to_string(after)
-        );
+        let before_str = self.trace_expr_to_string(before);
+        let after_str = self.trace_expr_to_string(after);
+        let lines = if self.trace_format == TraceFormat::Beautiful {
+            format!("{}[{}]\n{}  {}\n{}  ~> {}\n", indent, rule, indent, before_str, indent, after_str)
+        } else {
+            format!(
+                "{}[{}]\n{}  {}\n{}  ~> {}\n",
+                indent,
+                rule,
+                indent,
+                self.trace_ast_to_string(before),
+                indent,
+                self.trace_ast_to_string(after)
+            )
+        };
         eprint!("{}", lines);
         if let Some(ref mut w) = self.trace_writer {
             let _ = w.write_all(lines.as_bytes());
@@ -184,6 +217,15 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn trace_expr_to_string(&self, e: &Expr) -> String {
+        let s = format_expr(e);
+        if s.len() > 200 {
+            format!("{}...(truncated)", &s[..200])
+        } else {
+            s
+        }
+    }
+
+    fn trace_ast_to_string(&self, e: &Expr) -> String {
         let s = self.expr_to_string(e);
         if s.len() > 80 {
             format!("{}...(truncated)", &s[..80])
@@ -242,7 +284,7 @@ impl<'a> TypeChecker<'a> {
                 return self.lctx
                     .get_type(&Expr::FVar(name.clone()))
                     .cloned()
-                    .ok_or_else(|| format!("Unknown free variable {}", name.to_string()))
+                    .ok_or_else(|| format!("Unknown free variable {}", name.to_string()));
             }
             Expr::MVar(name) => {
                 if let Some(val) = self.st.get_mvar_assignment(name).cloned() {
@@ -941,10 +983,18 @@ impl<'a> TypeChecker<'a> {
             return true;
         }
 
-        // Proof irrelevance: any two expressions inhabiting Prop are definitionally equal.
-        // This is a simplified treatment where all proof terms are identified.
-        if self.is_prop_type(&t_n) && self.is_prop_type(&s_n) {
-            return true;
+        // Proof irrelevance: two proof terms of the *same* proposition are
+        // identified.  We require that t_n and s_n have the *same* inferred
+        // proposition type (structural equality, not full definitional equality,
+        // so that distinct propositions are not collapsed).
+        let ipt_t = self.is_prop_type(&t_n);
+        let ipt_s = self.is_prop_type(&s_n);
+        if ipt_t && ipt_s {
+            if let (Ok(ty_t), Ok(ty_s)) = (self.infer(&t_n), self.infer(&s_n)) {
+                if ty_t == ty_s {
+                    return true;
+                }
+            }
         }
 
         self.st.failure_cache.insert(pair, false);

@@ -1,0 +1,687 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+import GeometryCommon.PlaneSeparation
+import GeometryCommon.Crossbar
+import GeometryCommon.Angle
+
+-- =====================================================================
+-- Angle addition (Hilbert Theorem 14) as a THEOREM.
+--
+-- If D lies on segment AC (so ray BD is interior to angle ABC) and the two
+-- sub-angles are congruent to the two sub-angles at Q cut by an interior
+-- ray QR (P and S on opposite sides of line QR), then angle ABC is
+-- congruent to angle PQS.
+--
+-- Proof outline (Hilbert's three-SAS argument):
+--   1. Transfer BA, BC, BD onto the rays QP, QS, QR at A', C', D'.
+--   2. SAS twice: triangle BAD ≅ QA'D' and triangle BDC ≅ QD'C'.
+--   3. The angles QD'A' and QD'C' are supplements of each other (via
+--      supplement_congruent on the straight angle ADC), and A', C' lie on
+--      opposite sides of line QR, so III4 uniqueness forces A', D', C'
+--      collinear with D' between A' and C'.
+--   4. congruent_add (III3) gives AC ≅ A'C'; a final SAS gives
+--      angle ABC ≅ A'QC' = PQS.
+--
+-- The interiority hypothesis (P, S on opposite sides of line QR) was
+-- missing from the former axiom statement; without it the conclusion is
+-- false (the "sum" ray could be the exterior one).
+-- =====================================================================
+
+-- A point on the ray from an on-line point through an off-line point
+-- (beyond the off-line point) is itself off the line.
+theorem ray_point_off_line : forall (l : Line) (Q P A' : Point),
+  on_line Q l -> Not (on_line P l) -> between Q P A' -> Not (on_line A' l) := by
+  intro l
+  intro Q
+  intro P
+  intro A'
+  intro h_Q
+  intro h_P_off
+  intro h_QPA'
+  intro h_A'_l
+  have h_col : collinear Q P A' := between_implies_collinear Q P A' h_QPA'
+  have h_col_PQA' : collinear P Q A' :=
+    collinear_perm2 P A' Q (collinear_perm3 Q A' P (collinear_perm2 Q P A' h_col))
+  have h_ne_QA' : Not (Eq Point Q A') := between_distinct_ends Q P A' h_QPA'
+  exact (h_P_off (collinear_point_on_line P Q A' l h_col_PQA' h_Q h_A'_l h_ne_QA'))
+
+-- A point on the ray from Q through P (beyond P) lies on the same side of
+-- any line through Q (with a second point R on it) as P.
+theorem ray_point_same_side : forall (l : Line) (Q R P A' : Point),
+  on_line Q l -> on_line R l -> Not (Eq Point Q R) ->
+  Not (on_line P l) -> between Q P A' -> same_side_line l P A' := by
+  intro l
+  intro Q
+  intro R
+  intro P
+  intro A'
+  intro h_Q
+  intro h_R
+  intro h_QR
+  intro h_P_off
+  intro h_QPA'
+  have h_A'_off : Not (on_line A' l) := ray_point_off_line l Q P A' h_Q h_P_off h_QPA'
+  have h_nc : Not (collinear Q R A') :=
+    fun h : collinear Q R A' =>
+      h_A'_off (collinear_point_on_line A' Q R l
+        (collinear_perm2 A' R Q (collinear_perm3 Q R A' h)) h_Q h_R h_QR)
+  exact (between_point_same_side Q R A' P l h_Q h_R h_QR h_nc h_QPA')
+
+-- If a line l meets segment A'C' (witness of opposite_side) and D' is a
+-- point of l collinear with A' and C' (with A' off l), then D' is the
+-- meeting point: between A' D' C'.  Two distinct lines meet at most once.
+theorem opposite_between_at_line : forall (l : Line) (A' D' C' : Point),
+  Not (on_line A' l) -> on_line D' l ->
+  collinear A' D' C' -> opposite_side_line l A' C' -> between A' D' C' := by
+  intro l
+  intro A'
+  intro D'
+  intro C'
+  intro h_A'_off
+  intro h_D'_l
+  intro h_col
+  intro h_opp
+  have X : Point := choice Point (fun X : Point => And (on_line X l) (between A' X C')) h_opp
+  have h_X_spec : And (on_line X l) (between A' X C') :=
+    choice_spec Point (fun X : Point => And (on_line X l) (between A' X C')) h_opp
+  have h_X_l : on_line X l := and_fst (on_line X l) (between A' X C') h_X_spec
+  have h_A'XC' : between A' X C' := and_snd (on_line X l) (between A' X C') h_X_spec
+  exact (exists_elim_prop Line
+    (fun n : Line => And (on_line A' n) (And (on_line D' n) (on_line C' n)))
+    (between A' D' C')
+    (fun n : Line =>
+      fun hn : And (on_line A' n) (And (on_line D' n) (on_line C' n)) =>
+        let h_A'_n : on_line A' n := and_fst (on_line A' n) (And (on_line D' n) (on_line C' n)) hn in
+        let h_D'_n : on_line D' n := and_fst (on_line D' n) (on_line C' n)
+          (and_snd (on_line A' n) (And (on_line D' n) (on_line C' n)) hn) in
+        let h_C'_n : on_line C' n := and_snd (on_line D' n) (on_line C' n)
+          (and_snd (on_line A' n) (And (on_line D' n) (on_line C' n)) hn) in
+        let h_ne_A'C' : Not (Eq Point A' C') := between_distinct_ends A' X C' h_A'XC' in
+        let h_X_n : on_line X n :=
+          collinear_point_on_line X A' C' n (between_implies_collinear A' X C' h_A'XC')
+            h_A'_n h_C'_n h_ne_A'C' in
+        or_elim (Eq Point X D') (Not (Eq Point X D')) (between A' D' C')
+          (excluded_middle (Eq Point X D'))
+          (fun h_eq : Eq Point X D' =>
+            eq_subst Point X D' (fun Z : Point => between A' Z C') h_eq h_A'XC')
+          (fun h_ne : Not (Eq Point X D') =>
+            let h_nl : Eq Line n l := line_unique X D' n l h_ne h_X_n h_D'_n h_X_l h_D'_l in
+            False_elim (between A' D' C')
+              (h_A'_off (eq_subst Line n l (fun z : Line => on_line A' z) h_nl h_A'_n))))
+    h_col)
+
+-- The two-Pasch engine, collinear case: if P, S, A' are collinear then the
+-- whole configuration lies on one line n; either W = Q (giving the
+-- between-chain A'-Q-C') or n = l, contradicting P off l.
+theorem angle_add_opposite_collinear : forall (l : Line) (Q P S A' C' : Point),
+  on_line Q l -> Not (on_line P l) -> Not (on_line S l) ->
+  opposite_side_line l P S ->
+  between Q P A' -> between Q S C' ->
+  collinear P S A' ->
+  opposite_side_line l A' C' := by
+  intro l
+  intro Q
+  intro P
+  intro S
+  intro A'
+  intro C'
+  intro h_Q
+  intro h_P_off
+  intro h_S_off
+  intro h_opp_PS
+  intro h_QPA'
+  intro h_QSC'
+  intro h_col_PSA'
+  have W : Point := choice Point (fun W : Point => And (on_line W l) (between P W S)) h_opp_PS
+  have h_W_spec : And (on_line W l) (between P W S) :=
+    choice_spec Point (fun W : Point => And (on_line W l) (between P W S)) h_opp_PS
+  have h_W_l : on_line W l := and_fst (on_line W l) (between P W S) h_W_spec
+  have h_PWS : between P W S := and_snd (on_line W l) (between P W S) h_W_spec
+  have h_ne_PS : Not (Eq Point P S) := between_distinct_ends P W S h_PWS
+  exact (
+      exists_elim_prop Line
+        (fun n : Line => And (on_line P n) (And (on_line S n) (on_line A' n)))
+        (opposite_side_line l A' C')
+        (fun n : Line =>
+          fun hn : And (on_line P n) (And (on_line S n) (on_line A' n)) =>
+            let h_P_n : on_line P n := and_fst (on_line P n) (And (on_line S n) (on_line A' n)) hn in
+            let h_S_n : on_line S n := and_fst (on_line S n) (on_line A' n)
+              (and_snd (on_line P n) (And (on_line S n) (on_line A' n)) hn) in
+            let h_A'_n : on_line A' n := and_snd (on_line S n) (on_line A' n)
+              (and_snd (on_line P n) (And (on_line S n) (on_line A' n)) hn) in
+            let h_ne_PA' : Not (Eq Point P A') := between_distinct_middle Q P A' h_QPA' in
+            let h_Q_n : on_line Q n :=
+              collinear_point_on_line Q P A' n (between_implies_collinear Q P A' h_QPA')
+                h_P_n h_A'_n h_ne_PA' in
+            let h_W_n : on_line W n :=
+              collinear_point_on_line W P S n (between_implies_collinear P W S h_PWS)
+                h_P_n h_S_n h_ne_PS in
+            or_elim (Eq Point W Q) (Not (Eq Point W Q)) (opposite_side_line l A' C')
+              (excluded_middle (Eq Point W Q))
+              (fun h_eq : Eq Point W Q =>
+                let h_PQS : between P Q S :=
+                  eq_subst Point W Q (fun Z : Point => between P Z S) h_eq h_PWS in
+                let h_SQA' : between S Q A' :=
+                  between_trans S Q P A' (between_sym P Q S h_PQS) h_QPA' in
+                let h_A'QC' : between A' Q C' :=
+                  between_trans A' Q S C' (between_sym S Q A' h_SQA') h_QSC' in
+                Exists.intro Point (fun Y : Point => And (on_line Y l) (between A' Y C')) Q
+                  (And.conj (on_line Q l) (between A' Q C') h_Q h_A'QC'))
+              (fun h_ne_WQ : Not (Eq Point W Q) =>
+                let h_nl : Eq Line n l := line_unique W Q n l h_ne_WQ h_W_n h_Q_n h_W_l h_Q in
+                False_elim (opposite_side_line l A' C')
+                  (h_P_off (eq_subst Line n l (fun z : Line => on_line P z) h_nl h_P_n))))
+        h_col_PSA')
+
+-- The two-Pasch engine, non-collinear case: Pasch on triangle PSA' at W,
+-- then (in the S-E-A' subcase) Pasch on triangle SA'C' at E.
+theorem angle_add_opposite_noncollinear : forall (l : Line) (Q P S A' C' : Point),
+  on_line Q l -> Not (on_line P l) -> Not (on_line S l) ->
+  opposite_side_line l P S ->
+  between Q P A' -> between Q S C' ->
+  Not (collinear P S A') ->
+  opposite_side_line l A' C' := by
+  intro l
+  intro Q
+  intro P
+  intro S
+  intro A'
+  intro C'
+  intro h_Q
+  intro h_P_off
+  intro h_S_off
+  intro h_opp_PS
+  intro h_QPA'
+  intro h_QSC'
+  intro h_nc_PSA'
+  have h_A'_off : Not (on_line A' l) := ray_point_off_line l Q P A' h_Q h_P_off h_QPA'
+  have h_C'_off : Not (on_line C' l) := ray_point_off_line l Q S C' h_Q h_S_off h_QSC'
+  have h_ne_QP : Not (Eq Point Q P) :=
+    fun h : Eq Point Q P => h_P_off (eq_subst Point Q P (fun Z : Point => on_line Z l) h h_Q)
+  have h_ne_QS : Not (Eq Point Q S) :=
+    fun h : Eq Point Q S => h_S_off (eq_subst Point Q S (fun Z : Point => on_line Z l) h h_Q)
+  have W : Point := choice Point (fun W : Point => And (on_line W l) (between P W S)) h_opp_PS
+  have h_W_spec : And (on_line W l) (between P W S) :=
+    choice_spec Point (fun W : Point => And (on_line W l) (between P W S)) h_opp_PS
+  have h_W_l : on_line W l := and_fst (on_line W l) (between P W S) h_W_spec
+  have h_PWS : between P W S := and_snd (on_line W l) (between P W S) h_W_spec
+  exact (
+      let h_pre : forall (l' : Line), on_line P l' -> on_line S l' -> Not (on_line A' l') :=
+        fun l' : Line => fun h_Pl' : on_line P l' => fun h_Sl' : on_line S l' =>
+          fun h_A'l' : on_line A' l' =>
+            h_nc_PSA' (Exists.intro Line
+              (fun m : Line => And (on_line P m) (And (on_line S m) (on_line A' m))) l'
+              (And.conj (on_line P l') (And (on_line S l') (on_line A' l')) h_Pl'
+                (And.conj (on_line S l') (on_line A' l') h_Sl' h_A'l'))) in
+      let h_E_ex : exists (E : Point), And (on_line E l) (Or (between P E A') (between S E A')) :=
+        pasch P S A' l W h_pre h_P_off h_S_off h_A'_off h_W_l h_PWS in
+      exists_elim_prop Point
+        (fun E : Point => And (on_line E l) (Or (between P E A') (between S E A')))
+        (opposite_side_line l A' C')
+        (fun E : Point =>
+          fun hE : And (on_line E l) (Or (between P E A') (between S E A')) =>
+            let h_E_l : on_line E l := and_fst (on_line E l) (Or (between P E A') (between S E A')) hE in
+            let h_or : Or (between P E A') (between S E A') :=
+              and_snd (on_line E l) (Or (between P E A') (between S E A')) hE in
+            or_elim (between P E A') (between S E A') (opposite_side_line l A' C') h_or
+              (fun h_PEA' : between P E A' =>
+                exists_elim_prop Line (fun n : Line => And (on_line Q n) (on_line P n))
+                  (opposite_side_line l A' C')
+                  (fun n : Line =>
+                    fun hn : And (on_line Q n) (on_line P n) =>
+                      let h_Q_n : on_line Q n := and_fst (on_line Q n) (on_line P n) hn in
+                      let h_P_n : on_line P n := and_snd (on_line Q n) (on_line P n) hn in
+                      let h_ne_PA' : Not (Eq Point P A') := between_distinct_middle Q P A' h_QPA' in
+                      let h_A'_n : on_line A' n :=
+                        collinear_point_on_line A' Q P n
+                          (collinear_perm2 A' P Q (collinear_perm3 Q P A'
+                            (between_implies_collinear Q P A' h_QPA')))
+                          h_Q_n h_P_n h_ne_QP in
+                      let h_E_n : on_line E n :=
+                        collinear_point_on_line E P A' n (between_implies_collinear P E A' h_PEA')
+                          h_P_n h_A'_n h_ne_PA' in
+                      or_elim (Eq Point E Q) (Not (Eq Point E Q)) (opposite_side_line l A' C')
+                        (excluded_middle (Eq Point E Q))
+                        (fun h_eq : Eq Point E Q =>
+                          let h_PQA' : between P Q A' :=
+                            eq_subst Point E Q (fun Z : Point => between P Z A') h_eq h_PEA' in
+                          False_elim (opposite_side_line l A' C')
+                            (between_mid_swap_false Q P A' h_QPA' h_PQA'))
+                        (fun h_ne_EQ : Not (Eq Point E Q) =>
+                          let h_nl : Eq Line n l := line_unique E Q n l h_ne_EQ h_E_n h_Q_n h_E_l h_Q in
+                          False_elim (opposite_side_line l A' C')
+                            (h_P_off (eq_subst Line n l (fun z : Line => on_line P z) h_nl h_P_n))))
+                  (line_exists Q P))
+              (fun h_SEA' : between S E A' =>
+                let h_ne_QA' : Not (Eq Point Q A') := between_distinct_ends Q P A' h_QPA' in
+                let h_nc_SA'C' : Not (collinear S A' C') :=
+                  fun h : collinear S A' C' =>
+                    exists_elim_prop Line
+                      (fun n : Line => And (on_line S n) (And (on_line A' n) (on_line C' n)))
+                      False
+                      (fun n : Line =>
+                        fun hn : And (on_line S n) (And (on_line A' n) (on_line C' n)) =>
+                          let h_S_n : on_line S n := and_fst (on_line S n) (And (on_line A' n) (on_line C' n)) hn in
+                          let h_A'_n : on_line A' n := and_fst (on_line A' n) (on_line C' n)
+                            (and_snd (on_line S n) (And (on_line A' n) (on_line C' n)) hn) in
+                          let h_C'_n : on_line C' n := and_snd (on_line A' n) (on_line C' n)
+                            (and_snd (on_line S n) (And (on_line A' n) (on_line C' n)) hn) in
+                          exists_elim_prop Line (fun m : Line => And (on_line Q m) (on_line S m))
+                            False
+                            (fun m : Line =>
+                              fun hm : And (on_line Q m) (on_line S m) =>
+                                let h_Q_m : on_line Q m := and_fst (on_line Q m) (on_line S m) hm in
+                                let h_S_m : on_line S m := and_snd (on_line Q m) (on_line S m) hm in
+                                let h_C'_m : on_line C' m :=
+                                  collinear_point_on_line C' Q S m (between_implies_collinear Q S C' h_QSC')
+                                    h_Q_m h_S_m h_ne_QS in
+                                let h_ne_SC' : Not (Eq Point S C') := between_distinct_middle Q S C' h_QSC' in
+                                let h_nm : Eq Line n m := line_unique S C' n m h_ne_SC' h_S_n h_C'_n h_S_m h_C'_m in
+                                let h_A'_m : on_line A' m :=
+                                  eq_subst Line n m (fun z : Line => on_line A' z) h_nm h_A'_n in
+                                let h_col_A'QP : collinear A' Q P :=
+                                  collinear_perm2 A' P Q (collinear_perm3 Q P A'
+                                    (between_implies_collinear Q P A' h_QPA')) in
+                                let h_col_A'QS : collinear A' Q S :=
+                                  Exists.intro Line
+                                    (fun z : Line => And (on_line A' z) (And (on_line Q z) (on_line S z))) m
+                                    (And.conj (on_line A' m) (And (on_line Q m) (on_line S m)) h_A'_m
+                                      (And.conj (on_line Q m) (on_line S m) h_Q_m h_S_m)) in
+                                let h_ne_A'Q : Not (Eq Point A' Q) :=
+                                  fun h2 : Eq Point A' Q => h_ne_QA' (eq_sym Point A' Q h2) in
+                                let h_col_A'PS : collinear A' P S :=
+                                  collinear_shared_merge_fst A' Q P S h_col_A'QP h_col_A'QS h_ne_A'Q in
+                                h_nc_PSA' (collinear_perm3 A' S P
+                                  (collinear_perm2 A' P S h_col_A'PS)))
+                            (line_exists Q S))
+                      h in
+                let h_pre2 : forall (l' : Line), on_line S l' -> on_line A' l' -> Not (on_line C' l') :=
+                  fun l' : Line => fun h_Sl' : on_line S l' => fun h_A'l' : on_line A' l' =>
+                    fun h_C'l' : on_line C' l' =>
+                      h_nc_SA'C' (Exists.intro Line
+                        (fun m : Line => And (on_line S m) (And (on_line A' m) (on_line C' m))) l'
+                        (And.conj (on_line S l') (And (on_line A' l') (on_line C' l')) h_Sl'
+                          (And.conj (on_line A' l') (on_line C' l') h_A'l' h_C'l'))) in
+                let h_F_ex : exists (F : Point), And (on_line F l) (Or (between S F C') (between A' F C')) :=
+                  pasch S A' C' l E h_pre2 h_S_off h_A'_off h_C'_off h_E_l h_SEA' in
+                exists_elim_prop Point
+                  (fun F : Point => And (on_line F l) (Or (between S F C') (between A' F C')))
+                  (opposite_side_line l A' C')
+                  (fun F : Point =>
+                    fun hF : And (on_line F l) (Or (between S F C') (between A' F C')) =>
+                      let h_F_l : on_line F l := and_fst (on_line F l) (Or (between S F C') (between A' F C')) hF in
+                      let h_orF : Or (between S F C') (between A' F C') :=
+                        and_snd (on_line F l) (Or (between S F C') (between A' F C')) hF in
+                      or_elim (between S F C') (between A' F C') (opposite_side_line l A' C') h_orF
+                        (fun h_SFC' : between S F C' =>
+                          exists_elim_prop Line (fun m : Line => And (on_line Q m) (on_line S m))
+                            (opposite_side_line l A' C')
+                            (fun m : Line =>
+                              fun hm : And (on_line Q m) (on_line S m) =>
+                                let h_Q_m : on_line Q m := and_fst (on_line Q m) (on_line S m) hm in
+                                let h_S_m : on_line S m := and_snd (on_line Q m) (on_line S m) hm in
+                                let h_C'_m : on_line C' m :=
+                                  collinear_point_on_line C' Q S m (between_implies_collinear Q S C' h_QSC')
+                                    h_Q_m h_S_m h_ne_QS in
+                                let h_ne_FC' : Not (Eq Point F C') := between_distinct_middle S F C' h_SFC' in
+                                let h_F_m : on_line F m :=
+                                  collinear_point_on_line F S C' m (between_implies_collinear S F C' h_SFC')
+                                    h_S_m h_C'_m h_ne_FC' in
+                                or_elim (Eq Point F Q) (Not (Eq Point F Q)) (opposite_side_line l A' C')
+                                  (excluded_middle (Eq Point F Q))
+                                  (fun h_eq : Eq Point F Q =>
+                                    let h_SQC' : between S Q C' :=
+                                      eq_subst Point F Q (fun Z : Point => between S Z C') h_eq h_SFC' in
+                                    False_elim (opposite_side_line l A' C')
+                                      (between_mid_swap_false Q S C' h_QSC' h_SQC'))
+                                  (fun h_ne_FQ : Not (Eq Point F Q) =>
+                                    let h_ml : Eq Line m l := line_unique F Q m l h_ne_FQ h_F_m h_Q_m h_F_l h_Q in
+                                    False_elim (opposite_side_line l A' C')
+                                      (h_S_off (eq_subst Line m l (fun z : Line => on_line S z) h_ml h_S_m))))
+                            (line_exists Q S))
+                        (fun h_A'FC' : between A' F C' =>
+                          Exists.intro Point (fun Y : Point => And (on_line Y l) (between A' Y C')) F
+                            (And.conj (on_line F l) (between A' F C') h_F_l h_A'FC')))
+                  h_F_ex))
+        h_E_ex)
+
+-- The two-Pasch engine: rays from an on-line point Q through two
+-- opposite-side points P, S land on opposite sides of l.  Case split on
+-- whether P, S, A' are collinear.
+theorem angle_add_opposite : forall (l : Line) (Q P S A' C' : Point),
+  on_line Q l -> Not (on_line P l) -> Not (on_line S l) ->
+  opposite_side_line l P S ->
+  between Q P A' -> between Q S C' ->
+  opposite_side_line l A' C' := by
+  intro l
+  intro Q
+  intro P
+  intro S
+  intro A'
+  intro C'
+  intro h_Q
+  intro h_P_off
+  intro h_S_off
+  intro h_opp_PS
+  intro h_QPA'
+  intro h_QSC'
+  exact (or_elim (collinear P S A') (Not (collinear P S A')) (opposite_side_line l A' C')
+    (excluded_middle (collinear P S A'))
+    (fun h_col_PSA' : collinear P S A' =>
+      angle_add_opposite_collinear l Q P S A' C' h_Q h_P_off h_S_off h_opp_PS
+        h_QPA' h_QSC' h_col_PSA')
+    (fun h_nc_PSA' : Not (collinear P S A') =>
+      angle_add_opposite_noncollinear l Q P S A' C' h_Q h_P_off h_S_off h_opp_PS
+        h_QPA' h_QSC' h_nc_PSA'))
+
+-- If C and C2 are on opposite sides of l, any point P on the same side as
+-- C2 is on the opposite side from C.  The collinear case (P on line CC2)
+-- is settled by trichotomy; otherwise Pasch on triangle CC2P.
+theorem same_side_of_opposite_is_opposite : forall (l : Line) (C C2 P : Point),
+  Not (on_line C l) -> opposite_side_line l C C2 ->
+  same_side_line l P C2 -> opposite_side_line l P C := by
+  intro l
+  intro C
+  intro C2
+  intro P
+  intro h_C_off
+  intro h_opp_CC2
+  intro h_ss_PC2
+  have h_P_off : Not (on_line P l) :=
+    and_fst (Not (on_line P l))
+      (And (Not (on_line C2 l)) (Not (opposite_side_line l P C2))) h_ss_PC2
+  have h_C2_off : Not (on_line C2 l) := opposite_off_line l C C2 h_opp_CC2 h_C_off
+  have h_nopp_PC2 : Not (opposite_side_line l P C2) :=
+    and_snd (Not (on_line C2 l)) (Not (opposite_side_line l P C2))
+      (and_snd (Not (on_line P l))
+        (And (Not (on_line C2 l)) (Not (opposite_side_line l P C2))) h_ss_PC2)
+  have A : Point := choice Point (fun A : Point => And (on_line A l) (between C A C2)) h_opp_CC2
+  have h_A_spec : And (on_line A l) (between C A C2) :=
+    choice_spec Point (fun A : Point => And (on_line A l) (between C A C2)) h_opp_CC2
+  have h_A_l : on_line A l := and_fst (on_line A l) (between C A C2) h_A_spec
+  have h_CAC2 : between C A C2 := and_snd (on_line A l) (between C A C2) h_A_spec
+  exact (or_elim (collinear C C2 P) (Not (collinear C C2 P)) (opposite_side_line l P C)
+    (excluded_middle (collinear C C2 P))
+    (fun h_col : collinear C C2 P =>
+      exists_elim_prop Line
+        (fun n : Line => And (on_line C n) (And (on_line C2 n) (on_line P n)))
+        (opposite_side_line l P C)
+        (fun n : Line =>
+          fun hn : And (on_line C n) (And (on_line C2 n) (on_line P n)) =>
+            let h_C_n : on_line C n := and_fst (on_line C n) (And (on_line C2 n) (on_line P n)) hn in
+            let h_C2_n : on_line C2 n := and_fst (on_line C2 n) (on_line P n)
+              (and_snd (on_line C n) (And (on_line C2 n) (on_line P n)) hn) in
+            let h_P_n : on_line P n := and_snd (on_line C2 n) (on_line P n)
+              (and_snd (on_line C n) (And (on_line C2 n) (on_line P n)) hn) in
+            let h_ne_AC2 : Not (Eq Point A C2) := between_distinct_middle C A C2 h_CAC2 in
+            let h_A_n : on_line A n :=
+              collinear_point_on_line A C C2 n (between_implies_collinear C A C2 h_CAC2)
+                h_C_n h_C2_n h_ne_AC2 in
+            let h_ne_PA : Not (Eq Point P A) :=
+              fun h : Eq Point P A => h_P_off (eq_subst Point P A (fun Z : Point => on_line Z l) h h_A_l) in
+            let h_ne_AC : Not (Eq Point A C) :=
+              fun h : Eq Point A C => h_C_off (eq_subst Point A C (fun Z : Point => on_line Z l) h h_A_l) in
+            let h_ne_PC : Not (Eq Point P C) :=
+              fun h : Eq Point P C =>
+                h_nopp_PC2 (eq_subst Point C P (fun Z : Point => opposite_side_line l Z C2)
+                  (eq_sym Point P C h) h_opp_CC2) in
+            let h_col_CAP : collinear C A P :=
+              collinear_shared_merge_fst C C2 A P
+                (collinear_perm2 C A C2 (between_implies_collinear C A C2 h_CAC2)) h_col
+                (between_distinct_ends C A C2 h_CAC2) in
+            let h_col_PAC : collinear P A C := collinear_perm3 C A P h_col_CAP in
+            or_elim (between P A C) (Or (between A C P) (between A P C)) (opposite_side_line l P C)
+              (between_unique P A C h_ne_PA h_ne_AC h_ne_PC h_col_PAC)
+              (fun h_PAC : between P A C =>
+                Exists.intro Point (fun Y : Point => And (on_line Y l) (between P Y C)) A
+                  (And.conj (on_line A l) (between P A C) h_A_l h_PAC))
+              (fun h_or2 : Or (between A C P) (between A P C) =>
+                or_elim (between A C P) (between A P C) (opposite_side_line l P C) h_or2
+                  (fun h_ACP : between A C P =>
+                    let h_PAC2 : between P A C2 :=
+                      between_trans P C A C2 (between_sym A C P h_ACP) h_CAC2 in
+                    False_elim (opposite_side_line l P C)
+                      (h_nopp_PC2 (Exists.intro Point
+                        (fun Y : Point => And (on_line Y l) (between P Y C2)) A
+                        (And.conj (on_line A l) (between P A C2) h_A_l h_PAC2))))
+                  (fun h_APC : between A P C =>
+                    let h_PAC2 : between P A C2 :=
+                      between_trans P C A C2 (between_sym A P C h_APC) h_CAC2 in
+                    False_elim (opposite_side_line l P C)
+                      (h_nopp_PC2 (Exists.intro Point
+                        (fun Y : Point => And (on_line Y l) (between P Y C2)) A
+                        (And.conj (on_line A l) (between P A C2) h_A_l h_PAC2))))))
+        h_col)
+    (fun h_nc : Not (collinear C C2 P) =>
+      let h_pre : forall (l' : Line), on_line C l' -> on_line C2 l' -> Not (on_line P l') :=
+        fun l' : Line => fun h_Cl' : on_line C l' => fun h_C2l' : on_line C2 l' =>
+          fun h_Pl' : on_line P l' =>
+            h_nc (Exists.intro Line
+              (fun m : Line => And (on_line C m) (And (on_line C2 m) (on_line P m))) l'
+              (And.conj (on_line C l') (And (on_line C2 l') (on_line P l')) h_Cl'
+                (And.conj (on_line C2 l') (on_line P l') h_C2l' h_Pl'))) in
+      let h_E_ex : exists (E : Point), And (on_line E l) (Or (between C E P) (between C2 E P)) :=
+        pasch C C2 P l A h_pre h_C_off h_C2_off h_P_off h_A_l h_CAC2 in
+      exists_elim_prop Point
+        (fun E : Point => And (on_line E l) (Or (between C E P) (between C2 E P)))
+        (opposite_side_line l P C)
+        (fun E : Point =>
+          fun hE : And (on_line E l) (Or (between C E P) (between C2 E P)) =>
+            let h_E_l : on_line E l := and_fst (on_line E l) (Or (between C E P) (between C2 E P)) hE in
+            let h_or : Or (between C E P) (between C2 E P) :=
+              and_snd (on_line E l) (Or (between C E P) (between C2 E P)) hE in
+            or_elim (between C E P) (between C2 E P) (opposite_side_line l P C) h_or
+              (fun h_CEP : between C E P =>
+                Exists.intro Point (fun Y : Point => And (on_line Y l) (between P Y C)) E
+                  (And.conj (on_line E l) (between P E C) h_E_l (between_sym C E P h_CEP)))
+              (fun h_C2EP : between C2 E P =>
+                False_elim (opposite_side_line l P C)
+                  (h_nopp_PC2 (Exists.intro Point
+                    (fun Y : Point => And (on_line Y l) (between P Y C2)) E
+                    (And.conj (on_line E l) (between P E C2) h_E_l (between_sym C2 E P h_C2EP))))))
+        h_E_ex))
+
+-- Angle addition (Hilbert Theorem 14): the whole angle is congruent to the
+-- whole angle whenever the parts are, for an interior ray on each side.
+theorem angle_addition : forall (A B C D P Q R S : Point) (l : Line),
+  between A D C ->
+  Not (collinear A B C) ->
+  Not (Eq Point Q R) ->
+  on_line Q l -> on_line R l ->
+  Not (on_line P l) -> Not (on_line S l) ->
+  opposite_side_line l P S ->
+  angle_congruent A B D P Q R ->
+  angle_congruent D B C R Q S ->
+  angle_congruent A B C P Q S := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro P
+  intro Q
+  intro R
+  intro S
+  intro l
+  intro h_ADC
+  intro h_nc
+  intro h_QR
+  intro h_Q
+  intro h_R
+  intro h_P_off
+  intro h_S_off
+  intro h_opp_PS
+  intro h_ABD_PQR
+  intro h_DBC_RQS
+  -- Distinctness facts.
+  have h_ne_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+      (triangle_nondegenerate A B C h_nc)
+  have h_ne_BC : Not (Eq Point B C) :=
+    and_fst (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+        (triangle_nondegenerate A B C h_nc))
+  have h_ne_BA : Not (Eq Point B A) := fun h : Eq Point B A => h_ne_AB (eq_sym Point B A h)
+  have h_ne_AD : Not (Eq Point A D) := between_distinct_first A D C h_ADC
+  have h_ne_BD : Not (Eq Point B D) :=
+    fun h : Eq Point B D =>
+      h_nc (eq_subst Point D B (fun Z : Point => collinear A Z C)
+        (eq_sym Point B D h) (between_implies_collinear A D C h_ADC))
+  have h_ne_QP : Not (Eq Point Q P) :=
+    fun h : Eq Point Q P => h_P_off (eq_subst Point Q P (fun Z : Point => on_line Z l) h h_Q)
+  have h_ne_QS : Not (Eq Point Q S) :=
+    fun h : Eq Point Q S => h_S_off (eq_subst Point Q S (fun Z : Point => on_line Z l) h h_Q)
+  -- Transfer BA, BC, BD onto rays QP, QS, QR.
+  have h_A'_ex : exists (E : Point), And (between Q P E) (seg_congruent B A Q E) :=
+    congruent_transfer B A Q P h_ne_BA h_ne_QP
+  have A' : Point := choice Point (fun E : Point => And (between Q P E) (seg_congruent B A Q E)) h_A'_ex
+  have h_A'_spec : And (between Q P A') (seg_congruent B A Q A') :=
+    choice_spec Point (fun E : Point => And (between Q P E) (seg_congruent B A Q E)) h_A'_ex
+  have h_QPA' : between Q P A' := and_fst (between Q P A') (seg_congruent B A Q A') h_A'_spec
+  have h_BA_QA' : seg_congruent B A Q A' := and_snd (between Q P A') (seg_congruent B A Q A') h_A'_spec
+  have h_C'_ex : exists (E : Point), And (between Q S E) (seg_congruent B C Q E) :=
+    congruent_transfer B C Q S h_ne_BC h_ne_QS
+  have C' : Point := choice Point (fun E : Point => And (between Q S E) (seg_congruent B C Q E)) h_C'_ex
+  have h_C'_spec : And (between Q S C') (seg_congruent B C Q C') :=
+    choice_spec Point (fun E : Point => And (between Q S E) (seg_congruent B C Q E)) h_C'_ex
+  have h_QSC' : between Q S C' := and_fst (between Q S C') (seg_congruent B C Q C') h_C'_spec
+  have h_BC_QC' : seg_congruent B C Q C' := and_snd (between Q S C') (seg_congruent B C Q C') h_C'_spec
+  have h_D'_ex : exists (E : Point), And (between Q R E) (seg_congruent B D Q E) :=
+    congruent_transfer B D Q R h_ne_BD h_QR
+  have D' : Point := choice Point (fun E : Point => And (between Q R E) (seg_congruent B D Q E)) h_D'_ex
+  have h_D'_spec : And (between Q R D') (seg_congruent B D Q D') :=
+    choice_spec Point (fun E : Point => And (between Q R E) (seg_congruent B D Q E)) h_D'_ex
+  have h_QRD' : between Q R D' := and_fst (between Q R D') (seg_congruent B D Q D') h_D'_spec
+  have h_BD_QD' : seg_congruent B D Q D' := and_snd (between Q R D') (seg_congruent B D Q D') h_D'_spec
+  -- Off-line and side facts for the transferred points.
+  have h_A'_off : Not (on_line A' l) := ray_point_off_line l Q P A' h_Q h_P_off h_QPA'
+  have h_C'_off : Not (on_line C' l) := ray_point_off_line l Q S C' h_Q h_S_off h_QSC'
+  have h_ne_QD' : Not (Eq Point Q D') := between_distinct_ends Q R D' h_QRD'
+  have h_ne_QA' : Not (Eq Point Q A') :=
+    fun h : Eq Point Q A' => h_A'_off (eq_subst Point Q A' (fun Z : Point => on_line Z l) h h_Q)
+  have h_D'_l : on_line D' l :=
+    collinear_point_on_line D' Q R l (between_implies_collinear Q R D' h_QRD') h_Q h_R h_QR
+  -- SAS 1: triangle BAD ≅ triangle QA'D'.
+  have h_PQR_A'QD' : angle_congruent P Q R A' Q D' :=
+    angle_congruent_same_ray_both Q P A' R D'
+      (Or.inl (between Q P A') (between Q A' P) h_QPA')
+      (Or.inl (between Q R D') (between Q D' R) h_QRD')
+  have h_ABD_A'QD' : angle_congruent A B D A' Q D' :=
+    angle_trans A B D P Q R A' Q D' h_ABD_PQR h_PQR_A'QD'
+  have h_SAS1 : And (seg_congruent A D A' D')
+    (And (angle_congruent B A D Q A' D') (angle_congruent B D A Q D' A')) :=
+    SAS B A D Q A' D' h_BA_QA' h_ABD_A'QD' h_BD_QD'
+  have h_AD_A'D' : seg_congruent A D A' D' :=
+    and_fst (seg_congruent A D A' D')
+      (And (angle_congruent B A D Q A' D') (angle_congruent B D A Q D' A')) h_SAS1
+  have h_BAD_QA'D' : angle_congruent B A D Q A' D' :=
+    and_fst (angle_congruent B A D Q A' D') (angle_congruent B D A Q D' A')
+      (and_snd (seg_congruent A D A' D')
+        (And (angle_congruent B A D Q A' D') (angle_congruent B D A Q D' A')) h_SAS1)
+  have h_BDA_QD'A' : angle_congruent B D A Q D' A' :=
+    and_snd (angle_congruent B A D Q A' D') (angle_congruent B D A Q D' A')
+      (and_snd (seg_congruent A D A' D')
+        (And (angle_congruent B A D Q A' D') (angle_congruent B D A Q D' A')) h_SAS1)
+  -- SAS 2: triangle BDC ≅ triangle QD'C'.
+  have h_RQS_D'QC' : angle_congruent R Q S D' Q C' :=
+    angle_congruent_same_ray_both Q R D' S C'
+      (Or.inl (between Q R D') (between Q D' R) h_QRD')
+      (Or.inl (between Q S C') (between Q C' S) h_QSC')
+  have h_DBC_D'QC' : angle_congruent D B C D' Q C' :=
+    angle_trans D B C R Q S D' Q C' h_DBC_RQS h_RQS_D'QC'
+  have h_SAS3 : And (seg_congruent D C D' C')
+    (And (angle_congruent B D C Q D' C') (angle_congruent B C D Q C' D')) :=
+    SAS B D C Q D' C' h_BD_QD' h_DBC_D'QC' h_BC_QC'
+  have h_DC_D'C' : seg_congruent D C D' C' :=
+    and_fst (seg_congruent D C D' C')
+      (And (angle_congruent B D C Q D' C') (angle_congruent B C D Q C' D')) h_SAS3
+  have h_BDC_QD'C' : angle_congruent B D C Q D' C' :=
+    and_fst (angle_congruent B D C Q D' C') (angle_congruent B C D Q C' D')
+      (and_snd (seg_congruent D C D' C')
+        (And (angle_congruent B D C Q D' C') (angle_congruent B C D Q C' D')) h_SAS3)
+  -- A'' on the ray from A' through D' beyond D'.
+  have h_ne_A'D' : Not (Eq Point A' D') :=
+    fun h : Eq Point A' D' => h_A'_off (eq_subst Point A' D' (fun Z : Point => on_line Z l) h h_D'_l)
+  have h_A''_ex : exists (E : Point), And (between A' D' E) (seg_congruent A' D' A' E) :=
+    congruent_transfer A' D' A' D' h_ne_A'D' h_ne_A'D'
+  have A'' : Point := choice Point (fun E : Point => And (between A' D' E) (seg_congruent A' D' A' E)) h_A''_ex
+  have h_A''_spec : And (between A' D' A'') (seg_congruent A' D' A' A'') :=
+    choice_spec Point (fun E : Point => And (between A' D' E) (seg_congruent A' D' A' E)) h_A''_ex
+  have h_A'D'A'' : between A' D' A'' := and_fst (between A' D' A'') (seg_congruent A' D' A' A'') h_A''_spec
+  have h_A''_off : Not (on_line A'' l) := between_point_off_line l A' D' A'' h_D'_l h_A'_off h_A'D'A''
+  -- Supplement chain: angle A''D'Q ≅ angle QD'C'.
+  have h_nc_ADB : Not (collinear A D B) :=
+    fun h : collinear A D B =>
+      h_nc (collinear_shared_merge_fst A D B C h (between_implies_collinear A D C h_ADC) h_ne_AD)
+  have h_ne_D'Q : Not (Eq Point D' Q) := fun h : Eq Point D' Q => h_ne_QD' (eq_sym Point D' Q h)
+  have h_nc_A'D'Q : Not (collinear A' D' Q) :=
+    fun h : collinear A' D' Q =>
+      h_A'_off (collinear_point_on_line A' D' Q l h h_D'_l h_Q h_ne_D'Q)
+  have h_A'D'Q_ADB : angle_congruent A' D' Q A D B :=
+    angle_trans A' D' Q B D A A D B
+      (angle_trans A' D' Q Q D' A' B D A (angle_vertex_swap D' A' Q)
+        (angle_sym B D A Q D' A' h_BDA_QD'A'))
+      (angle_vertex_swap D B A)
+  have h_A''D'Q_CDB : angle_congruent A'' D' Q C D B :=
+    supplement_congruent A' D' Q A D B A'' C h_A'D'A'' h_ADC h_nc_A'D'Q h_nc_ADB h_A'D'Q_ADB
+  have h_A''D'Q_QD'C' : angle_congruent A'' D' Q Q D' C' :=
+    angle_trans A'' D' Q B D C Q D' C'
+      (angle_trans A'' D' Q C D B B D C h_A''D'Q_CDB (angle_vertex_swap D C B))
+      h_BDC_QD'C'
+  have h_QD'A''_QD'C' : angle_congruent Q D' A'' Q D' C' :=
+    angle_trans Q D' A'' A'' D' Q Q D' C' (angle_vertex_swap D' Q A'') h_A''D'Q_QD'C'
+  -- A' and C' lie on opposite sides of l; A'' shares A''-side with C'.
+  have h_opp_A'C' : opposite_side_line l A' C' :=
+    angle_add_opposite l Q P S A' C' h_Q h_P_off h_S_off h_opp_PS h_QPA' h_QSC'
+  have h_opp_A'A'' : opposite_side_line l A' A'' :=
+    Exists.intro Point (fun Y : Point => And (on_line Y l) (between A' Y A'')) D'
+      (And.conj (on_line D' l) (between A' D' A'') h_D'_l h_A'D'A'')
+  have h_ss_A''C' : same_side_line l A'' C' :=
+    opposite_opposite_to_same l A' A'' C' h_A'_off h_opp_A'A'' h_opp_A'C'
+  -- III4 uniqueness: D', A'', C' collinear; hence A', D', C' collinear.
+  have h_col_D'A''C' : collinear D' A'' C' :=
+    angle_congruent_same_side_collinear Q D' C' A'' l h_D'_l h_Q h_ne_QD' h_C'_off
+      h_ss_A''C' h_QD'A''_QD'C'
+  have h_col_A'D'A'' : collinear A' D' A'' := between_implies_collinear A' D' A'' h_A'D'A''
+  have h_col_D'A''A' : collinear D' A'' A' :=
+    collinear_perm3 A' A'' D' (collinear_perm2 A' D' A'' h_col_A'D'A'')
+  have h_ne_D'A'' : Not (Eq Point D' A'') := between_distinct_middle A' D' A'' h_A'D'A''
+  have h_col_D'A'C' : collinear D' A' C' :=
+    collinear_shared_merge_fst D' A'' A' C' h_col_D'A''A' h_col_D'A''C' h_ne_D'A''
+  have h_col_A'D'C' : collinear A' D' C' :=
+    collinear_perm3 C' D' A' (collinear_perm2 C' A' D' (collinear_perm3 D' A' C' h_col_D'A'C'))
+  -- D' is the crossing point of l with segment A'C'.
+  have h_A'D'C' : between A' D' C' :=
+    opposite_between_at_line l A' D' C' h_A'_off h_D'_l h_col_A'D'C' h_opp_A'C'
+  -- III3: AC ≅ A'C'.
+  have h_AC_A'C' : seg_congruent A C A' C' :=
+    congruent_add A D C A' D' C' h_ADC h_A'D'C' h_AD_A'D' h_DC_D'C'
+  -- Final SAS: triangle BAC ≅ triangle QA'C'.
+  have h_BAC_BAD : angle_congruent B A C B A D :=
+    angle_trans B A C D A B B A D
+      (angle_trans B A C C A B D A B (angle_vertex_swap A B C)
+        (angle_sym D A B C A B
+          (angle_congruent_same_ray A D C B (Or.inl (between A D C) (between A C D) h_ADC))))
+      (angle_vertex_swap A D B)
+  have h_QA'D'_QA'C' : angle_congruent Q A' D' Q A' C' :=
+    angle_trans Q A' D' C' A' Q Q A' C'
+      (angle_trans Q A' D' D' A' Q C' A' Q (angle_vertex_swap A' Q D')
+        (angle_congruent_same_ray A' D' C' Q (Or.inl (between A' D' C') (between A' C' D') h_A'D'C')))
+      (angle_vertex_swap A' C' Q)
+  have h_BAC_QA'C' : angle_congruent B A C Q A' C' :=
+    angle_trans B A C Q A' D' Q A' C'
+      (angle_trans B A C B A D Q A' D' h_BAC_BAD h_BAD_QA'D') h_QA'D'_QA'C'
+  have h_AB_A'Q : seg_congruent A B A' Q := congruent_swap_both B A Q A' h_ne_BA h_ne_QA' h_BA_QA'
+  have h_SAS2 : And (seg_congruent B C Q C')
+    (And (angle_congruent A B C A' Q C') (angle_congruent A C B A' C' Q)) :=
+    SAS A B C A' Q C' h_AB_A'Q h_BAC_QA'C' h_AC_A'C'
+  have h_ABC_A'QC' : angle_congruent A B C A' Q C' :=
+    and_fst (angle_congruent A B C A' Q C') (angle_congruent A C B A' C' Q)
+      (and_snd (seg_congruent B C Q C')
+        (And (angle_congruent A B C A' Q C') (angle_congruent A C B A' C' Q)) h_SAS2)
+  -- Move A', C' back along the rays QP, QS.
+  have h_PQS_A'QC' : angle_congruent P Q S A' Q C' :=
+    angle_congruent_same_ray_both Q P A' S C'
+      (Or.inl (between Q P A') (between Q A' P) h_QPA')
+      (Or.inl (between Q S C') (between Q C' S) h_QSC')
+  exact (angle_trans A B C A' Q C' P Q S h_ABC_A'QC'
+    (angle_sym P Q S A' Q C' h_PQS_A'QC'))

@@ -1,0 +1,1076 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+import GeometryCommon.Angle
+import GeometryCommon.Midpoint
+
+-- =====================================================================
+-- 20. Quadrilateral definitions
+-- =====================================================================
+
+-- Four points form a quadrilateral (no three collinear)
+def quadrilateral (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
+  And (Not (collinear A B C))
+    (And (Not (collinear B C D))
+      (And (Not (collinear C D A))
+        (Not (collinear D A B))))
+
+-- Parallelogram: both pairs of opposite sides are parallel (segment-wise).
+def segment_parallel (D : Point) (E : Point) (B : Point) (C : Point) : Prop :=
+  exists (l : Line), exists (m : Line),
+    And (on_line D l) (And (on_line E l)
+      (And (on_line B m) (And (on_line C m) (parallel l m))))
+
+-- Swapping the two points on the first line preserves segment parallelism.
+theorem segment_parallel_perm_fst : forall (D E B C : Point),
+  segment_parallel D E B C -> segment_parallel E D B C := by
+  intro D
+  intro E
+  intro B
+  intro C
+  intro h
+  exact h
+
+-- Swapping the two points on the second line preserves segment parallelism.
+theorem segment_parallel_perm_snd : forall (D E B C : Point),
+  segment_parallel D E B C -> segment_parallel D E C B := by
+  intro D
+  intro E
+  intro B
+  intro C
+  intro h
+  exact h
+
+-- Build a segment_parallel witness from two parallel lines and the incidence facts.
+theorem segment_parallel_from_lines : forall (A B C D : Point) (l m : Line),
+  on_line A l -> on_line B l -> on_line C m -> on_line D m -> parallel l m ->
+  segment_parallel A B C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro l
+  intro m
+  intro h_A
+  intro h_B
+  intro h_C
+  intro h_D
+  intro h_p
+  exact (Exists.intro Line (fun l' : Line => exists (m' : Line),
+    And (on_line A l') (And (on_line B l') (And (on_line C m') (And (on_line D m') (parallel l' m'))))) l
+    (Exists.intro Line (fun m' : Line =>
+      And (on_line A l) (And (on_line B l) (And (on_line C m') (And (on_line D m') (parallel l m'))))) m
+      (And.conj (on_line A l) (And (on_line B l) (And (on_line C m) (And (on_line D m) (parallel l m))))
+        h_A
+        (And.conj (on_line B l) (And (on_line C m) (And (on_line D m) (parallel l m))) h_B
+          (And.conj (on_line C m) (And (on_line D m) (parallel l m)) h_C
+            (And.conj (on_line D m) (parallel l m) h_D h_p))))))
+
+def parallelogram (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
+  And (segment_parallel A B C D) (segment_parallel B C D A)
+
+-- Rectangle: parallelogram with a right angle
+def rectangle (A : Point) (B : Point) (C : Point) (D : Point) : Prop :=
+  And (parallelogram A B C D)
+    (right_angle D A B)
+
+-- A quadrilateral contains two non-collinear triangles sharing a diagonal.
+theorem quadrilateral_triangle_ACD : forall (A B C D : Point),
+  quadrilateral A B C D -> triangle A C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_snd (Not (collinear C D A))
+    (Not (collinear D A B))
+    (and_snd (Not (collinear B C D))
+      (And (Not (collinear C D A)) (Not (collinear D A B)))
+      (and_snd (Not (collinear A B C))
+        (And (Not (collinear B C D)) (And (Not (collinear C D A)) (Not (collinear D A B))))
+        h)))
+
+-- Similarly, A, B, C are non-collinear.
+theorem quadrilateral_triangle_ABC : forall (A B C D : Point),
+  quadrilateral A B C D -> triangle A B C := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_fst (Not (collinear A B C))
+    (And (Not (collinear B C D)) (And (Not (collinear C D A)) (Not (collinear D A B))))
+    h)
+
+-- A, B, D are non-collinear.
+theorem quadrilateral_triangle_ABD : forall (A B C D : Point),
+  quadrilateral A B C D -> triangle A B D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_snd (Not (collinear C D A))
+    (Not (collinear D A B))
+    (and_snd (Not (collinear B C D))
+      (And (Not (collinear C D A)) (Not (collinear D A B)))
+      (and_snd (Not (collinear A B C))
+        (And (Not (collinear B C D)) (And (Not (collinear C D A)) (Not (collinear D A B))))
+        h)))
+
+-- B, C, D are non-collinear.
+theorem quadrilateral_triangle_BCD : forall (A B C D : Point),
+  quadrilateral A B C D -> triangle B C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  exact (and_fst (Not (collinear B C D))
+    (And (Not (collinear C D A)) (Not (collinear D A B)))
+    (and_snd (Not (collinear A B C))
+      (And (Not (collinear B C D)) (And (Not (collinear C D A)) (Not (collinear D A B))))
+      h))
+
+
+-- =====================================================================
+-- 21. Derived theorems from SSS
+-- =====================================================================
+
+-- =====================================================================
+-- 21. Derived theorems from SSS
+-- =====================================================================
+
+-- If one pair of opposite sides of a quadrilateral are congruent and parallel,
+-- the quadrilateral is a parallelogram.
+-- Proof: draw diagonal AC.  By SAS, triangles ABC and CDA are congruent,
+-- so BC ≅ DA and the alternate interior angles are congruent, hence BC ∥ DA.
+theorem parallelogram_from_pair : forall (A B C D : Point),
+  Not (collinear A B C) ->
+  seg_congruent A B D C ->
+  (exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m))))) ->
+  parallelogram A B C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_noncol
+  intro h_AB_DC
+  intro h_parallel
+  have h_l_ex : exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m)))) := h_parallel
+  have l_AB : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m))))) h_l_ex
+  have h_l_AB_spec : exists (m : Line),
+    And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m) (And (on_line C m) (parallel l_AB m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m))))) h_l_ex
+  have m_CD : Line := choice Line (fun m : Line =>
+    And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m) (And (on_line C m) (parallel l_AB m))))) h_l_AB_spec
+  have h_m_CD_spec : And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m) (And (on_line C m) (parallel l_AB m))))) h_l_AB_spec
+
+
+  -- Non-collinearity gives the pairwise distinctness of A, B, C.
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_noncol
+  have h_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist
+  have h_BC : Not (Eq Point B C) :=
+    and_fst (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+  have h_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+
+  -- Extract incidence facts for the given parallel pair AB || DC.
+  have h_A_lAB : on_line A l_AB :=
+    and_fst (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)))) h_m_CD_spec
+  have h_rest1 : And (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD))) :=
+    and_snd (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)))) h_m_CD_spec
+  have h_B_lAB : on_line B l_AB :=
+    and_fst (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD))) h_rest1
+  have h_rest2 : And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)) :=
+    and_snd (on_line B l_AB) (And (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD))) h_rest1
+  have h_D_mCD : on_line D m_CD :=
+    and_fst (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)) h_rest2
+  have h_rest3 : And (on_line C m_CD) (parallel l_AB m_CD) :=
+    and_snd (on_line D m_CD) (And (on_line C m_CD) (parallel l_AB m_CD)) h_rest2
+  have h_C_mCD : on_line C m_CD :=
+    and_fst (on_line C m_CD) (parallel l_AB m_CD) h_rest3
+  have h_parallel_AB_CD : parallel l_AB m_CD :=
+    and_snd (on_line C m_CD) (parallel l_AB m_CD) h_rest3
+
+  -- Diagonal AC serves as the transversal.
+  have h_AC_line : exists (t : Line), And (on_line A t) (on_line C t) := line_exists A C
+  have t_AC : Line := choice Line (fun t : Line => And (on_line A t) (on_line C t)) h_AC_line
+  have h_t_AC : And (on_line A t_AC) (on_line C t_AC) :=
+    choice_spec Line (fun t : Line => And (on_line A t) (on_line C t)) h_AC_line
+  have h_A_tAC : on_line A t_AC :=
+    and_fst (on_line A t_AC) (on_line C t_AC) h_t_AC
+  have h_C_tAC : on_line C t_AC :=
+    and_snd (on_line A t_AC) (on_line C t_AC) h_t_AC
+
+  -- Construct the remaining sides BC and DA.
+  have h_BC_line : exists (l : Line), And (on_line B l) (on_line C l) := line_exists B C
+  have l_BC : Line := choice Line (fun l : Line => And (on_line B l) (on_line C l)) h_BC_line
+  have h_l_BC : And (on_line B l_BC) (on_line C l_BC) :=
+    choice_spec Line (fun l : Line => And (on_line B l) (on_line C l)) h_BC_line
+  have h_B_lBC : on_line B l_BC :=
+    and_fst (on_line B l_BC) (on_line C l_BC) h_l_BC
+  have h_C_lBC : on_line C l_BC :=
+    and_snd (on_line B l_BC) (on_line C l_BC) h_l_BC
+
+  have h_DA_line : exists (p : Line), And (on_line D p) (on_line A p) := line_exists D A
+  have p_DA : Line := choice Line (fun p : Line => And (on_line D p) (on_line A p)) h_DA_line
+  have h_p_DA : And (on_line D p_DA) (on_line A p_DA) :=
+    choice_spec Line (fun p : Line => And (on_line D p) (on_line A p)) h_DA_line
+  have h_D_pDA : on_line D p_DA :=
+    and_fst (on_line D p_DA) (on_line A p_DA) h_p_DA
+  have h_A_pDA : on_line A p_DA :=
+    and_snd (on_line D p_DA) (on_line A p_DA) h_p_DA
+
+  -- Reorder the first side so that BA corresponds to DC in the SAS application.
+  have h_AB_BA : seg_congruent A B B A := congruent_swap A B h_AB
+  have h_BA_AB : seg_congruent B A A B := congruent_sym A B B A h_AB_BA
+  have h_BA_DC : seg_congruent B A D C := congruent_trans B A A B D C h_BA_AB h_AB_DC
+
+  -- Alternate interior angles from AB || DC and transversal AC.
+  have h_BAC_DCA : angle_congruent B A C D C A :=
+    alternate_interior_angles A C B D l_AB m_CD t_AC
+      h_A_lAB h_B_lAB h_C_mCD h_D_mCD h_A_tAC h_C_tAC h_AC h_parallel_AB_CD
+
+  -- The diagonal is congruent to itself with swapped endpoints.
+  have h_AC_CA : seg_congruent A C C A := congruent_swap A C h_AC
+
+  -- Apply SAS to triangles BAC and DCA.
+  -- The third output angle is the alternate-interior equality BCA ≅ DAC.
+  have h_SAS : And (seg_congruent A C C A)
+    (And (angle_congruent B A C D C A) (angle_congruent B C A D A C)) :=
+    SAS B A C D C A h_BA_DC h_BAC_DCA h_AC_CA
+  have h_BCA_DAC : angle_congruent B C A D A C :=
+    and_snd (angle_congruent B A C D C A) (angle_congruent B C A D A C)
+      (and_snd (seg_congruent A C C A)
+        (And (angle_congruent B A C D C A) (angle_congruent B C A D A C))
+        h_SAS)
+
+  -- Therefore BC || DA by the alternate-interior-angle converse.
+  have h_CA : Not (Eq Point C A) :=
+    fun h_eq : Eq Point C A => h_AC (eq_sym Point C A h_eq)
+  have h_parallel_BC_DA : parallel l_BC p_DA :=
+    alternate_interior_converse C A B D l_BC p_DA t_AC
+      h_C_lBC h_B_lBC h_A_pDA h_D_pDA h_C_tAC h_A_tAC h_CA h_BCA_DAC
+
+  -- Both pairs of opposite sides are parallel.
+  exact (And.conj (segment_parallel A B C D) (segment_parallel B C D A)
+    (segment_parallel_from_lines A B C D l_AB m_CD h_A_lAB h_B_lAB h_C_mCD h_D_mCD h_parallel_AB_CD)
+    (segment_parallel_from_lines B C D A l_BC p_DA h_B_lBC h_C_lBC h_D_pDA h_A_pDA h_parallel_BC_DA))
+
+-- =====================================================================
+-- 21b. Segment-parallel swap and parallel uniqueness
+-- =====================================================================
+
+-- Swap the two parallel lines in a segment_parallel witness.
+theorem segment_parallel_swap : forall (A B C D : Point),
+  segment_parallel A B C D -> segment_parallel C D A B := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h
+  have h_ex : exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l)
+      (And (on_line C m) (And (on_line D m) (parallel l m)))) := h
+  have l_AB : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line A l) (And (on_line B l)
+      (And (on_line C m) (And (on_line D m) (parallel l m))))) h_ex
+  have h_l_spec : exists (m : Line),
+    And (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m) (And (on_line D m) (parallel l_AB m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line A l) (And (on_line B l)
+        (And (on_line C m) (And (on_line D m) (parallel l m))))) h_ex
+  have m_CD : Line := choice Line (fun m : Line =>
+    And (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m) (And (on_line D m) (parallel l_AB m))))) h_l_spec
+  have h_m_spec : And (on_line A l_AB) (And (on_line B l_AB)
+    (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line A l_AB) (And (on_line B l_AB)
+        (And (on_line C m) (And (on_line D m) (parallel l_AB m))))) h_l_spec
+  have h_A_l : on_line A l_AB :=
+    and_fst (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec
+  have h_rest1 : And (on_line B l_AB)
+    (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD))) :=
+    and_snd (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec
+  have h_B_l : on_line B l_AB :=
+    and_fst (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD))) h_rest1
+  have h_rest2 : And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) :=
+    and_snd (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD))) h_rest1
+  have h_C_m : on_line C m_CD :=
+    and_fst (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) h_rest2
+  have h_rest3 : And (on_line D m_CD) (parallel l_AB m_CD) :=
+    and_snd (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) h_rest2
+  have h_D_m : on_line D m_CD :=
+    and_fst (on_line D m_CD) (parallel l_AB m_CD) h_rest3
+  have h_para : parallel l_AB m_CD :=
+    and_snd (on_line D m_CD) (parallel l_AB m_CD) h_rest3
+  exact (Exists.intro Line (fun l' : Line => exists (m' : Line),
+    And (on_line C l') (And (on_line D l')
+      (And (on_line A m') (And (on_line B m') (parallel l' m'))))) m_CD
+    (Exists.intro Line (fun m' : Line =>
+      And (on_line C m_CD) (And (on_line D m_CD)
+        (And (on_line A m') (And (on_line B m') (parallel m_CD m'))))) l_AB
+      (And.conj (on_line C m_CD) (And (on_line D m_CD)
+        (And (on_line A l_AB) (And (on_line B l_AB) (parallel m_CD l_AB))))
+        h_C_m
+        (And.conj (on_line D m_CD)
+          (And (on_line A l_AB) (And (on_line B l_AB) (parallel m_CD l_AB)))
+          h_D_m
+          (And.conj (on_line A l_AB) (And (on_line B l_AB) (parallel m_CD l_AB))
+            h_A_l
+            (And.conj (on_line B l_AB) (parallel m_CD l_AB) h_B_l
+              (parallel_sym l_AB m_CD h_para)))))))
+
+-- Through a point not on a line there is at most one parallel line.
+theorem parallel_unique_through_point : forall (l : Line) (P : Point),
+  Not (on_line P l) ->
+  forall (m1 m2 : Line),
+    on_line P m1 -> on_line P m2 ->
+    parallel l m1 -> parallel l m2 ->
+    Eq Line m1 m2 := by
+  intro l
+  intro P
+  intro h_P_not_l
+  intro m1
+  intro m2
+  intro h_P_m1
+  intro h_P_m2
+  intro h_lm1
+  intro h_lm2
+  have h_playfair : exists (p : Line),
+    And (on_line P p) (And (parallel l p)
+      (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line p m')) :=
+    playfair l P h_P_not_l
+  have p : Line := choice Line (fun p : Line =>
+    And (on_line P p) (And (parallel l p)
+      (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line p m'))) h_playfair
+  have h_p_spec : And (on_line P p) (And (parallel l p)
+    (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line p m')) :=
+    choice_spec Line (fun p : Line =>
+      And (on_line P p) (And (parallel l p)
+        (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line p m'))) h_playfair
+  have h_uniq : forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line p m' :=
+    and_snd (parallel l p)
+      (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line p m')
+      (and_snd (on_line P p)
+        (And (parallel l p)
+          (forall (m' : Line), on_line P m' -> parallel l m' -> Eq Line p m'))
+        h_p_spec)
+  have h_p_eq_m1 : Eq Line p m1 := h_uniq m1 h_P_m1 h_lm1
+  have h_p_eq_m2 : Eq Line p m2 := h_uniq m2 h_P_m2 h_lm2
+  exact (eq_trans Line m1 p m2 (eq_sym Line p m1 h_p_eq_m1) h_p_eq_m2)
+
+-- =====================================================================
+-- 21c. Opposite sides of a parallelogram are congruent
+-- =====================================================================
+
+-- In a parallelogram, both pairs of opposite sides are congruent.
+theorem parallelogram_opposite_sides_congruent : forall (A B C D : Point),
+  Not (collinear A B C) ->
+  parallelogram A B C D ->
+  And (seg_congruent A B C D) (seg_congruent B C D A) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_noncol
+  intro h_para
+  have h_AB_CD : segment_parallel A B C D :=
+    and_fst (segment_parallel A B C D) (segment_parallel B C D A) h_para
+  have h_BC_DA : segment_parallel B C D A :=
+    and_snd (segment_parallel A B C D) (segment_parallel B C D A) h_para
+  -- Distinctness from the triangle hypothesis.
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_noncol
+  have h_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist
+  have h_BC : Not (Eq Point B C) :=
+    and_fst (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+  have h_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+  have h_CA : Not (Eq Point C A) :=
+    fun h_eq : Eq Point C A => h_AC (eq_sym Point C A h_eq)
+
+  -- Extract the parallel pair AB || CD.
+  have h_l_ex : exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l)
+      (And (on_line C m) (And (on_line D m) (parallel l m)))) := h_AB_CD
+  have l_AB : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line A l) (And (on_line B l)
+      (And (on_line C m) (And (on_line D m) (parallel l m))))) h_l_ex
+  have h_l_spec : exists (m : Line),
+    And (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m) (And (on_line D m) (parallel l_AB m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line A l) (And (on_line B l)
+        (And (on_line C m) (And (on_line D m) (parallel l m))))) h_l_ex
+  have m_CD : Line := choice Line (fun m : Line =>
+    And (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m) (And (on_line D m) (parallel l_AB m))))) h_l_spec
+  have h_m_spec : And (on_line A l_AB) (And (on_line B l_AB)
+    (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line A l_AB) (And (on_line B l_AB)
+        (And (on_line C m) (And (on_line D m) (parallel l_AB m))))) h_l_spec
+  have h_A_lAB : on_line A l_AB :=
+    and_fst (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec
+  have h_rest1 : And (on_line B l_AB)
+    (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD))) :=
+    and_snd (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec
+  have h_B_lAB : on_line B l_AB :=
+    and_fst (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD))) h_rest1
+  have h_rest2 : And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) :=
+    and_snd (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD))) h_rest1
+  have h_C_mCD : on_line C m_CD :=
+    and_fst (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) h_rest2
+  have h_rest3 : And (on_line D m_CD) (parallel l_AB m_CD) :=
+    and_snd (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) h_rest2
+  have h_D_mCD : on_line D m_CD :=
+    and_fst (on_line D m_CD) (parallel l_AB m_CD) h_rest3
+  have h_para_AB_CD : parallel l_AB m_CD :=
+    and_snd (on_line D m_CD) (parallel l_AB m_CD) h_rest3
+
+  -- Extract the parallel pair BC || DA.
+  have h_p_ex : exists (l : Line), exists (m : Line),
+    And (on_line B l) (And (on_line C l)
+      (And (on_line D m) (And (on_line A m) (parallel l m)))) := h_BC_DA
+  have l_BC : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line B l) (And (on_line C l)
+      (And (on_line D m) (And (on_line A m) (parallel l m))))) h_p_ex
+  have h_p_spec : exists (m : Line),
+    And (on_line B l_BC) (And (on_line C l_BC)
+      (And (on_line D m) (And (on_line A m) (parallel l_BC m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line B l) (And (on_line C l)
+        (And (on_line D m) (And (on_line A m) (parallel l m))))) h_p_ex
+  have p_DA : Line := choice Line (fun m : Line =>
+    And (on_line B l_BC) (And (on_line C l_BC)
+      (And (on_line D m) (And (on_line A m) (parallel l_BC m))))) h_p_spec
+  have h_pDA_spec : And (on_line B l_BC) (And (on_line C l_BC)
+    (And (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line B l_BC) (And (on_line C l_BC)
+        (And (on_line D m) (And (on_line A m) (parallel l_BC m))))) h_p_spec
+  have h_B_lBC : on_line B l_BC :=
+    and_fst (on_line B l_BC) (And (on_line C l_BC)
+      (And (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA)))) h_pDA_spec
+  have h_restp1 : And (on_line C l_BC)
+    (And (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA))) :=
+    and_snd (on_line B l_BC) (And (on_line C l_BC)
+      (And (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA)))) h_pDA_spec
+  have h_C_lBC : on_line C l_BC :=
+    and_fst (on_line C l_BC)
+      (And (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA))) h_restp1
+  have h_restp2 : And (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA)) :=
+    and_snd (on_line C l_BC)
+      (And (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA))) h_restp1
+  have h_D_pDA : on_line D p_DA :=
+    and_fst (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA)) h_restp2
+  have h_restp3 : And (on_line A p_DA) (parallel l_BC p_DA) :=
+    and_snd (on_line D p_DA) (And (on_line A p_DA) (parallel l_BC p_DA)) h_restp2
+  have h_A_pDA : on_line A p_DA :=
+    and_fst (on_line A p_DA) (parallel l_BC p_DA) h_restp3
+  have h_para_BC_DA : parallel l_BC p_DA :=
+    and_snd (on_line A p_DA) (parallel l_BC p_DA) h_restp3
+
+  -- Diagonal AC.
+  have h_t_ex : exists (t : Line), And (on_line A t) (on_line C t) := line_exists A C
+  have t_AC : Line := choice Line (fun t : Line => And (on_line A t) (on_line C t)) h_t_ex
+  have h_t_spec : And (on_line A t_AC) (on_line C t_AC) :=
+    choice_spec Line (fun t : Line => And (on_line A t) (on_line C t)) h_t_ex
+  have h_A_tAC : on_line A t_AC :=
+    and_fst (on_line A t_AC) (on_line C t_AC) h_t_spec
+  have h_C_tAC : on_line C t_AC :=
+    and_snd (on_line A t_AC) (on_line C t_AC) h_t_spec
+
+  -- Alternate interior angles from AB || CD with transversal AC.
+  have h_BAC_DCA : angle_congruent B A C D C A :=
+    alternate_interior_angles A C B D l_AB m_CD t_AC
+      h_A_lAB h_B_lAB h_C_mCD h_D_mCD h_A_tAC h_C_tAC h_AC h_para_AB_CD
+  -- Convert to the form needed for ASA.
+  have h_CAB_ACD : angle_congruent C A B A C D :=
+    angle_trans A C B A B C C A D
+      (angle_vertex_swap A C B)
+      (angle_trans A B C C D A A C D h_BAC_DCA (angle_vertex_swap C D A))
+
+  -- Alternate interior angles from BC || DA with transversal AC.
+  have h_BCA_DAC : angle_congruent B C A D A C :=
+    alternate_interior_angles C A B D l_BC p_DA t_AC
+      h_C_lBC h_B_lBC h_D_pDA h_A_pDA h_C_tAC h_A_tAC h_CA h_para_BC_DA
+  -- Convert to the form needed for ASA.
+  have h_ACB_CAD : angle_congruent A C B C A D :=
+    angle_trans C A B C B A A C D
+      (angle_sym B C A A C B (angle_vertex_swap C B A))
+      (angle_trans C B A A D C C A D h_BCA_DAC (angle_vertex_swap A D C))
+
+  -- Common side AC ≅ CA.
+  have h_AC_CA : seg_congruent A C C A := congruent_swap A C h_AC
+
+  -- ASA on triangles ACB and CAD gives AB ≅ CD.
+  -- Non-degeneracy for ASA: B is off diagonal AC (from h_noncol), and C ≠ D
+  -- (otherwise BC || DA collapses onto a common line through C, forcing
+  -- A, B, C collinear).
+  have h_nc_ACB : Not (collinear A C B) := fun h : collinear A C B => h_noncol h
+  have h_ne_CD : Not (Eq Point C D) :=
+    fun h_eq : Eq Point C D =>
+      exists_elim_prop Line (fun l : Line => exists (m : Line), And (on_line B l) (And (on_line C l) (And (on_line D m) (And (on_line A m) (parallel l m))))) False
+        (fun l_BC2 : Line =>
+          fun h_lBC : exists (m : Line), And (on_line B l_BC2) (And (on_line C l_BC2) (And (on_line D m) (And (on_line A m) (parallel l_BC2 m)))) =>
+            exists_elim_prop Line (fun m : Line => And (on_line B l_BC2) (And (on_line C l_BC2) (And (on_line D m) (And (on_line A m) (parallel l_BC2 m))))) False
+              (fun p_DA2 : Line =>
+                fun h_pDA : And (on_line B l_BC2) (And (on_line C l_BC2) (And (on_line D p_DA2) (And (on_line A p_DA2) (parallel l_BC2 p_DA2)))) =>
+                  let h_r1 : And (on_line C l_BC2) (And (on_line D p_DA2) (And (on_line A p_DA2) (parallel l_BC2 p_DA2))) :=
+                    and_snd (on_line B l_BC2) (And (on_line C l_BC2) (And (on_line D p_DA2) (And (on_line A p_DA2) (parallel l_BC2 p_DA2)))) h_pDA in
+                  let h_C_lBC : on_line C l_BC2 := and_fst (on_line C l_BC2) (And (on_line D p_DA2) (And (on_line A p_DA2) (parallel l_BC2 p_DA2))) h_r1 in
+                  let h_r2 : And (on_line D p_DA2) (And (on_line A p_DA2) (parallel l_BC2 p_DA2)) :=
+                    and_snd (on_line C l_BC2) (And (on_line D p_DA2) (And (on_line A p_DA2) (parallel l_BC2 p_DA2))) h_r1 in
+                  let h_D_pDA : on_line D p_DA2 := and_fst (on_line D p_DA2) (And (on_line A p_DA2) (parallel l_BC2 p_DA2)) h_r2 in
+                  let h_r3 : And (on_line A p_DA2) (parallel l_BC2 p_DA2) := and_snd (on_line D p_DA2) (And (on_line A p_DA2) (parallel l_BC2 p_DA2)) h_r2 in
+                  let h_para : parallel l_BC2 p_DA2 := and_snd (on_line A p_DA2) (parallel l_BC2 p_DA2) h_r3 in
+                  let h_C_pDA : on_line C p_DA2 := eq_subst Point D C (fun Z : Point => on_line Z p_DA2) (eq_sym Point C D h_eq) h_D_pDA in
+                  h_para C (And.conj (on_line C l_BC2) (on_line C p_DA2) h_C_lBC h_C_pDA))
+              h_lBC)
+        h_BC_DA
+  have h_ASA : seg_congruent A B C D :=
+    ASA A C B C A D h_nc_ACB h_ne_CD h_CAB_ACD h_AC_CA h_ACB_CAD
+
+  -- SAS on triangles ABC and CDA gives BC ≅ DA.
+  have h_SAS : And (seg_congruent B C D A)
+    (And (angle_congruent A B C C D A) (angle_congruent A C B C A D)) :=
+    SAS A B C C D A h_ASA h_BAC_DCA h_AC_CA
+  have h_BC_DA : seg_congruent B C D A :=
+    and_fst (seg_congruent B C D A)
+      (And (angle_congruent A B C C D A) (angle_congruent A C B C A D))
+      h_SAS
+
+  exact (And.conj (seg_congruent A B C D) (seg_congruent B C D A) h_ASA h_BC_DA)
+
+-- =====================================================================
+-- 20. Parallelogram from diagonals
+-- =====================================================================
+
+theorem parallelogram_from_diagonals : forall (A B C D M : Point),
+  Not (collinear A B C) ->
+  midpoint M A C ->
+  midpoint M B D ->
+  parallelogram A B C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro M
+  intro h_nocol
+  intro h_mid_AC
+  intro h_mid_BD
+
+  -- Half-diagonal facts from the two midpoints.
+  have h_AMC : between A M C := and_fst (between A M C) (seg_congruent A M M C) h_mid_AC
+  have h_AM_MC : seg_congruent A M M C := and_snd (between A M C) (seg_congruent A M M C) h_mid_AC
+  have h_BMD : between B M D := and_fst (between B M D) (seg_congruent B M M D) h_mid_BD
+  have h_BM_MD : seg_congruent B M M D := and_snd (between B M D) (seg_congruent B M M D) h_mid_BD
+
+  -- Extract pairwise distinctness from the triangle hypothesis.
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_nocol
+  have h_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist
+  have h_BD : Not (Eq Point B D) := between_distinct_middle B M D h_BMD
+
+  -- C and D cannot coincide, otherwise M would be the midpoint of both A C and B C,
+  -- forcing A = B by reflection uniqueness.
+  have h_CD : Not (Eq Point C D) := fun h_eq : Eq Point C D =>
+    let h_mid_CA : midpoint M C A := midpoint_sym M A C h_mid_AC in
+    let h_mid_CB : midpoint M C B := eq_subst Point D C (fun x : Point => midpoint M x B)
+      (eq_sym Point C D h_eq) (midpoint_sym M B D h_mid_BD) in
+    let h_A_eq_B : Eq Point A B := midpoint_reflection_unique M C A B h_mid_CA h_mid_CB in
+    h_AB h_A_eq_B
+
+  -- A, M, B are not collinear, otherwise A, B, C would be collinear.
+  have h_nocol_AMB : Not (collinear A M B) :=
+    fun h_col : collinear A M B =>
+      let h_col_AMC : collinear A M C := between_implies_collinear A M C h_AMC in
+      let h_AM : Not (Eq Point A M) := between_distinct_first A M C h_AMC in
+      let h_col_ACB : collinear A C B := collinear_shared_merge_fst A M C B h_col_AMC h_col h_AM in
+      h_nocol (collinear_perm2 A B C h_col_ACB)
+
+  -- Vertical angles at M.
+  have h_vert : angle_congruent A M B C M D :=
+    vertical_angles A C B D M h_AMC h_BMD h_nocol_AMB
+
+  -- Side M A ≅ M C for SAS.
+  have h_AM : Not (Eq Point A M) := between_distinct_first A M C h_AMC
+  have h_MA : Not (Eq Point M A) := fun h_eq : Eq Point M A => h_AM (eq_sym Point M A h_eq)
+  have h_MA_AM : seg_congruent M A A M := congruent_swap M A h_MA
+  have h_MA_MC : seg_congruent M A M C := congruent_trans M A A M M C h_MA_AM h_AM_MC
+
+  -- Side M B ≅ M D for SAS.
+  have h_BM : Not (Eq Point B M) := between_distinct_first B M D h_BMD
+  have h_MB : Not (Eq Point M B) := fun h_eq : Eq Point M B => h_BM (eq_sym Point M B h_eq)
+  have h_MB_BM : seg_congruent M B B M := congruent_swap M B h_MB
+  have h_MB_MD : seg_congruent M B M D := congruent_trans M B B M M D h_MB_BM h_BM_MD
+
+  -- SAS: triangles MAB and MCD are congruent.
+  have h_SAS : And (seg_congruent A B C D)
+    (And (angle_congruent M A B M C D) (angle_congruent M B A M D C)) :=
+    SAS M A B M C D h_MA_MC h_vert h_MB_MD
+  have h_AB_CD : seg_congruent A B C D :=
+    and_fst (seg_congruent A B C D)
+      (And (angle_congruent M A B M C D) (angle_congruent M B A M D C))
+      h_SAS
+  have h_MAB_MCD : angle_congruent M A B M C D :=
+    and_fst (angle_congruent M A B M C D) (angle_congruent M B A M D C)
+      (and_snd (seg_congruent A B C D)
+        (And (angle_congruent M A B M C D) (angle_congruent M B A M D C))
+        h_SAS)
+
+  -- Convert the congruent angles at A and C into alternate interior angles
+  -- for the transversal AC: ∠BAC ≅ ∠DCA.
+  have h_MAB_CAB : angle_congruent M A B C A B :=
+    angle_congruent_same_ray A M C B (Or.inl (between A M C) (between A C M) h_AMC)
+  have h_CAB_MAB : angle_congruent C A B M A B := angle_sym M A B C A B h_MAB_CAB
+  have h_BAC_CAB : angle_congruent B A C C A B :=
+    angle_sym C A B B A C (angle_vertex_swap A C B)
+  have h_BAC_MAB : angle_congruent B A C M A B :=
+    angle_trans B A C C A B M A B h_BAC_CAB h_CAB_MAB
+  have h_CMA : between C M A := between_sym A M C h_AMC
+  have h_MCD_ACD : angle_congruent M C D A C D :=
+    angle_congruent_same_ray C M A D (Or.inl (between C M A) (between C A M) h_CMA)
+  have h_ACD_MCD : angle_congruent A C D M C D := angle_sym M C D A C D h_MCD_ACD
+  have h_DCA_ACD : angle_congruent D C A A C D :=
+    angle_sym A C D D C A (angle_vertex_swap C A D)
+  have h_DCA_MCD : angle_congruent D C A M C D :=
+    angle_trans D C A A C D M C D h_DCA_ACD h_ACD_MCD
+  have h_BAC_MCD : angle_congruent B A C M C D :=
+    angle_trans B A C M A B M C D h_BAC_MAB h_MAB_MCD
+  have h_BAC_DCA : angle_congruent B A C D C A :=
+    angle_trans B A C M C D D C A h_BAC_MCD (angle_sym D C A M C D h_DCA_MCD)
+
+  -- Build the lines AB, CD, and AC.
+  have h_l_AB_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l_AB : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_l_AB_ex
+  have h_l_AB_spec : And (on_line A l_AB) (on_line B l_AB) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_l_AB_ex
+  have h_A_lAB : on_line A l_AB := and_fst (on_line A l_AB) (on_line B l_AB) h_l_AB_spec
+  have h_B_lAB : on_line B l_AB := and_snd (on_line A l_AB) (on_line B l_AB) h_l_AB_spec
+
+  have h_l_CD_ex : exists (l : Line), And (on_line C l) (on_line D l) := line_exists C D
+  have l_CD : Line := choice Line (fun l : Line => And (on_line C l) (on_line D l)) h_l_CD_ex
+  have h_l_CD_spec : And (on_line C l_CD) (on_line D l_CD) :=
+    choice_spec Line (fun l : Line => And (on_line C l) (on_line D l)) h_l_CD_ex
+  have h_C_lCD : on_line C l_CD := and_fst (on_line C l_CD) (on_line D l_CD) h_l_CD_spec
+  have h_D_lCD : on_line D l_CD := and_snd (on_line C l_CD) (on_line D l_CD) h_l_CD_spec
+
+  have h_l_AC_ex : exists (l : Line), And (on_line A l) (on_line C l) := line_exists A C
+  have l_AC : Line := choice Line (fun l : Line => And (on_line A l) (on_line C l)) h_l_AC_ex
+  have h_l_AC_spec : And (on_line A l_AC) (on_line C l_AC) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (on_line C l)) h_l_AC_ex
+  have h_A_lAC : on_line A l_AC := and_fst (on_line A l_AC) (on_line C l_AC) h_l_AC_spec
+  have h_C_lAC : on_line C l_AC := and_snd (on_line A l_AC) (on_line C l_AC) h_l_AC_spec
+
+  -- Apply the converse of the alternate-interior-angle theorem.
+  have h_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+        (triangle_nondegenerate A B C h_nocol))
+  have h_parallel_AB_CD : parallel l_AB l_CD :=
+    alternate_interior_converse A C B D l_AB l_CD l_AC
+      h_A_lAB h_B_lAB h_C_lCD h_D_lCD h_A_lAC h_C_lAC h_AC h_BAC_DCA
+
+  -- Reorder the congruence to match the one-pair parallelogram criterion.
+  have h_CD_DC : seg_congruent C D D C := congruent_swap C D h_CD
+  have h_AB_DC : seg_congruent A B D C := congruent_trans A B C D D C h_AB_CD h_CD_DC
+
+  -- Apply the criterion.
+  exact (parallelogram_from_pair A B C D h_nocol h_AB_DC
+    (Exists.intro Line (fun l : Line => exists (m : Line),
+      And (on_line A l) (And (on_line B l) (And (on_line D m) (And (on_line C m) (parallel l m))))) l_AB
+      (Exists.intro Line (fun m : Line =>
+        And (on_line A l_AB) (And (on_line B l_AB) (And (on_line D m) (And (on_line C m) (parallel l_AB m))))) l_CD
+        (And.conj (on_line A l_AB) (And (on_line B l_AB) (And (on_line D l_CD) (And (on_line C l_CD) (parallel l_AB l_CD))))
+          h_A_lAB
+          (And.conj (on_line B l_AB) (And (on_line D l_CD) (And (on_line C l_CD) (parallel l_AB l_CD))) h_B_lAB
+            (And.conj (on_line D l_CD) (And (on_line C l_CD) (parallel l_AB l_CD)) h_D_lCD
+              (And.conj (on_line C l_CD) (parallel l_AB l_CD) h_C_lCD h_parallel_AB_CD)))))))
+
+-- =====================================================================
+-- 21d. Diagonals of a parallelogram bisect each other
+-- =====================================================================
+
+-- The diagonals of a parallelogram intersect at their common midpoint.
+theorem parallelogram_diagonals_bisect : forall (A B C D : Point),
+  Not (collinear A B C) ->
+  parallelogram A B C D ->
+  exists (M : Point),
+    And (midpoint M A C) (midpoint M B D) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_noncol
+  intro h_para
+  have h_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+      (triangle_nondegenerate A B C h_noncol)
+  have h_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+        (triangle_nondegenerate A B C h_noncol))
+  have h_BC : Not (Eq Point B C) :=
+    and_fst (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+        (triangle_nondegenerate A B C h_noncol))
+  have h_M_ex : exists (M : Point), midpoint M A C := midpoint_exists A C h_AC
+  have M : Point := choice Point (fun M : Point => midpoint M A C) h_M_ex
+  have h_M_AC : midpoint M A C := choice_spec Point (fun M : Point => midpoint M A C) h_M_ex
+  have h_M_ne_B : Not (Eq Point M B) :=
+    fun h_eq : Eq Point M B =>
+      let h_col_AMC : collinear A M C := between_implies_collinear A M C
+        (and_fst (between A M C) (seg_congruent A M M C) h_M_AC)
+      in
+      h_noncol (collinear_perm2 A B C
+        (eq_subst Point M B (fun X : Point => collinear A C X)
+          h_eq (collinear_perm2 A M C h_col_AMC)))
+  have h_BM_ne : Not (Eq Point B M) :=
+    fun h_eq : Eq Point B M =>
+      h_M_ne_B (eq_sym Point B M h_eq)
+  have h_Dp_ex : exists (Dp : Point),
+    And (between B M Dp) (And (seg_congruent M Dp B M) (Not (Eq Point M Dp))) :=
+    segment_extension B M h_BM_ne
+  have Dp : Point := choice Point (fun Dp : Point =>
+    And (between B M Dp) (And (seg_congruent M Dp B M) (Not (Eq Point M Dp)))) h_Dp_ex
+  have h_Dp_spec : And (between B M Dp) (And (seg_congruent M Dp B M) (Not (Eq Point M Dp))) :=
+    choice_spec Point (fun Dp : Point =>
+      And (between B M Dp) (And (seg_congruent M Dp B M) (Not (Eq Point M Dp)))) h_Dp_ex
+  have h_BMDp : between B M Dp :=
+    and_fst (between B M Dp) (And (seg_congruent M Dp B M) (Not (Eq Point M Dp))) h_Dp_spec
+  have h_MDp_BM : seg_congruent M Dp B M :=
+    and_fst (seg_congruent M Dp B M) (Not (Eq Point M Dp))
+      (and_snd (between B M Dp) (And (seg_congruent M Dp B M) (Not (Eq Point M Dp))) h_Dp_spec)
+  have h_BM_MDp : seg_congruent B M M Dp := congruent_sym M Dp B M h_MDp_BM
+  have h_mid_BMDp : midpoint M B Dp :=
+    And.conj (between B M Dp) (seg_congruent B M M Dp) h_BMDp h_BM_MDp
+  have h_para_ABCDp : parallelogram A B C Dp :=
+    parallelogram_from_diagonals A B C Dp M h_noncol h_M_AC h_mid_BMDp
+
+  have h_AB_CD : segment_parallel A B C D :=
+    and_fst (segment_parallel A B C D) (segment_parallel B C D A) h_para
+  have h_BC_AD : segment_parallel B C D A :=
+    and_snd (segment_parallel A B C D) (segment_parallel B C D A) h_para
+  have h_AB_CDp : segment_parallel A B C Dp :=
+    and_fst (segment_parallel A B C Dp) (segment_parallel B C Dp A) h_para_ABCDp
+  have h_BC_ADp : segment_parallel B C Dp A :=
+    and_snd (segment_parallel A B C Dp) (segment_parallel B C Dp A) h_para_ABCDp
+
+  have h_l_ex : exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l)
+      (And (on_line C m) (And (on_line D m) (parallel l m)))) := h_AB_CD
+  have l_AB : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line A l) (And (on_line B l)
+      (And (on_line C m) (And (on_line D m) (parallel l m))))) h_l_ex
+  have h_l_spec : exists (m : Line),
+    And (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m) (And (on_line D m) (parallel l_AB m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line A l) (And (on_line B l)
+        (And (on_line C m) (And (on_line D m) (parallel l m))))) h_l_ex
+  have m_CD : Line := choice Line (fun m : Line =>
+    And (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m) (And (on_line D m) (parallel l_AB m))))) h_l_spec
+  have h_m_spec : And (on_line A l_AB) (And (on_line B l_AB)
+    (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line A l_AB) (And (on_line B l_AB)
+        (And (on_line C m) (And (on_line D m) (parallel l_AB m))))) h_l_spec
+  have h_A_lAB : on_line A l_AB :=
+    and_fst (on_line A l_AB) (And (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec
+  have h_B_lAB : on_line B l_AB :=
+    and_fst (on_line B l_AB)
+      (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))
+      (and_snd (on_line A l_AB) (And (on_line B l_AB)
+        (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec)
+  have h_C_mCD : on_line C m_CD :=
+    let h_rest : And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) :=
+      and_snd (on_line B l_AB)
+        (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))
+        (and_snd (on_line A l_AB) (And (on_line B l_AB)
+          (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec)
+    in and_fst (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) h_rest
+  have h_D_mCD : on_line D m_CD :=
+    let h_rest : And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) :=
+      and_snd (on_line B l_AB)
+        (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))
+        (and_snd (on_line A l_AB) (And (on_line B l_AB)
+          (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec)
+    in and_fst (on_line D m_CD) (parallel l_AB m_CD)
+      (and_snd (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) h_rest)
+  have h_para_lAB_mCD : parallel l_AB m_CD :=
+    let h_rest : And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) :=
+      and_snd (on_line B l_AB)
+        (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))
+        (and_snd (on_line A l_AB) (And (on_line B l_AB)
+          (And (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)))) h_m_spec)
+    in and_snd (on_line D m_CD) (parallel l_AB m_CD)
+      (and_snd (on_line C m_CD) (And (on_line D m_CD) (parallel l_AB m_CD)) h_rest)
+
+  have h_lp_ex : exists (l : Line), exists (m : Line),
+    And (on_line A l) (And (on_line B l)
+      (And (on_line C m) (And (on_line Dp m) (parallel l m)))) := h_AB_CDp
+  have lp_AB : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line A l) (And (on_line B l)
+      (And (on_line C m) (And (on_line Dp m) (parallel l m))))) h_lp_ex
+  have h_lp_spec : exists (m : Line),
+    And (on_line A lp_AB) (And (on_line B lp_AB)
+      (And (on_line C m) (And (on_line Dp m) (parallel lp_AB m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line A l) (And (on_line B l)
+        (And (on_line C m) (And (on_line Dp m) (parallel l m))))) h_lp_ex
+  have m_CDp : Line := choice Line (fun m : Line =>
+    And (on_line A lp_AB) (And (on_line B lp_AB)
+      (And (on_line C m) (And (on_line Dp m) (parallel lp_AB m))))) h_lp_spec
+  have h_mp_spec : And (on_line A lp_AB) (And (on_line B lp_AB)
+    (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line A lp_AB) (And (on_line B lp_AB)
+        (And (on_line C m) (And (on_line Dp m) (parallel lp_AB m))))) h_lp_spec
+  have h_A_lpAB : on_line A lp_AB :=
+    and_fst (on_line A lp_AB) (And (on_line B lp_AB)
+      (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))) h_mp_spec
+  have h_B_lpAB : on_line B lp_AB :=
+    and_fst (on_line B lp_AB)
+      (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))
+      (and_snd (on_line A lp_AB) (And (on_line B lp_AB)
+        (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))) h_mp_spec)
+  have h_C_mCDp : on_line C m_CDp :=
+    let h_rest : And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)) :=
+      and_snd (on_line B lp_AB)
+        (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))
+        (and_snd (on_line A lp_AB) (And (on_line B lp_AB)
+          (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))) h_mp_spec)
+    in and_fst (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)) h_rest
+  have h_Dp_mCDp : on_line Dp m_CDp :=
+    let h_rest : And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)) :=
+      and_snd (on_line B lp_AB)
+        (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))
+        (and_snd (on_line A lp_AB) (And (on_line B lp_AB)
+          (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))) h_mp_spec)
+    in and_fst (on_line Dp m_CDp) (parallel lp_AB m_CDp)
+      (and_snd (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)) h_rest)
+  have h_para_lpAB_mCDp : parallel lp_AB m_CDp :=
+    let h_rest : And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)) :=
+      and_snd (on_line B lp_AB)
+        (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))
+        (and_snd (on_line A lp_AB) (And (on_line B lp_AB)
+          (And (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)))) h_mp_spec)
+    in and_snd (on_line Dp m_CDp) (parallel lp_AB m_CDp)
+      (and_snd (on_line C m_CDp) (And (on_line Dp m_CDp) (parallel lp_AB m_CDp)) h_rest)
+
+  have h_lAB_eq_lpAB : Eq Line l_AB lp_AB :=
+    line_unique A B l_AB lp_AB
+      (and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+        (triangle_nondegenerate A B C h_noncol))
+      h_A_lAB h_B_lAB h_A_lpAB h_B_lpAB
+  have h_para_lAB_mCDp : parallel l_AB m_CDp :=
+    eq_subst Line lp_AB l_AB (fun l : Line => parallel l m_CDp)
+      (eq_sym Line l_AB lp_AB h_lAB_eq_lpAB)
+      h_para_lpAB_mCDp
+  have h_C_not_lAB : Not (on_line C l_AB) :=
+    fun h_C_lAB : on_line C l_AB =>
+      let h_col_ABC : collinear A B C :=
+        Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l)))
+          l_AB
+          (And.conj (on_line A l_AB) (And (on_line B l_AB) (on_line C l_AB))
+            h_A_lAB
+            (And.conj (on_line B l_AB) (on_line C l_AB) h_B_lAB h_C_lAB))
+      in
+      h_noncol h_col_ABC
+  have h_mCD_eq_mCDp : Eq Line m_CD m_CDp :=
+    parallel_unique_through_point l_AB C h_C_not_lAB m_CD m_CDp h_C_mCD h_C_mCDp
+      h_para_lAB_mCD h_para_lAB_mCDp
+
+  have h_q_ex : exists (l : Line), exists (m : Line),
+    And (on_line B l) (And (on_line C l)
+      (And (on_line D m) (And (on_line A m) (parallel l m)))) := h_BC_AD
+  have l_BC0 : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line B l) (And (on_line C l)
+      (And (on_line D m) (And (on_line A m) (parallel l m))))) h_q_ex
+  have h_q_spec : exists (m : Line),
+    And (on_line B l_BC0) (And (on_line C l_BC0)
+      (And (on_line D m) (And (on_line A m) (parallel l_BC0 m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line B l) (And (on_line C l)
+        (And (on_line D m) (And (on_line A m) (parallel l m))))) h_q_ex
+  have p_DA0 : Line := choice Line (fun m : Line =>
+    And (on_line B l_BC0) (And (on_line C l_BC0)
+      (And (on_line D m) (And (on_line A m) (parallel l_BC0 m))))) h_q_spec
+  have h_qDA_spec : And (on_line B l_BC0) (And (on_line C l_BC0)
+    (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line B l_BC0) (And (on_line C l_BC0)
+        (And (on_line D m) (And (on_line A m) (parallel l_BC0 m))))) h_q_spec
+  have h_B_lBC0 : on_line B l_BC0 :=
+    and_fst (on_line B l_BC0) (And (on_line C l_BC0)
+      (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))) h_qDA_spec
+  have h_C_lBC0 : on_line C l_BC0 :=
+    and_fst (on_line C l_BC0)
+      (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))
+      (and_snd (on_line B l_BC0) (And (on_line C l_BC0)
+        (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))) h_qDA_spec)
+  have h_D_pDA0 : on_line D p_DA0 :=
+    let h_rest : And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)) :=
+      and_snd (on_line C l_BC0)
+        (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))
+        (and_snd (on_line B l_BC0) (And (on_line C l_BC0)
+          (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))) h_qDA_spec)
+    in and_fst (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)) h_rest
+  have h_A_pDA0 : on_line A p_DA0 :=
+    let h_rest : And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)) :=
+      and_snd (on_line C l_BC0)
+        (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))
+        (and_snd (on_line B l_BC0) (And (on_line C l_BC0)
+          (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))) h_qDA_spec)
+    in and_fst (on_line A p_DA0) (parallel l_BC0 p_DA0)
+      (and_snd (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)) h_rest)
+  have h_para_lBC0_pDA0 : parallel l_BC0 p_DA0 :=
+    let h_rest : And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)) :=
+      and_snd (on_line C l_BC0)
+        (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))
+        (and_snd (on_line B l_BC0) (And (on_line C l_BC0)
+          (And (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)))) h_qDA_spec)
+    in and_snd (on_line A p_DA0) (parallel l_BC0 p_DA0)
+      (and_snd (on_line D p_DA0) (And (on_line A p_DA0) (parallel l_BC0 p_DA0)) h_rest)
+
+  have h_qp_ex : exists (l : Line), exists (m : Line),
+    And (on_line B l) (And (on_line C l)
+      (And (on_line Dp m) (And (on_line A m) (parallel l m)))) := h_BC_ADp
+  have l_BC0p : Line := choice Line (fun l : Line => exists (m : Line),
+    And (on_line B l) (And (on_line C l)
+      (And (on_line Dp m) (And (on_line A m) (parallel l m))))) h_qp_ex
+  have h_qp_spec : exists (m : Line),
+    And (on_line B l_BC0p) (And (on_line C l_BC0p)
+      (And (on_line Dp m) (And (on_line A m) (parallel l_BC0p m)))) :=
+    choice_spec Line (fun l : Line => exists (m : Line),
+      And (on_line B l) (And (on_line C l)
+        (And (on_line Dp m) (And (on_line A m) (parallel l m))))) h_qp_ex
+  have p_DAp : Line := choice Line (fun m : Line =>
+    And (on_line B l_BC0p) (And (on_line C l_BC0p)
+      (And (on_line Dp m) (And (on_line A m) (parallel l_BC0p m))))) h_qp_spec
+  have h_qpDA_spec : And (on_line B l_BC0p) (And (on_line C l_BC0p)
+    (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line B l_BC0p) (And (on_line C l_BC0p)
+        (And (on_line Dp m) (And (on_line A m) (parallel l_BC0p m))))) h_qp_spec
+  have h_B_lBC0p : on_line B l_BC0p :=
+    and_fst (on_line B l_BC0p) (And (on_line C l_BC0p)
+      (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))) h_qpDA_spec
+  have h_C_lBC0p : on_line C l_BC0p :=
+    and_fst (on_line C l_BC0p)
+      (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))
+      (and_snd (on_line B l_BC0p) (And (on_line C l_BC0p)
+        (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))) h_qpDA_spec)
+  have h_Dp_pDAp : on_line Dp p_DAp :=
+    let h_rest : And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)) :=
+      and_snd (on_line C l_BC0p)
+        (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))
+        (and_snd (on_line B l_BC0p) (And (on_line C l_BC0p)
+          (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))) h_qpDA_spec)
+    in and_fst (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)) h_rest
+  have h_A_pDAp : on_line A p_DAp :=
+    let h_rest : And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)) :=
+      and_snd (on_line C l_BC0p)
+        (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))
+        (and_snd (on_line B l_BC0p) (And (on_line C l_BC0p)
+          (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))) h_qpDA_spec)
+    in and_fst (on_line A p_DAp) (parallel l_BC0p p_DAp)
+      (and_snd (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)) h_rest)
+  have h_para_lBC0p_pDAp : parallel l_BC0p p_DAp :=
+    let h_rest : And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)) :=
+      and_snd (on_line C l_BC0p)
+        (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))
+        (and_snd (on_line B l_BC0p) (And (on_line C l_BC0p)
+          (And (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)))) h_qpDA_spec)
+    in and_snd (on_line A p_DAp) (parallel l_BC0p p_DAp)
+      (and_snd (on_line Dp p_DAp) (And (on_line A p_DAp) (parallel l_BC0p p_DAp)) h_rest)
+
+  have h_lBC0_eq_lBC0p : Eq Line l_BC0 l_BC0p :=
+    line_unique B C l_BC0 l_BC0p h_BC h_B_lBC0 h_C_lBC0 h_B_lBC0p h_C_lBC0p
+  have h_para_lBC0_pDAp : parallel l_BC0 p_DAp :=
+    eq_subst Line l_BC0p l_BC0 (fun l : Line => parallel l p_DAp)
+      (eq_sym Line l_BC0 l_BC0p h_lBC0_eq_lBC0p) h_para_lBC0p_pDAp
+  have h_A_not_lBC0 : Not (on_line A l_BC0) :=
+    fun h_A_lBC0 : on_line A l_BC0 =>
+      let h_col_ABC : collinear A B C :=
+        Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l)))
+          l_BC0
+          (And.conj (on_line A l_BC0) (And (on_line B l_BC0) (on_line C l_BC0))
+            h_A_lBC0
+            (And.conj (on_line B l_BC0) (on_line C l_BC0) h_B_lBC0 h_C_lBC0))
+      in
+      h_noncol h_col_ABC
+  have h_pDA0_eq_pDAp : Eq Line p_DA0 p_DAp :=
+    parallel_unique_through_point l_BC0 A h_A_not_lBC0 p_DA0 p_DAp h_A_pDA0 h_A_pDAp
+      h_para_lBC0_pDA0 h_para_lBC0_pDAp
+
+  have h_D_mCDp : on_line D m_CDp :=
+    eq_subst Line m_CD m_CDp (fun l : Line => on_line D l) h_mCD_eq_mCDp h_D_mCD
+  have h_D_pDAp : on_line D p_DAp :=
+    eq_subst Line p_DA0 p_DAp (fun l : Line => on_line D l) h_pDA0_eq_pDAp h_D_pDA0
+  have h_Dp_mCD : on_line Dp m_CD :=
+    eq_subst Line m_CDp m_CD (fun l : Line => on_line Dp l)
+      (eq_sym Line m_CD m_CDp h_mCD_eq_mCDp) h_C_mCDp
+  have h_Dp_pDA0 : on_line Dp p_DA0 :=
+    eq_subst Line p_DAp p_DA0 (fun l : Line => on_line Dp l)
+      (eq_sym Line p_DA0 p_DAp h_pDA0_eq_pDAp) h_A_pDAp
+  have h_mCD_ne_pDA0 : Not (Eq Line m_CD p_DA0) :=
+    fun h_eq : Eq Line m_CD p_DA0 =>
+      let h_A_mCD : on_line A m_CD :=
+        eq_subst Line p_DA0 m_CD (fun l : Line => on_line A l)
+          (eq_sym Line m_CD p_DA0 h_eq) h_A_pDA0
+      in
+      let h_col_ABC : collinear A B C :=
+        Exists.intro Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l)))
+          m_CD
+          (And.conj (on_line A m_CD) (And (on_line B m_CD) (on_line C m_CD))
+            h_A_mCD
+            (And.conj (on_line B m_CD) (on_line C m_CD)
+              (eq_subst Line l_AB m_CD (fun l : Line => on_line B l)
+                (line_unique A B l_AB m_CD h_AB h_A_lAB h_B_lAB h_A_mCD h_C_mCD)
+                h_B_lAB)
+              h_C_mCD))
+      in
+      h_noncol h_col_ABC
+  have h_D_eq_Dp : Eq Point D Dp :=
+    line_unique_neq m_CD p_DA0 h_mCD_ne_pDA0 D Dp h_D_mCD h_Dp_mCD h_D_pDA0 h_Dp_pDA0
+
+  have h_mid_BD : midpoint M B D :=
+    eq_subst Point Dp D (fun X : Point => midpoint M B X)
+      (eq_sym Point D Dp h_D_eq_Dp) h_mid_BMDp
+  exact (Exists.intro Point (fun M0 : Point =>
+    And (midpoint M0 A C) (midpoint M0 B D)) M
+    (And.conj (midpoint M A C) (midpoint M B D) h_M_AC h_mid_BD))
+
+-- =====================================================================
+-- 22. Rectangle theorems moved to GeometryCommon.Rectangle
+-- =====================================================================

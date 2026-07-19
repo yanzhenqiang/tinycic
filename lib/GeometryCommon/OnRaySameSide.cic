@@ -1,0 +1,203 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+import GeometryCommon.PlaneSeparation
+import GeometryCommon.AngleAddition
+import GeometryCommon.Crossbar
+
+-- =====================================================================
+-- Same-side facts for points on a closed ray.
+--
+-- If B lies on line l and M is off l, any point Y on the closed ray BM
+-- lies on the same side of l as M does.  These are pure order/facts used
+-- by ray_interior_trans in RightAnglesEqual.cic.
+-- =====================================================================
+
+-- If B is on l and Y is beyond M on ray BM, then Y is off l when M is off l.
+theorem on_ray_beyond_off_line : forall (l : Line) (B M Y : Point),
+  on_line B l -> Not (on_line M l) -> between B M Y -> Not (on_line Y l) := by
+  intro l
+  intro B
+  intro M
+  intro Y
+  intro h_B_l
+  intro h_M_off
+  intro h_BMY
+  exact (fun h_Y_l : on_line Y l =>
+    h_M_off (collinear_point_on_line M B Y l
+      (between_implies_collinear B M Y h_BMY) h_B_l h_Y_l
+      (between_distinct_ends B M Y h_BMY)))
+
+-- If B is on l and Y lies between B and M (M off l), then Y is off l.
+theorem on_ray_between_off_line : forall (l : Line) (B M Y : Point),
+  on_line B l -> Not (on_line M l) -> between B Y M -> Not (on_line Y l) := by
+  intro l
+  intro B
+  intro M
+  intro Y
+  intro h_B_l
+  intro h_M_off
+  intro h_BYM
+  exact (fun h_Y_l : on_line Y l =>
+    h_M_off (collinear_point_on_line M B Y l
+      (collinear_perm3 B Y M (between_implies_collinear B Y M h_BYM))
+      h_B_l h_Y_l
+      (between_distinct_first B Y M h_BYM)))
+
+-- Z lies on the line through B and M because it is collinear with Y and M
+-- and Y, M are already on that line.
+theorem point_collinear_with_segment_on_line : forall (B M Y Z : Point) (l_BM : Line),
+  on_line B l_BM -> on_line M l_BM ->
+  between B Y M -> between M Z Y ->
+  on_line Z l_BM := by
+  intro B
+  intro M
+  intro Y
+  intro Z
+  intro l_BM
+  intro h_B_lBM
+  intro h_M_lBM
+  intro h_BYM
+  intro h_MZY
+  have h_Y_lBM : on_line Y l_BM :=
+    collinear_point_on_line Y B M l_BM
+      (between_implies_collinear B Y M h_BYM)
+      h_B_lBM h_M_lBM
+      (between_distinct_ends B Y M h_BYM)
+  exact (collinear_point_on_line Z Y M l_BM
+    (collinear_perm Y Z M (collinear_perm3 M Z Y (between_implies_collinear M Z Y h_MZY)))
+    h_Y_lBM h_M_lBM
+    (between_distinct_middle B Y M h_BYM))
+
+-- Strict between case: Y on BM (B on l, M off l) => Y and M same side of l.
+-- Proof: if they were opposite, the witness Z on l between M and Y would have
+-- to be B by unique crossing, giving M-B-Y; but B-Y-M is assumed.
+theorem on_ray_between_same_side_line : forall (l : Line) (B M Y : Point),
+  on_line B l -> Not (on_line M l) -> between B Y M -> same_side_line l Y M := by
+  intro l
+  intro B
+  intro M
+  intro Y
+  intro h_B_l
+  intro h_M_off
+  intro h_BYM
+  have h_Y_off : Not (on_line Y l) := on_ray_between_off_line l B M Y h_B_l h_M_off h_BYM
+  have h_nopp : Not (opposite_side_line l M Y) :=
+    fun h_opp : opposite_side_line l M Y =>
+      exists_elim_prop Point (fun Z : Point => And (on_line Z l) (between M Z Y)) False
+        (fun Z : Point =>
+          fun hZ : And (on_line Z l) (between M Z Y) =>
+            let h_Z_l : on_line Z l := and_fst (on_line Z l) (between M Z Y) hZ in
+            let h_MZY : between M Z Y := and_snd (on_line Z l) (between M Z Y) hZ in
+            let l_BM : Line := choice Line (fun m : Line => And (on_line B m) (on_line M m)) (line_exists B M) in
+            let h_lBM : And (on_line B l_BM) (on_line M l_BM) :=
+              choice_spec Line (fun m : Line => And (on_line B m) (on_line M m)) (line_exists B M) in
+            let h_Z_lBM : on_line Z l_BM := point_collinear_with_segment_on_line B M Y Z l_BM
+              (and_fst (on_line B l_BM) (on_line M l_BM) h_lBM)
+              (and_snd (on_line B l_BM) (on_line M l_BM) h_lBM)
+              h_BYM h_MZY in
+            let h_l_ne_lBM : Not (Eq Line l l_BM) :=
+              fun h_eq : Eq Line l l_BM =>
+                let h_M_lBM : on_line M l_BM :=
+                  and_snd (on_line B l_BM) (on_line M l_BM)
+                    (choice_spec Line (fun m : Line => And (on_line B m) (on_line M m)) (line_exists B M)) in
+                h_M_off (eq_subst Line l_BM l (fun k : Line => on_line M k) (eq_sym Line l l_BM h_eq) h_M_lBM) in
+            let h_ZB : Eq Point Z B :=
+              let h_em : Or (Eq Point Z B) (Not (Eq Point Z B)) := excluded_middle (Eq Point Z B) in
+              or_elim (Eq Point Z B) (Not (Eq Point Z B)) (Eq Point Z B) h_em
+                (fun h : Eq Point Z B => h)
+                (fun h_ne : Not (Eq Point Z B) =>
+                  False_elim (Eq Point Z B)
+                    (h_l_ne_lBM (line_unique Z B l l_BM h_ne h_Z_l h_B_l h_Z_lBM
+                      (and_fst (on_line B l_BM) (on_line M l_BM) h_lBM)))) in
+            let h_MBY : between M B Y :=
+              eq_subst Point Z B (fun W : Point => between M W Y) h_ZB h_MZY in
+            False_elim False (between_not_both B Y M h_BYM h_MBY))
+        h_opp
+  exact (And.conj (Not (on_line Y l))
+    (And (Not (on_line M l)) (Not (opposite_side_line l Y M))) h_Y_off
+    (And.conj (Not (on_line M l)) (Not (opposite_side_line l Y M)) h_M_off
+      (fun h_opp2 : opposite_side_line l Y M => h_nopp (opposite_side_line_sym l Y M h_opp2))))
+
+-- Y equals M: trivial same side.
+theorem same_point_same_side_line : forall (l : Line) (M : Point),
+  Not (on_line M l) -> same_side_line l M M := by
+  intro l
+  intro M
+  intro h_M_off
+  exact (And.conj (Not (on_line M l))
+    (And (Not (on_line M l)) (Not (opposite_side_line l M M))) h_M_off
+    (And.conj (Not (on_line M l)) (Not (opposite_side_line l M M)) h_M_off
+      (fun h_opp : opposite_side_line l M M =>
+        exists_elim_prop Point (fun Z : Point => And (on_line Z l) (between M Z M)) False
+          (fun Z : Point => fun hZ : And (on_line Z l) (between M Z M) =>
+            let h_ne_MM : Not (Eq Point M M) :=
+              and_snd (Not (Eq Point Z M)) (Not (Eq Point M M))
+                (and_snd (Not (Eq Point M Z)) (And (Not (Eq Point Z M)) (Not (Eq Point M M)))
+                  (between_not_eq M Z M (and_snd (on_line Z l) (between M Z M) hZ))) in
+            h_ne_MM (refl Point M))
+          h_opp)))
+
+-- Given a point P on line l, obtain a second point on l distinct from P.
+theorem point_off_point_on_line : forall (l : Line) (P : Point),
+  on_line P l -> exists (Q : Point), And (on_line Q l) (Not (Eq Point P Q)) := by
+  intro l
+  intro P
+  intro h_P_l
+  have h_ex : exists (A : Point), exists (B : Point),
+    And (Not (Eq Point A B)) (And (on_line A l) (on_line B l)) := line_has_two_points l
+  have A : Point := choice Point
+    (fun A : Point => exists (B : Point), And (Not (Eq Point A B)) (And (on_line A l) (on_line B l))) h_ex
+  have h_A : exists (B : Point), And (Not (Eq Point A B)) (And (on_line A l) (on_line B l)) :=
+    choice_spec Point
+      (fun A : Point => exists (B : Point), And (Not (Eq Point A B)) (And (on_line A l) (on_line B l))) h_ex
+  have B : Point := choice Point
+    (fun B : Point => And (Not (Eq Point A B)) (And (on_line A l) (on_line B l))) h_A
+  have h_AB : And (Not (Eq Point A B)) (And (on_line A l) (on_line B l)) :=
+    choice_spec Point
+      (fun B : Point => And (Not (Eq Point A B)) (And (on_line A l) (on_line B l))) h_A
+  have h_ne_AB : Not (Eq Point A B) := and_fst (Not (Eq Point A B)) (And (on_line A l) (on_line B l)) h_AB
+  have h_A_l : on_line A l := and_fst (on_line A l) (on_line B l)
+    (and_snd (Not (Eq Point A B)) (And (on_line A l) (on_line B l)) h_AB)
+  have h_B_l : on_line B l := and_snd (on_line A l) (on_line B l)
+    (and_snd (Not (Eq Point A B)) (And (on_line A l) (on_line B l)) h_AB)
+  exact (or_elim (Eq Point P A) (Not (Eq Point P A))
+    (exists (Q : Point), And (on_line Q l) (Not (Eq Point P Q)))
+    (excluded_middle (Eq Point P A))
+    (fun h_PA : Eq Point P A =>
+      Exists.intro Point (fun Q : Point => And (on_line Q l) (Not (Eq Point P Q))) B
+        (And.conj (on_line B l) (Not (Eq Point P B))
+          h_B_l
+          (fun h_PB : Eq Point P B =>
+            h_ne_AB (eq_trans Point A P B (eq_sym Point P A h_PA) h_PB))))
+    (fun h_nPA : Not (Eq Point P A) =>
+      Exists.intro Point (fun Q : Point => And (on_line Q l) (Not (Eq Point P Q))) A
+        (And.conj (on_line A l) (Not (Eq Point P A)) h_A_l h_nPA)))
+
+-- A point Y on the closed ray BM lies on the same side of line l (through B)
+-- as M does, provided M is off l.
+theorem on_ray_same_side_line : forall (l : Line) (B M Y : Point),
+  on_line B l -> Not (on_line M l) -> on_ray B M Y -> same_side_line l Y M := by
+  intro l
+  intro B
+  intro M
+  intro Y
+  intro h_B_l
+  intro h_M_off
+  intro h_onray
+  exact (or_elim (between B M Y) (Or (between B Y M) (Eq Point Y M)) (same_side_line l Y M) h_onray
+    (fun h_BMY : between B M Y =>
+      have h_R_ex : exists (R : Point), And (on_line R l) (Not (Eq Point B R)) :=
+        point_off_point_on_line l B h_B_l
+      have R : Point := choice Point (fun R : Point => And (on_line R l) (Not (Eq Point B R))) h_R_ex
+      have h_R : And (on_line R l) (Not (Eq Point B R)) :=
+        choice_spec Point (fun R : Point => And (on_line R l) (Not (Eq Point B R))) h_R_ex
+      have h_R_l : on_line R l := and_fst (on_line R l) (Not (Eq Point B R)) h_R
+      have h_ne_BR : Not (Eq Point B R) := and_snd (on_line R l) (Not (Eq Point B R)) h_R
+      same_side_line_sym l M Y
+        (ray_point_same_side l B R M Y h_B_l h_R_l h_ne_BR h_M_off h_BMY))
+    (fun h_rest : Or (between B Y M) (Eq Point Y M) =>
+      or_elim (between B Y M) (Eq Point Y M) (same_side_line l Y M) h_rest
+        (fun h_BYM : between B Y M => on_ray_between_same_side_line l B M Y h_B_l h_M_off h_BYM)
+        (fun h_YM : Eq Point Y M =>
+          same_side_line_sym l M Y (eq_subst Point Y M (fun Z : Point => same_side_line l M Z) h_YM
+            (same_point_same_side_line l M h_M_off))))))

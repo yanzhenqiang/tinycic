@@ -4,10 +4,12 @@ use super::expr::*;
 use super::format::format_expr;
 use super::repl_parser::{ParsedDecl, ParsedExpr, Parser as ReplParser};
 use super::tactic::TacticEngine;
-use super::type_checker::{TypeChecker, TypeCheckerState};
+use super::type_checker::{TraceFormat, TypeChecker, TypeCheckerState};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fs;
 use std::io::{self, Write};
+use std::path::PathBuf;
 use std::rc::Rc;
 
 /// Interactive Lean REPL.
@@ -20,11 +22,6 @@ use std::rc::Rc;
 ///   :def <name> : <type> := <value>  Add a definition with explicit type
 ///   :theorem <name> : <type> := <proof>  Add a theorem
 ///   :inductive <name> | <ctor> : <type> | ...   Add an inductive type
-///   :infer <expr>                 Infer the type of an expression
-///   :reduce <expr>                Reduce to weak head normal form
-///   :nf <expr>                    Reduce to full normal form
-///   :defeq <e1> = <e2>            Check definitional equality
-///   :help                         Show this help
 ///   :quit                         Exit
 pub struct Repl {
     env: Environment,
@@ -42,6 +39,12 @@ pub struct Repl {
     section_stack: Vec<SectionScope>,
     /// Track files loaded in the current session to avoid duplicate imports
     loaded_files: HashSet<String>,
+    /// Whether reduction tracing is enabled for theorem checks.
+    trace_enabled: bool,
+    /// Format used for trace output.
+    trace_format: TraceFormat,
+    /// Path to the trace log file.
+    trace_path: PathBuf,
 }
 
 /// Scope snapshot for section/end
@@ -133,6 +136,7 @@ impl Repl {
     pub fn new() -> Self {
         let env = Environment::new();
         let tc_state = TypeCheckerState::new(env.clone());
+        let (trace_enabled, trace_path) = Self::default_trace_config();
         let mut repl = Repl {
             env,
             tc_state,
@@ -143,9 +147,35 @@ impl Repl {
             notations: HashMap::new(),
             section_stack: Vec::new(),
             loaded_files: HashSet::new(),
+            trace_enabled,
+            trace_format: TraceFormat::Beautiful,
+            trace_path,
         };
         repl.load_quot();
         repl
+    }
+
+    fn default_trace_config() -> (bool, PathBuf) {
+        let default_path = PathBuf::from(".test-out/trace.log");
+        if let Ok(path) = env::var("TINYCIC_TRACE_FILE") {
+            if !path.is_empty() {
+                return (true, PathBuf::from(path));
+            }
+        }
+        (false, default_path)
+    }
+
+    pub fn set_trace_enabled(&mut self, enabled: bool) {
+        self.trace_enabled = enabled;
+    }
+
+    pub fn set_trace_format(&mut self, format: TraceFormat) {
+        self.trace_format = format;
+    }
+
+    pub fn set_trace_path(&mut self, path: impl Into<PathBuf>) {
+        self.trace_path = path.into();
+        self.trace_enabled = true;
     }
 
     pub fn set_quiet(&mut self, quiet: bool) {
@@ -242,7 +272,7 @@ impl Repl {
     pub fn run(&mut self) {
         println!("╔═══════════════════════════════════════════════════════════════════════╗");
         println!("║          Lean 4 Kernel Symbolic Execution REPL v0.1                  ║");
-        println!("║     Type :help for available commands. Type :quit to exit.          ║");
+        println!("║     Type :quit to exit.                                             ║");
         println!("╚═══════════════════════════════════════════════════════════════════════╝");
         println!();
 
@@ -284,11 +314,6 @@ impl Repl {
             return Ok(true);
         }
 
-        if input.starts_with(":help") {
-            self.print_help();
-            return Ok(false);
-        }
-
         if input.starts_with(":env") {
             self.print_env();
             return Ok(false);
@@ -302,10 +327,6 @@ impl Repl {
             return self.handle_axiom(&input[7..]).map(|_| false);
         }
 
-        if input.starts_with(":trace ") {
-            return self.handle_trace(&input[7..]).map(|_| false);
-        }
-
         if input.starts_with(":def ") {
             return self.handle_def(&input[5..]).map(|_| false);
         }
@@ -316,26 +337,6 @@ impl Repl {
 
         if input.starts_with(":inductive ") {
             return self.handle_inductive(&input[11..]).map(|_| false);
-        }
-
-        if input.starts_with(":infer ") {
-            return self.handle_infer(&input[7..]).map(|_| false);
-        }
-
-        if input.starts_with(":reduce ") {
-            return self.handle_reduce(&input[8..]).map(|_| false);
-        }
-
-        if input.starts_with(":nf ") {
-            return self.handle_nf(&input[4..]).map(|_| false);
-        }
-
-        if input.starts_with(":defeq ") {
-            return self.handle_defeq(&input[7..]).map(|_| false);
-        }
-
-        if input.starts_with(":solve ") {
-            return self.handle_solve(&input[7..]).map(|_| false);
         }
 
         // Default: try to infer and reduce the expression
@@ -353,43 +354,6 @@ impl Repl {
         Ok(false)
     }
 
-    fn handle_trace(&mut self, rest: &str) -> Result<(), String> {
-        // Try to parse as a declaration first (def/theorem)
-        let mut parser = ReplParser::new_with_state(rest, self.infix_ops.clone(), self.notations.clone());
-        match parser.parse_file() {
-            Ok(decls) if decls.len() == 1 => {
-                match &decls[0] {
-                    ParsedDecl::Def { name, params, ret_ty, value } => {
-                        println!("[trace] definition {}", name);
-                        return self.process_def_or_theorem(
-                            name.clone(), params.clone(), ret_ty.clone(), value.clone(), false, true
-                        );
-                    }
-                    ParsedDecl::Theorem { name, params, ret_ty, value } => {
-                        println!("[trace] theorem {}", name);
-                        return self.process_def_or_theorem(
-                            name.clone(), params.clone(), Some(ret_ty.clone()), value.clone(), true, true
-                        );
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
-
-        // Otherwise treat as expression
-        println!("[trace] expression");
-        let expr = self.parse_and_convert(rest)?;
-        let mut tc = TypeChecker::with_local_ctx(
-            &mut self.tc_state, super::local_ctx::LocalCtx::new());
-        let ty = tc.infer(&expr).map_err(|e| format!("type error: {}", e))?;
-        println!("  type: {}", format_expr(&ty));
-        tc.set_trace(true);
-        tc.set_trace_file(std::path::Path::new(".test-out/trace.log"));
-        let reduced = tc.whnf(&expr);
-        println!("  whnf: {}", format_expr(&reduced));
-        Ok(())
-    }
 
     fn parse_and_convert(&self, input: &str) -> Result<Expr, String> {
         let mut parser = ReplParser::new_with_state(input, self.infix_ops.clone(), self.notations.clone());
@@ -420,13 +384,24 @@ impl Repl {
     }
 
     fn process_import(&mut self, path: String) -> Result<(), String> {
-        let mut filepath = format!("{}.cic", path);
+        // For module paths like "Foo.Bar", also consider the subdirectory
+        // form "Foo/Bar.cic" so that modules can be organized in folders.
+        let dotted_path = format!("{}.cic", path);
+        let slashed_path = format!("{}.cic", path.replace('.', std::path::MAIN_SEPARATOR_STR));
+        let lib_dotted_path = format!("lib/{}", dotted_path);
+        let lib_slashed_path = format!("lib/{}", slashed_path);
 
-        // If not found in current directory, try lib/
-        if !std::path::Path::new(&filepath).exists() {
-            let alt = format!("lib/{}.cic", path);
-            if std::path::Path::new(&alt).exists() {
-                filepath = alt;
+        let candidates = [
+            dotted_path.clone(),
+            slashed_path,
+            lib_dotted_path,
+            lib_slashed_path,
+        ];
+        let mut filepath = dotted_path;
+        for candidate in &candidates {
+            if std::path::Path::new(candidate).exists() {
+                filepath = candidate.clone();
+                break;
             }
         }
 
@@ -1003,8 +978,11 @@ impl Repl {
         if is_theorem {
             // Type-check in relaxed mode (allows unassigned metavariables during solving)
             let mut tc = TypeChecker::with_allow_unassigned_mvar(&mut self.tc_state, super::local_ctx::LocalCtx::new());
-            tc.set_trace(trace);
-            tc.set_trace_file(std::path::Path::new(".test-out/trace.log"));
+            if trace || self.trace_enabled {
+                tc.set_trace(true);
+                tc.set_trace_format(self.trace_format);
+                tc.set_trace_file(&self.trace_path);
+            }
             tc.check(&final_value, &final_ty)
                 .map_err(|e| format!("Proof does not match theorem type: {}", e))?;
 
@@ -1319,51 +1297,6 @@ impl Repl {
         Ok(())
     }
 
-    fn handle_solve(&mut self, rest: &str) -> Result<(), String> {
-        let name_end = rest.find(|c: char| c.is_whitespace() || c == ':' || c == '=')
-            .unwrap_or(rest.len());
-        let name = rest[..name_end].trim().to_string();
-        let rest_after_name = rest[name_end..].trim_start().to_string();
-
-        if !rest_after_name.starts_with(':') {
-            return Err("Usage: :solve <name> : <type> := <expr>".to_string());
-        }
-        let rest = &rest_after_name[1..];
-        let parts: Vec<&str> = rest.splitn(2, ":=").collect();
-        if parts.len() != 2 {
-            return Err("Usage: :solve <name> : <type> := <expr>".to_string());
-        }
-        let ty_str = parts[0].trim();
-        let expr_str = parts[1].trim();
-
-        let ty = self.parse_and_convert(ty_str)?;
-        let expr = self.parse_and_convert(expr_str)?;
-
-        self.tc_state.clear_mvar_types();
-        let mut tc = TypeChecker::with_allow_unassigned_mvar(&mut self.tc_state, super::local_ctx::LocalCtx::new());
-        tc.check(&expr, &ty).map_err(|e| format!("Solve type check failed: {}", e))?;
-
-        let mut solve_vars: Vec<(Name, Expr, Option<Expr>)> = Vec::new();
-        for (mvar_name, mvar_ty) in self.tc_state.iter_mvar_types() {
-            let assigned = self.tc_state.get_mvar_assignment(mvar_name).cloned();
-            solve_vars.push((mvar_name.clone(), mvar_ty.clone(), assigned));
-        }
-
-        println!("  Solved: {}", name);
-        if solve_vars.is_empty() {
-            println!("    (no solve variables)");
-        } else {
-            for (mvar_name, mvar_ty, val) in &solve_vars {
-                match val {
-                    Some(v) => println!("    ?{} : {} = {}", mvar_name.to_string(), format_expr(mvar_ty), format_expr(v)),
-                    None => println!("    ?{} : {} (unassigned)", mvar_name.to_string(), format_expr(mvar_ty)),
-                }
-            }
-        }
-
-        self.env_bindings.insert(name.clone(), expr.clone());
-        Ok(())
-    }
 
     fn handle_inductive(&mut self, rest: &str) -> Result<(), String> {
         let mut parts = rest.split('|');
@@ -1429,85 +1362,12 @@ impl Repl {
         Ok(())
     }
 
-    fn handle_infer(&mut self, rest: &str) -> Result<(), String> {
-        let expr = self.parse_and_convert(rest)?;
-        let mut tc = TypeChecker::with_local_ctx(&mut self.tc_state, super::local_ctx::LocalCtx::new());
-        let ty = tc.infer(&expr).map_err(|e| e)?;
-        println!("  {}", format_expr(&ty));
-        Ok(())
-    }
-
-    fn handle_reduce(&mut self, rest: &str) -> Result<(), String> {
-        let expr = self.parse_and_convert(rest)?;
-        let mut tc = TypeChecker::with_local_ctx(&mut self.tc_state, super::local_ctx::LocalCtx::new());
-        let reduced = tc.whnf(&expr);
-        println!("  {}", format_expr(&reduced));
-        Ok(())
-    }
-
-    fn handle_nf(&mut self, rest: &str) -> Result<(), String> {
-        let expr = self.parse_and_convert(rest)?;
-        let mut tc = TypeChecker::with_local_ctx(&mut self.tc_state, super::local_ctx::LocalCtx::new());
-        let reduced = tc.nf(&expr);
-        println!("  {}", format_expr(&reduced));
-        Ok(())
-    }
-
-    fn handle_defeq(&mut self, rest: &str) -> Result<(), String> {
-        let parts: Vec<&str> = rest.splitn(2, '=').collect();
-        if parts.len() != 2 {
-            return Err("Usage: :defeq <expr1> = <expr2>".to_string());
-        }
-        let e1 = self.parse_and_convert(parts[0].trim())?;
-        let e2 = self.parse_and_convert(parts[1].trim())?;
-        let mut tc = TypeChecker::with_local_ctx(&mut self.tc_state, super::local_ctx::LocalCtx::new());
-        let result = tc.is_def_eq(&e1, &e2);
-        println!("  {}", result);
-        Ok(())
-    }
-
     fn print_env(&self) {
         println!("  Current environment:");
         println!("    Constants: {}", self.env.num_constants());
         self.env.for_each_constant(|info| {
             println!("      {} : {}", info.name().to_string(), format_expr(info.get_type()));
         });
-    }
-
-    fn print_help(&self) {
-        println!("Commands:");
-        println!("  :env                          Show current environment");
-        println!("  :load <file.cic>             Load declarations from a file");
-        println!("  :axiom <name> : <type>        Add an axiom");
-        println!("  :def <name> := <value>        Add a definition");
-        println!("  :def <name> : <type> := <val> Add a definition with type");
-        println!("  :theorem <name> : <type> := <proof>  Add a theorem");
-        println!("  :inductive <name> | <c>:<t>|..Add an inductive type");
-        println!("  :infer <expr>                 Infer the type");
-        println!("  :reduce <expr>                Reduce to WHNF");
-        println!("  :nf <expr>                    Reduce to full NF");
-        println!("  :defeq <e1> = <e2>            Check definitional equality");
-        println!("  :solve <name> : <type> := <expr>  Solve with metavariables");
-        println!("  :help                         Show this help");
-        println!("  :quit                         Exit");
-        println!();
-        println!("Expression syntax:");
-        println!("  Constants: Nat, zero, succ, Bool, true, ...");
-        println!("  Application: f a b (left-associative)");
-        println!("  Lambda: \\x : Nat . x  or  fun x => x");
-        println!("  Pi: Nat -> Nat  or  (x : Nat) -> Nat");
-        println!("  Let: let x := zero in x");
-        println!("  Have: have h : P := proof in e");
-        println!("  Match: match e : T with | ctor => e1 | ctor x => e2");
-        println!("  Sort: Type, Prop");
-        println!("  Parens: (e)");
-        println!("  Numbers: 0, 1, 2, ...");
-        println!();
-        println!("File syntax (:load)");
-        println!("  inductive Name where");
-        println!("  | ctor : Type");
-        println!("  def name (params) : type := value");
-        println!("  theorem name (params) : type := proof");
     }
 
     fn load_axioms(&mut self) {

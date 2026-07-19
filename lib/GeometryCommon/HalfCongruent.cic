@@ -1,0 +1,67 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+
+-- =====================================================================
+-- Half-congruent segments
+-- =====================================================================
+
+-- Congruent segments are halved congruently: if two segments are congruent
+-- and each is bisected, then the corresponding half-segments are congruent.
+theorem half_congruent_segments : forall (A C B D M N : Point),
+  between A M C -> between B N D ->
+  seg_congruent A M M C -> seg_congruent B N N D ->
+  seg_congruent A C B D ->
+  seg_congruent A M B N := by
+  intro A
+  intro C
+  intro B
+  intro D
+  intro M
+  intro N
+  intro h_AMC
+  intro h_BND
+  intro h_AM_MC
+  intro h_BN_ND
+  intro h_AC_BD
+  -- Transport the bisection of AC onto BD.
+  have h_H_ex : exists (H : Point),
+    And (between B H D)
+      (And (seg_congruent A M B H) (seg_congruent M C H D)) :=
+    segment_betweenness_congruent_transport A M C B D h_AMC h_AC_BD
+  have H : Point := choice Point (fun H : Point =>
+    And (between B H D)
+      (And (seg_congruent A M B H) (seg_congruent M C H D))) h_H_ex
+  have h_H_spec : And (between B H D)
+    (And (seg_congruent A M B H) (seg_congruent M C H D)) :=
+    choice_spec Point (fun H : Point =>
+      And (between B H D)
+        (And (seg_congruent A M B H) (seg_congruent M C H D))) h_H_ex
+  have h_BHD : between B H D :=
+    and_fst (between B H D)
+      (And (seg_congruent A M B H) (seg_congruent M C H D)) h_H_spec
+  have h_rest : And (seg_congruent A M B H) (seg_congruent M C H D) :=
+    and_snd (between B H D)
+      (And (seg_congruent A M B H) (seg_congruent M C H D)) h_H_spec
+  have h_AM_BH : seg_congruent A M B H :=
+    and_fst (seg_congruent A M B H) (seg_congruent M C H D) h_rest
+  have h_MC_HD : seg_congruent M C H D :=
+    and_snd (seg_congruent A M B H) (seg_congruent M C H D) h_rest
+  -- The transported point H is also a midpoint of BD.
+  have h_BH_HD : seg_congruent B H H D :=
+    congruent_trans B H A M H D
+      (congruent_sym A M B H h_AM_BH)
+      (congruent_trans A M M C H D h_AM_MC h_MC_HD)
+  have h_mid_H : midpoint H B D :=
+    And.conj (between B H D) (seg_congruent B H H D) h_BHD h_BH_HD
+  have h_mid_N : midpoint N B D :=
+    And.conj (between B N D) (seg_congruent B N N D) h_BND h_BN_ND
+  -- A segment has only one midpoint.
+  have h_H_eq_N : Eq Point H N := midpoint_unique H N B D h_mid_H h_mid_N
+  -- Therefore BN equals BH, which equals AM.
+  have h_BH_BH : seg_congruent B H B H :=
+    congruent_refl B H (between_distinct_first B H D h_BHD)
+  have h_BH_BN : seg_congruent B H B N :=
+    eq_subst Point H N (fun X : Point => seg_congruent B H B X) h_H_eq_N h_BH_BH
+  have h_AM_BN : seg_congruent A M B N :=
+    congruent_trans A M B H B N h_AM_BH h_BH_BN
+  exact h_AM_BN

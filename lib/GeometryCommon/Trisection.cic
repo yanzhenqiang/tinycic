@@ -1,0 +1,135 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+import GeometryCommon.SegmentOrder
+
+-- =====================================================================
+-- Trisection uniqueness
+-- =====================================================================
+
+-- A segment AD is trisected by B, C: A-B-C-D with AB = BC = CD.
+def trisection (A B C D : Point) : Prop :=
+  And (between A B C)
+    (And (between B C D)
+      (And (seg_congruent A B B C)
+        (seg_congruent B C C D)))
+
+-- If two trisections of the same segment AD have their first trisector in
+-- strict order (AB < AE), the whole segment would be strictly less than
+-- itself, which is impossible.
+theorem trisection_first_less_impossible : forall (A B C D E F : Point),
+  between A B C ->
+  between B C D ->
+  seg_congruent A B B C ->
+  seg_congruent B C C D ->
+  between A E F ->
+  between E F D ->
+  seg_congruent A E E F ->
+  seg_congruent E F F D ->
+  segment_less A B A E ->
+  False := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro h_ABC
+  intro h_BCD
+  intro h_AB_BC
+  intro h_BC_CD
+  intro h_AEF
+  intro h_EFD
+  intro h_AE_EF
+  intro h_EF_FD
+  intro h_AB_less_AE
+  -- Lift AB < AE to the three congruent pieces.
+  have h_BC_less_AE : segment_less B C A E :=
+    segment_less_preserve_congruent_left A B A E B C h_AB_less_AE h_AB_BC
+  have h_BC_less_EF : segment_less B C E F :=
+    segment_less_preserve_congruent B C A E E F h_BC_less_AE h_AE_EF
+  have h_AB_CD : seg_congruent A B C D :=
+    congruent_trans A B B C C D h_AB_BC h_BC_CD
+  have h_CD_less_AE : segment_less C D A E :=
+    segment_less_preserve_congruent_left A B A E C D h_AB_less_AE h_AB_CD
+  have h_AE_FD : seg_congruent A E F D :=
+    congruent_trans A E E F F D h_AE_EF h_EF_FD
+  have h_CD_less_FD : segment_less C D F D :=
+    segment_less_preserve_congruent C D A E F D h_CD_less_AE h_AE_FD
+  -- Add the inequalities along the two trisections of AD.
+  have h_ACD : between A C D := between_trans A B C D h_ABC h_BCD
+  have h_AFD : between A F D := between_trans A E F D h_AEF h_EFD
+  have h_AC_less_AF : segment_less A C A F :=
+    segment_less_add A B C A E F h_ABC h_AEF h_AB_less_AE h_BC_less_EF
+  have h_AD_less_AD : segment_less A D A D :=
+    segment_less_add A C D A F D h_ACD h_AFD h_AC_less_AF h_CD_less_FD
+  exact (segment_less_irrefl A D h_AD_less_AD)
+
+-- A segment can be divided into three congruent subsegments in at most one way.
+theorem congruent_trisection_unique : forall (A B C D E F : Point),
+  between A B C ->
+  between B C D ->
+  seg_congruent A B B C ->
+  seg_congruent B C C D ->
+  between A E F ->
+  between E F D ->
+  seg_congruent A E E F ->
+  seg_congruent E F F D ->
+  Eq Point B E := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro h_ABC
+  intro h_BCD
+  intro h_AB_BC
+  intro h_BC_CD
+  intro h_AEF
+  intro h_EFD
+  intro h_AE_EF
+  intro h_EF_FD
+  -- B and E both lie on segment AD, hence on line AD.
+  have h_ABD : between A B D := between_trans A B C D h_ABC h_BCD
+  have h_AED : between A E D := between_trans A E F D h_AEF h_EFD
+  have h_col_ABD : collinear A B D := between_implies_collinear A B D h_ABD
+  have h_col_AED : collinear A E D := between_implies_collinear A E D h_AED
+  have h_col_ADB : collinear A D B := collinear_perm2 A B D h_col_ABD
+  have h_col_ADE : collinear A D E := collinear_perm2 A E D h_col_AED
+  have h_AD_ne : Not (Eq Point A D) := between_distinct_ends A B D h_ABD
+  have h_col_ABE : collinear A B E :=
+    collinear_shared_merge_fst A D B E h_col_ADB h_col_ADE h_AD_ne
+  have h_AB_ne : Not (Eq Point A B) := between_distinct_first A B C h_ABC
+  have h_AE_ne : Not (Eq Point A E) := between_distinct_first A E F h_AEF
+  -- Either B = E, or B and E are distinct and ordered on line AD.
+  have h_em : Or (Eq Point B E) (Not (Eq Point B E)) :=
+    excluded_middle (Eq Point B E)
+  exact (or_elim (Eq Point B E) (Not (Eq Point B E)) (Eq Point B E) h_em
+    (fun h_eq : Eq Point B E => h_eq)
+    (fun h_BE_ne : Not (Eq Point B E) =>
+      let h_bet_or : Or (between A B E) (Or (between B E A) (between B A E)) :=
+        between_unique A B E h_AB_ne h_BE_ne h_AE_ne h_col_ABE in
+      or_elim (between A B E) (Or (between B E A) (between B A E)) (Eq Point B E) h_bet_or
+        (fun h_ABE : between A B E =>
+          let h_AB_less_AE : segment_less A B A E := between_implies_segment_less A B E h_ABE in
+          False_elim (Eq Point B E)
+            (trisection_first_less_impossible A B C D E F
+              h_ABC h_BCD h_AB_BC h_BC_CD h_AEF h_EFD h_AE_EF h_EF_FD h_AB_less_AE))
+        (fun h_rest : Or (between B E A) (between B A E) =>
+          or_elim (between B E A) (between B A E) (Eq Point B E) h_rest
+            (fun h_BEA : between B E A =>
+              let h_AEB : between A E B := between_sym B E A h_BEA in
+              let h_AE_less_AB : segment_less A E A B := between_implies_segment_less A E B h_AEB in
+              False_elim (Eq Point B E)
+                (trisection_first_less_impossible A E F D B C
+                  h_AEF h_EFD h_AE_EF h_EF_FD h_ABC h_BCD h_AB_BC h_BC_CD h_AE_less_AB))
+            (fun h_BAE : between B A E =>
+              let h_AED_copy : between A E D := h_AED in
+              let h_BAD : between B A D := between_trans B A E D h_BAE h_AED_copy in
+              let h_DAB : between D A B := between_sym B A D h_BAD in
+              let h_DBA : between D B A := between_sym A B D h_ABD in
+              let h_DA_less_DB : segment_less D A D B := between_implies_segment_less D A B h_DAB in
+              let h_DB_less_DA : segment_less D B D A := between_implies_segment_less D B A h_DBA in
+              let h_DA_less_DA : segment_less D A D A :=
+                segment_less_trans D A D B D A h_DA_less_DB h_DB_less_DA in
+              False_elim (Eq Point B E) (segment_less_irrefl D A h_DA_less_DA)))))

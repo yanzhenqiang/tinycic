@@ -99,12 +99,68 @@ theorem thales : forall (O : Point), forall (B : Point),
   -- Ray BO is the same as ray BA, so angle OBC equals angle ABC.
   have h_OBC_ABC : angle_congruent O B C A B C := angle_congruent_same_ray B O A C (Or.inl (between B O A) (between B A O) h_BOA)
   have h_BCO_ABC : angle_congruent B C O A B C := angle_trans B C O O B C A B C h_BCO_OBC h_OBC_ABC
-  -- Construct a point P so that angle PBA equals angle BAC.
-  have h_P_ex : exists (P : Point), angle_congruent B A C A B P :=
-    angle_transfer A B C B A h_AB h_AC h_BA
-  have P : Point := choice Point (fun P : Point => angle_congruent B A C A B P) h_P_ex
+  -- Construct a point P on the opposite side of line AB from C so that
+  -- angle PBA equals angle BAC (Hilbert III4 with a chosen side).
+  have h_l_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_l_ex
+  have h_l : And (on_line A l) (on_line B l) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_l_ex
+  have h_A_l : on_line A l := and_fst (on_line A l) (on_line B l) h_l
+  have h_B_l : on_line B l := and_snd (on_line A l) (on_line B l) h_l
+  have h_C_off : Not (on_line C l) :=
+    fun h : on_line C l =>
+      h_nocol_ABC (Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l
+        (And.conj (on_line A l) (And (on_line B l) (on_line C l)) h_A_l
+          (And.conj (on_line B l) (on_line C l) h_B_l h)))
+  have h_CA : Not (Eq Point C A) := fun h_eq : Eq Point C A => h_AC (eq_sym Point C A h_eq)
+  have h_C2_ex : exists (E : Point), And (between C A E) (seg_congruent C A C E) :=
+    congruent_transfer C A C A h_CA h_CA
+  have C2 : Point := choice Point (fun E : Point => And (between C A E) (seg_congruent C A C E)) h_C2_ex
+  have h_C2_spec : And (between C A C2) (seg_congruent C A C C2) :=
+    choice_spec Point (fun E : Point => And (between C A E) (seg_congruent C A C E)) h_C2_ex
+  have h_CAC2 : between C A C2 := and_fst (between C A C2) (seg_congruent C A C C2) h_C2_spec
+  have h_C2_off : Not (on_line C2 l) := between_point_off_line l C A C2 h_A_l h_C_off h_CAC2
+  have h_P_ex : exists (P : Point),
+    And (angle_congruent B A C A B P)
+      (And (same_side_line l P C2)
+        (forall (C'' : Point),
+          angle_congruent B A C A B C'' -> same_side_line l C'' C2 -> collinear A P C'')) :=
+    angle_transfer_III4 A B C A B l C2 h_AB h_AC h_AB h_A_l h_B_l h_C2_off
+  have P : Point := choice Point (fun P : Point =>
+    And (angle_congruent B A C A B P)
+      (And (same_side_line l P C2)
+        (forall (C'' : Point),
+          angle_congruent B A C A B C'' -> same_side_line l C'' C2 -> collinear A P C''))) h_P_ex
+  have h_P_full : And (angle_congruent B A C A B P)
+    (And (same_side_line l P C2)
+      (forall (C'' : Point),
+        angle_congruent B A C A B C'' -> same_side_line l C'' C2 -> collinear A P C'')) :=
+    choice_spec Point (fun P : Point =>
+      And (angle_congruent B A C A B P)
+        (And (same_side_line l P C2)
+          (forall (C'' : Point),
+            angle_congruent B A C A B C'' -> same_side_line l C'' C2 -> collinear A P C''))) h_P_ex
   have h_P_spec : angle_congruent B A C A B P :=
-    choice_spec Point (fun P : Point => angle_congruent B A C A B P) h_P_ex
+    and_fst (angle_congruent B A C A B P)
+      (And (same_side_line l P C2)
+        (forall (C'' : Point),
+          angle_congruent B A C A B C'' -> same_side_line l C'' C2 -> collinear A P C'')) h_P_full
+  have h_ss_PC2 : same_side_line l P C2 :=
+    and_fst (same_side_line l P C2)
+      (forall (C'' : Point),
+        angle_congruent B A C A B C'' -> same_side_line l C'' C2 -> collinear A P C'')
+      (and_snd (angle_congruent B A C A B P)
+        (And (same_side_line l P C2)
+          (forall (C'' : Point),
+            angle_congruent B A C A B C'' -> same_side_line l C'' C2 -> collinear A P C'')) h_P_full)
+  have h_P_off : Not (on_line P l) :=
+    and_fst (Not (on_line P l))
+      (And (Not (on_line C2 l)) (Not (opposite_side_line l P C2))) h_ss_PC2
+  have h_opp_CC2 : opposite_side_line l C C2 :=
+    Exists.intro Point (fun Y : Point => And (on_line Y l) (between C Y C2)) A
+      (And.conj (on_line A l) (between C A C2) h_A_l h_CAC2)
+  have h_opp_PC : opposite_side_line l P C :=
+    same_side_of_opposite_is_opposite l C C2 P h_C_off h_opp_CC2 h_ss_PC2
   have h_ABP_BAC : angle_congruent A B P B A C := angle_sym B A C A B P h_P_spec
   have h_PBA_ABP : angle_congruent P B A A B P := angle_vertex_swap B P A
   have h_PBA_BAC : angle_congruent P B A B A C := angle_trans P B A A B P B A C h_PBA_ABP h_ABP_BAC
@@ -116,7 +172,8 @@ theorem thales : forall (O : Point), forall (B : Point),
   have h_OCB_ABC : angle_congruent O C B A B C := angle_trans O C B B C O A B C
     (angle_vertex_swap C O B) h_BCO_ABC
   have h_ACB_PBC : angle_congruent A C B P B C :=
-    angle_addition A C B O P B A C h_AOB h_nocol_ACB h_ACO_PBA h_OCB_ABC
+    angle_addition A C B O P B A C l h_AOB h_nocol_ACB h_BA h_B_l h_A_l h_P_off h_C_off
+      h_opp_PC h_ACO_PBA h_OCB_ABC
   -- Extend AC through C to D; the exterior angle BCD also equals PBA + ABC = PBC.
   have h_D_ex : exists (D : Point), And (between A C D) (And (seg_congruent C D A C) (Not (Eq Point C D))) :=
     segment_extension A C h_AC
@@ -136,7 +193,7 @@ theorem thales : forall (O : Point), forall (B : Point),
   have h_DCB_ACB : angle_congruent D C B A C B := angle_trans D C B B C D A C B
     (angle_sym B C D D C B (angle_vertex_swap C B D))
     (angle_sym A C B B C D h_ACB_BCD)
-  exact (right_angle_from_equal_sum A C D B A C B h_ACD h_nocol_ACB
+  exact (right_angle_from_equal_sum A C D B A C B h_ACD h_nocol_ACB h_nocol_ACB
     (angle_refl A C B)
     h_DCB_ACB)
 
@@ -156,7 +213,7 @@ theorem isosceles_converse : forall (A : Point), forall (B : Point), forall (C :
   exact (and_fst (seg_congruent A B A C)
     (And (seg_congruent A C A B) (angle_congruent A C B A B C))
     (AAS A B C A C B
-      (angle_trans B A C B A C C A B (angle_refl A B C) (angle_vertex_swap A B C))
+      (angle_vertex_swap A B C)
       h
       (congruent_swap B C
         (and_fst (Not (Eq Point B C)) (Not (Eq Point A C))
@@ -444,9 +501,9 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
   have h_mBD1_eq_mBD2 : Eq Line m_BD1 m_BD2 :=
     line_unique B D m_BD1 m_BD2 h_BD
       (midsegment_pair_B E H B D l_EH m_BD1 h_m_BD1)
-      (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1)
+      (midsegment_pair_C E H B D l_EH m_BD1 h_m_BD1)
       (midsegment_pair_B F G B D l_FG m_BD2 h_m_BD2)
-      (midsegment_pair_D F G B D l_FG m_BD2 h_m_BD2)
+      (midsegment_pair_C F G B D l_FG m_BD2 h_m_BD2)
   have h_FG_para_mBD1 : parallel l_FG m_BD1 :=
     eq_subst Line m_BD2 m_BD1 (fun x : Line => parallel l_FG x)
       (eq_sym Line m_BD1 m_BD2 h_mBD1_eq_mBD2)
@@ -488,12 +545,12 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
     let h_lFG_eq_lEF : Eq Line l_FG l_EF :=
       line_unique F G l_FG l_EF h_F_ne_G
         (midsegment_pair_D F G B D l_FG m_BD2 h_m_BD2)
-        h_G_lEF
         (midsegment_pair_F F G B D l_FG m_BD2 h_m_BD2)
-        (midsegment_pair_F E F A C l_EF m_AC1 h_m_AC1) in
+        (midsegment_pair_D E F A C l_EF m_AC1 h_m_AC1)
+        h_G_lEF in
     let h_lEF_para_mBD : parallel l_EF m_BD1 :=
       eq_subst Line l_FG l_EF (fun x : Line => parallel x m_BD1)
-        (eq_sym Line l_EF l_FG h_lFG_eq_lEF)
+        h_lFG_eq_lEF
         h_FG_para_mBD1 in
     let h_mAC_para_mBD : parallel m_AC1 m_BD1 :=
       parallel_trans m_AC1 l_EF m_BD1
@@ -511,7 +568,7 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
               (And.conj (on_line B m_BD1) (And (on_line D m_BD1) (parallel m_AC1 m_BD1))
                 (midsegment_pair_B E H B D l_EH m_BD1 h_m_BD1)
                 (And.conj (on_line D m_BD1) (parallel m_AC1 m_BD1)
-                  (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1) h_mAC_para_mBD))))) in
+                  (midsegment_pair_C E H B D l_EH m_BD1 h_m_BD1) h_mAC_para_mBD))))) in
     h_nospg h_spg
   have h_EF_GH : parallel l_EF l_GH :=
     parallel_trans l_EF m_AC1 l_GH
@@ -526,12 +583,12 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
     let h_lEF_eq_lEH : Eq Line l_EF l_EH :=
       line_unique E F l_EF l_EH h_E_ne_F
         (midsegment_pair_D E F A C l_EF m_AC1 h_m_AC1)
-        h_F_lEH
         (midsegment_pair_F E F A C l_EF m_AC1 h_m_AC1)
-        (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1) in
+        (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1)
+        h_F_lEH in
     let h_lEH_para_mAC : parallel l_EH m_AC1 :=
       eq_subst Line l_EF l_EH (fun x : Line => parallel x m_AC1)
-        (eq_sym Line l_EH l_EF h_lEF_eq_lEH)
+        h_lEF_eq_lEH
         (midsegment_pair_parallel E F A C l_EF m_AC1 h_m_AC1) in
     let h_mAC_para_mBD : parallel m_AC1 m_BD1 :=
       parallel_trans m_AC1 l_EH m_BD1
@@ -550,7 +607,7 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
               (And.conj (on_line B m_BD1) (And (on_line D m_BD1) (parallel m_AC1 m_BD1))
                 (midsegment_pair_B E H B D l_EH m_BD1 h_m_BD1)
                 (And.conj (on_line D m_BD1) (parallel m_AC1 m_BD1)
-                  (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1) h_mAC_para_mBD))))) in
+                  (midsegment_pair_C E H B D l_EH m_BD1 h_m_BD1) h_mAC_para_mBD))))) in
     h_nospg h_spg
   have h_EH_FG : parallel l_EH l_FG :=
     parallel_trans l_EH m_BD1 l_FG
@@ -570,7 +627,7 @@ theorem varignon : forall (A : Point), forall (B : Point), forall (C : Point), f
       (midsegment_pair_F F G B D l_FG m_BD2 h_m_BD2)
       (midsegment_pair_F E H B D l_EH m_BD1 h_m_BD1)
       (midsegment_pair_D E H B D l_EH m_BD1 h_m_BD1)
-      h_EH_FG))
+      (parallel_sym l_EH l_FG h_EH_FG)))
 -- 31. Centroid Theorem
 -- =====================================================================
 

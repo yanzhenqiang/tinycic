@@ -68,17 +68,18 @@ axiom between_collinear : forall (A : Point), forall (B : Point), forall (C : Po
 axiom between_exists : forall (A : Point), forall (C : Point),
   Not (Eq Point A C) -> exists (B : Point), between A B C
 
--- O2b: For any two distinct points A, B, there exists C with B between A and C
-axiom between_extension : forall (A : Point), forall (B : Point),
-  Not (Eq Point A B) -> exists (C : Point), between A B C
-
 -- O3: Betweenness is symmetric
 axiom between_sym : forall (A : Point), forall (B : Point), forall (C : Point),
   between A B C -> between C B A
 
 -- O4 (Pasch's axiom)
+-- A line meeting side AB of triangle ABC internally, and passing through
+-- none of the vertices, meets one of the other two sides internally.
+-- The vertex-avoidance premises are essential: without them the statement
+-- is false (take l through C, or l = line AB).
 axiom pasch : forall (A : Point), forall (B : Point), forall (C : Point), forall (l : Line), forall (D : Point),
   (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')) ->
+  Not (on_line A l) -> Not (on_line B l) -> Not (on_line C l) ->
   on_line D l -> between A D B ->
   exists (E : Point), And (on_line E l) (Or (between A E C) (between B E C))
 
@@ -130,6 +131,10 @@ axiom congruent_trans : forall (A : Point), forall (B : Point), forall (C : Poin
 axiom congruent_swap : forall (A : Point), forall (B : Point),
   Not (Eq Point A B) -> seg_congruent A B B A
 
+-- A zero segment cannot be congruent to a non-zero segment.
+axiom congruent_nonzero : forall (X Y Z : Point),
+  Not (Eq Point Y Z) -> Not (seg_congruent X X Y Z)
+
 -- C5: Addition
 axiom congruent_add : forall (A : Point), forall (B : Point), forall (C : Point), forall (A' : Point), forall (B' : Point), forall (C' : Point),
   between A B C -> between A' B' C' ->
@@ -137,11 +142,7 @@ axiom congruent_add : forall (A : Point), forall (B : Point), forall (C : Point)
   seg_congruent A C A' C'
 
 -- Congruent segments are halved congruently.
-axiom half_congruent_segments : forall (A C B D M N : Point),
-  between A M C -> between B N D ->
-  seg_congruent A M M C -> seg_congruent B N N D ->
-  seg_congruent A C B D ->
-  seg_congruent A M B N
+-- Theorem: half_congruent_segments (proved in GeometryCommon.HalfCongruent).
 
 -- C1': Uniqueness of segment transfer.
 -- On a given ray from C, there is at most one point D with AB ≅ CD.
@@ -153,19 +154,27 @@ axiom segment_transfer_unique : forall (A B C D E : Point),
   Eq Point D E
 
 -- Uniqueness of trisection: a segment can be divided into three congruent
--- subsegments in at most one way.  This follows from the Archimedean and
--- Dedekind continuity axioms together with segment-transfer uniqueness; a
--- direct derivation is long, so we state it as a default fact.
-axiom congruent_trisection_unique : forall (A B C D E F : Point),
-  between A B C ->
-  between B C D ->
-  seg_congruent A B B C ->
-  seg_congruent B C C D ->
-  between A E F ->
-  between E F D ->
-  seg_congruent A E E F ->
-  seg_congruent E F F D ->
-  Eq Point B E
+-- subsegments in at most one way.  Theorem: congruent_trisection_unique
+-- (proved in GeometryCommon.Trisection).
+
+-- O2b: For any two distinct points A, B, there exists C with B between A and C
+-- This follows directly from C1 (segment transfer): on the ray from A through B
+-- lay off a segment congruent to AB.
+theorem between_extension : forall (A : Point), forall (B : Point),
+  Not (Eq Point A B) -> exists (C : Point), between A B C := by
+  intro A
+  intro B
+  intro h_AB
+  have h_C_ex : exists (C : Point), And (between A B C) (seg_congruent A B A C) :=
+    congruent_transfer A B A B h_AB h_AB
+  exact (exists_elim_prop Point
+    (fun C : Point => And (between A B C) (seg_congruent A B A C))
+    (exists (C : Point), between A B C)
+    (fun C : Point =>
+      fun h_C_spec : And (between A B C) (seg_congruent A B A C) =>
+      Exists.intro Point (fun C0 : Point => between A B C0) C
+        (and_fst (between A B C) (seg_congruent A B A C) h_C_spec))
+    h_C_ex)
 
 -- -----------------------------------------------------------------
 -- 6. Parallel axiom (Playfair)
@@ -195,28 +204,38 @@ axiom archimedes : forall (A B C D : Point),
 
 -- Dedekind completeness: every partition of the points of a line into
 -- two non-empty convex sets has a cut point.
+-- Here P and Q are two fixed points on the line; the conclusion says that
+-- every S1-point lies between the cut O and Q (or equals O), and every
+-- S2-point lies between P and O (or equals O).
 axiom dedekind : forall (l : Line) (P Q : Point),
   on_line P l -> on_line Q l -> Not (Eq Point P Q) ->
   forall (S1 S2 : Point -> Prop),
     (exists (X : Point), And (on_line X l) (S1 X)) ->
     (exists (Y : Point), And (on_line Y l) (S2 Y)) ->
     (forall (X Y : Point), on_line X l -> on_line Y l -> S1 X -> S2 Y ->
-      Or (between X Y P) (between P X Y)) ->
+      Or (between X Y Q) (between P X Y)) ->
     exists (O : Point), And (on_line O l)
       (forall (X : Point), on_line X l ->
-        And (S1 X -> Or (between X O P) (Eq Point X O))
+        And (S1 X -> Or (between X O Q) (Eq Point X O))
              (S2 X -> Or (between P O X) (Eq Point X O)))
 
 -- -----------------------------------------------------------------
 -- 8. Foundational existence/intersection axioms
 -- -----------------------------------------------------------------
--- These follow from the Hilbert axioms above, but full derivations are
--- long.  They are stated as axioms here to make practical proofs usable.
--- Eventually they should become theorems proved from continuity.
-
--- Every segment has a midpoint.
-axiom midpoint_exists : forall (A : Point), forall (B : Point),
-  Not (Eq Point A B) -> exists (M : Point), midpoint M A B
+-- Genuine geometric-existence facts that are not derivable from the
+-- incidence/order/congruence axioms above without a *plane-separation /
+-- side predicate* (the missing lemma: at a point P on a line l, two equal
+-- right angles sharing a ray along l force the other two rays to be
+-- collinear -- equivalently, the perpendicular to l at P is unique).
+-- Once such a side predicate and its Pasch/ray-uniqueness consequences are
+-- added, these become theorems.  Until then they are primitive-grade,
+-- comparable to Birkhoff's ruler/protractor postulates.
+--
+-- midpoint_exists is a *theorem* (GeometryCommon.Midpoint).  It is proved
+-- by bisecting the apex angle of an isosceles triangle over AB (SAS); the
+-- existence of that isosceles apex (an off-line point P with PA ≅ PB) is
+-- the geometric-existence input, provided by the axiom
+-- isosceles_apex_exists in GeometryCommon.Midpoint.
 
 -- Through any point there exists a perpendicular to a given line.
 axiom perpendicular_exists : forall (l : Line), forall (P : Point),
@@ -228,9 +247,35 @@ axiom perpendicular_unique : forall (l : Line), forall (P : Point), forall (m1 m
   on_line P l -> on_line P m1 -> on_line P m2 ->
   perpendicular l m1 -> perpendicular l m2 -> Eq Line m1 m2
 
+-- Classical logical equivalence: ¬∀x ¬P(x) implies ∃x P(x).
+theorem not_forall_not_to_exists : forall (A : Type) (P : A -> Prop),
+  Not (forall (x : A), Not (P x)) -> exists (x : A), P x := by
+  intro A
+  intro P
+  intro h
+  have h_em : Or (exists (x : A), P x) (Not (exists (x : A), P x)) :=
+    excluded_middle (exists (x : A), P x)
+  exact (or_elim (exists (x : A), P x) (Not (exists (x : A), P x))
+    (exists (x : A), P x) h_em
+    (fun h_ex : exists (x : A), P x => h_ex)
+    (fun h_nex : Not (exists (x : A), P x) =>
+      let h_forall_not : forall (x : A), Not (P x) :=
+        fun x : A =>
+          fun h_px : P x =>
+            h_nex (Exists.intro A P x h_px)
+      in
+      False_elim (exists (x : A), P x) (h h_forall_not)))
+
 -- Two non-parallel lines meet in a unique point.
-axiom lines_meet : forall (l m : Line),
-  Not (parallel l m) -> exists (P : Point), And (on_line P l) (on_line P m)
+-- This is a direct consequence of the classical meaning of "not parallel".
+theorem lines_meet : forall (l m : Line),
+  Not (parallel l m) -> exists (P : Point), And (on_line P l) (on_line P m) := by
+  intro l
+  intro m
+  intro h
+  exact (not_forall_not_to_exists Point
+    (fun P : Point => And (on_line P l) (on_line P m))
+    h)
 
 -- A line through the interior of a circle meets the circle.
 axiom circle_line_meet : forall (O P Q : Point) (l : Line),
@@ -245,14 +290,6 @@ axiom circle_circle_meet : forall (O1 O2 A B C : Point),
   on_circle C O1 B ->
   between O1 C O2 ->
   exists (P : Point), And (on_circle P O1 B) (on_circle P O2 A)
-
--- Every triangle has a circumcenter: a point equidistant from all three vertices.
--- This follows from the circle axioms in full Hilbert; we take it as a
--- primitive Euclidean existence axiom here.
-axiom circumcenter_exists : forall (A B C : Point),
-  Not (collinear A B C) ->
-  exists (O : Point),
-    And (seg_congruent O A O B) (seg_congruent O B O C)
 
 -- Similarity shortcut: if M is the midpoint of AB and triangles ABC and
 -- A'B'C' have all corresponding angles congruent, and AM ≅ A'B', then the
@@ -276,6 +313,20 @@ axiom similar_triangle_scale_2 :
 -- Collinearity
 def collinear (A : Point) (B : Point) (C : Point) : Prop :=
   exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l))
+
+-- Side of a line (Hilbert Group II notion, defined purely from `between`).
+-- A line l partitions the plane into two sides; P and Q are on opposite
+-- sides when segment PQ meets l, and on the same side when it does not.
+-- The partition facts (each off-line point belongs to exactly one side,
+-- same-side is an equivalence relation) follow from Pasch (II4) and are
+-- proved as theorems, not assumed.
+def opposite_side_line (l : Line) (P Q : Point) : Prop :=
+  exists (X : Point), And (on_line X l) (between P X Q)
+
+def same_side_line (l : Line) (P Q : Point) : Prop :=
+  And (Not (on_line P l))
+    (And (Not (on_line Q l))
+      (Not (opposite_side_line l P Q)))
 
 -- -----------------------------------------------------------------
 -- 8. Basic theorems
@@ -359,6 +410,222 @@ theorem between_distinct_ends : forall (A B C : Point),
           (exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)))))
         (between_collinear A B C h))))
 
+-- Segment ordering: AB < CD means CD contains a subsegment CE congruent to AB
+-- with E strictly between C and D.
+def segment_less (A B C D : Point) : Prop :=
+  exists (E : Point), And (between C E D) (seg_congruent A B C E)
+
+-- The shorter segment is not congruent to the longer one.
+theorem segment_less_not_congruent : forall (A B C D : Point),
+  segment_less A B C D -> Not (seg_congruent A B C D) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_less
+  intro h_cong
+  have h_E_ex : exists (E : Point), And (between C E D) (seg_congruent A B C E) := h_less
+  have E : Point := choice Point (fun E : Point =>
+    And (between C E D) (seg_congruent A B C E)) h_E_ex
+  have h_E_spec : And (between C E D) (seg_congruent A B C E) :=
+    choice_spec Point (fun E : Point =>
+      And (between C E D) (seg_congruent A B C E)) h_E_ex
+  have h_bet_CED : between C E D :=
+    and_fst (between C E D) (seg_congruent A B C E) h_E_spec
+  have h_CE_ne : Not (Eq Point C E) :=
+    between_distinct_first C E D h_bet_CED
+  have h_CE_AB : seg_congruent C E A B :=
+    congruent_sym A B C E
+      (and_snd (between C E D) (seg_congruent A B C E) h_E_spec)
+  have h_CE_CD : seg_congruent C E C D :=
+    congruent_trans C E A B C D h_CE_AB h_cong
+  have h_E_ne_D : Not (Eq Point E D) := between_distinct_middle C E D h_bet_CED
+  have h_eq_DE : Eq Point D E :=
+    segment_transfer_unique C E C D E h_CE_ne
+      (Or.inr (between C D E) (between C E D) h_bet_CED)
+      h_CE_CD
+      (congruent_refl C E h_CE_ne)
+  have h_eq : Eq Point E D := eq_sym Point D E h_eq_DE
+  exact (h_E_ne_D h_eq)
+
+-- No segment is shorter than itself.
+theorem segment_less_irrefl : forall (A B : Point),
+  Not (segment_less A B A B) := by
+  intro A
+  intro B
+  intro h
+  exact (segment_less_not_congruent A B A B h (congruent_refl A B
+    (fun h_eq : Eq Point A B =>
+      let h_E_ex : exists (E : Point), And (between A E B) (seg_congruent A B A E) := h
+      in
+      let E : Point := choice Point (fun E : Point =>
+        And (between A E B) (seg_congruent A B A E)) h_E_ex
+      in
+      let h_E_spec : And (between A E B) (seg_congruent A B A E) :=
+        choice_spec Point (fun E : Point =>
+          And (between A E B) (seg_congruent A B A E)) h_E_ex
+      in
+      let h_bet_AEB : between A E B :=
+        and_fst (between A E B) (seg_congruent A B A E) h_E_spec
+      in
+      let h_AB_ne : Not (Eq Point A B) := between_distinct_ends A E B h_bet_AEB
+      in
+      h_AB_ne h_eq)))
+
+-- Congruent segments are not less than one another.
+theorem segment_congruent_not_less : forall (A B C D : Point),
+  seg_congruent A B C D -> Not (segment_less A B C D) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_cong
+  intro h_less
+  exact (segment_less_not_congruent A B C D h_less h_cong)
+
+-- Betweenness yields segment ordering: if B is between A and C, then AB < AC.
+theorem between_implies_segment_less : forall (A B C : Point),
+  between A B C -> segment_less A B A C := by
+  intro A
+  intro B
+  intro C
+  intro h
+  have h_AB_ne : Not (Eq Point A B) := between_distinct_first A B C h
+  exact (Exists.intro Point
+    (fun E : Point => And (between A E C) (seg_congruent A B A E))
+    B
+    (And.conj (between A B C) (seg_congruent A B A B)
+      h
+      (congruent_refl A B h_AB_ne)))
+
+-- TEMPORARY AXIOM: Congruence preserves betweenness structure.
+-- If G lies between C and D, and CD ≅ EF, then there is a point H between
+-- E and F with EH ≅ CG (and HF ≅ GD).  This follows from Hilbert's
+-- congruence axioms together with segment-transfer uniqueness; a direct
+-- derivation is long, so we state it here as a default fact.
+axiom segment_betweenness_congruent_transport : forall (C G D E F : Point),
+  between C G D ->
+  seg_congruent C D E F ->
+  exists (H : Point),
+    And (between E H F)
+        (And (seg_congruent C G E H)
+             (seg_congruent G D H F))
+
+-- Congruence preserves segment ordering.
+theorem segment_less_preserve_congruent : forall (A B C D E F : Point),
+  segment_less A B C D ->
+  seg_congruent C D E F ->
+  segment_less A B E F := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro h_less
+  intro h_CD_EF
+  have h_G_ex : exists (G : Point), And (between C G D) (seg_congruent A B C G) := h_less
+  have G : Point := choice Point (fun G : Point =>
+    And (between C G D) (seg_congruent A B C G)) h_G_ex
+  have h_G_spec : And (between C G D) (seg_congruent A B C G) :=
+    choice_spec Point (fun G : Point =>
+      And (between C G D) (seg_congruent A B C G)) h_G_ex
+  have h_bet_CGD : between C G D :=
+    and_fst (between C G D) (seg_congruent A B C G) h_G_spec
+  have h_CG_AB : seg_congruent A B C G :=
+    and_snd (between C G D) (seg_congruent A B C G) h_G_spec
+  have h_H_ex : exists (H : Point), And (between E H F)
+      (And (seg_congruent C G E H) (seg_congruent G D H F)) :=
+    segment_betweenness_congruent_transport C G D E F h_bet_CGD h_CD_EF
+  have H : Point := choice Point (fun H : Point => And (between E H F)
+    (And (seg_congruent C G E H) (seg_congruent G D H F))) h_H_ex
+  have h_H_spec : And (between E H F)
+      (And (seg_congruent C G E H) (seg_congruent G D H F)) :=
+    choice_spec Point (fun H : Point => And (between E H F)
+      (And (seg_congruent C G E H) (seg_congruent G D H F))) h_H_ex
+  have h_bet_EHF : between E H F :=
+    and_fst (between E H F)
+      (And (seg_congruent C G E H) (seg_congruent G D H F)) h_H_spec
+  have h_CG_EH : seg_congruent C G E H :=
+    and_fst (seg_congruent C G E H) (seg_congruent G D H F)
+      (and_snd (between E H F)
+        (And (seg_congruent C G E H) (seg_congruent G D H F)) h_H_spec)
+  have h_EH_AB : seg_congruent A B E H :=
+    congruent_trans A B C G E H h_CG_AB h_CG_EH
+  exact (Exists.intro Point
+    (fun H0 : Point => And (between E H0 F) (seg_congruent A B E H0))
+    H
+    (And.conj (between E H F) (seg_congruent A B E H)
+      h_bet_EHF h_EH_AB))
+
+-- Inner betweenness: if A-M-N and A-N-B, then M-N-B.
+-- This is a standard consequence of Hilbert's Group II order axioms (O1-O7);
+-- it is needed for transitivity of segment ordering.
+axiom between_inner : forall (A M N B : Point),
+  between A M N -> between A N B -> between M N B
+
+-- Transitivity of segment ordering.
+theorem segment_less_trans : forall (A B C D E F : Point),
+  segment_less A B C D ->
+  segment_less C D E F ->
+  segment_less A B E F := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro h_AB_CD
+  intro h_CD_EF
+  have h_G_ex : exists (G : Point), And (between C G D) (seg_congruent A B C G) := h_AB_CD
+  have G : Point := choice Point (fun G : Point =>
+    And (between C G D) (seg_congruent A B C G)) h_G_ex
+  have h_G_spec : And (between C G D) (seg_congruent A B C G) :=
+    choice_spec Point (fun G : Point =>
+      And (between C G D) (seg_congruent A B C G)) h_G_ex
+  have h_bet_CGD : between C G D :=
+    and_fst (between C G D) (seg_congruent A B C G) h_G_spec
+  have h_CG_AB : seg_congruent A B C G :=
+    and_snd (between C G D) (seg_congruent A B C G) h_G_spec
+  have h_H_ex : exists (H : Point), And (between E H F) (seg_congruent C D E H) := h_CD_EF
+  have H : Point := choice Point (fun H : Point =>
+    And (between E H F) (seg_congruent C D E H)) h_H_ex
+  have h_H_spec : And (between E H F) (seg_congruent C D E H) :=
+    choice_spec Point (fun H : Point =>
+      And (between E H F) (seg_congruent C D E H)) h_H_ex
+  have h_bet_EHF : between E H F :=
+    and_fst (between E H F) (seg_congruent C D E H) h_H_spec
+  have h_EH_CD : seg_congruent C D E H :=
+    and_snd (between E H F) (seg_congruent C D E H) h_H_spec
+  have h_CD_EH : seg_congruent E H C D :=
+    congruent_sym C D E H h_EH_CD
+  have h_Hp_ex : exists (Hp : Point), And (between E Hp H)
+      (And (seg_congruent C G E Hp) (seg_congruent G D Hp H)) :=
+    segment_betweenness_congruent_transport C G D E H h_bet_CGD h_EH_CD
+  have Hp : Point := choice Point (fun Hp : Point => And (between E Hp H)
+    (And (seg_congruent C G E Hp) (seg_congruent G D Hp H))) h_Hp_ex
+  have h_Hp_spec : And (between E Hp H)
+      (And (seg_congruent C G E Hp) (seg_congruent G D Hp H)) :=
+    choice_spec Point (fun Hp : Point => And (between E Hp H)
+      (And (seg_congruent C G E Hp) (seg_congruent G D Hp H))) h_Hp_ex
+  have h_bet_EHpH : between E Hp H :=
+    and_fst (between E Hp H)
+      (And (seg_congruent C G E Hp) (seg_congruent G D Hp H)) h_Hp_spec
+  have h_CG_EHp : seg_congruent C G E Hp :=
+    and_fst (seg_congruent C G E Hp) (seg_congruent G D Hp H)
+      (and_snd (between E Hp H)
+        (And (seg_congruent C G E Hp) (seg_congruent G D Hp H)) h_Hp_spec)
+  have h_EHp_AB : seg_congruent A B E Hp :=
+    congruent_trans A B C G E Hp h_CG_AB h_CG_EHp
+  have h_bet_EHpF : between E Hp F :=
+    between_trans E Hp H F h_bet_EHpH
+      (between_inner E Hp H F h_bet_EHpH h_bet_EHF)
+  exact (Exists.intro Point
+    (fun H0 : Point => And (between E H0 F) (seg_congruent A B E H0))
+    Hp
+    (And.conj (between E Hp F) (seg_congruent A B E Hp)
+      h_bet_EHpF h_EHp_AB))
+
 -- And is symmetric in its arguments
 theorem and_swap : forall (P : Prop), forall (Q : Prop), And P Q -> And Q P := by
   intro P
@@ -419,13 +686,30 @@ theorem parallel_trans : forall (l : Line), forall (m : Line), forall (n : Line)
   have h_l_eq_n : Eq Line l n := eq_trans Line l p n h_l_eq_p_sym h_n_eq_p
   exact (h_neq h_l_eq_n)
 
--- Segment: two points determine a segment (existence of a line through them)
-def segment (A : Point) (B : Point) : Prop :=
-  exists (l : Line), And (on_line A l) (on_line B l)
-
 -- Triangle: three non-collinear points
 def triangle (A : Point) (B : Point) (C : Point) : Prop :=
   Not (collinear A B C)
+
+-- Two distinct lines share at most one point.
+theorem line_unique_neq : forall (l m : Line),
+  Not (Eq Line l m) -> forall (P Q : Point),
+  on_line P l -> on_line Q l -> on_line P m -> on_line Q m ->
+  Eq Point P Q := by
+  intro l
+  intro m
+  intro h_neq
+  intro P
+  intro Q
+  intro h_P_l
+  intro h_Q_l
+  intro h_P_m
+  intro h_Q_m
+  have h_em : Or (Eq Point P Q) (Not (Eq Point P Q)) := excluded_middle (Eq Point P Q)
+  exact (or_elim (Eq Point P Q) (Not (Eq Point P Q)) (Eq Point P Q) h_em
+    (fun h_eq : Eq Point P Q => h_eq)
+    (fun h_PQ : Not (Eq Point P Q) =>
+      let h_eq_lm : Eq Line l m := line_unique P Q l m h_PQ h_P_l h_Q_l h_P_m h_Q_m in
+      False_elim (Eq Point P Q) (h_neq h_eq_lm)))
 
 -- -----------------------------------------------------------------
 -- 9. Parallel line construction (using axiom of choice)
@@ -493,8 +777,7 @@ theorem midpoint_sym : forall (M A B : Point),
   have h_step : seg_congruent M B A M :=
     congruent_sym A M M B h_cong
   have h_swap : seg_congruent M B B M :=
-    congruent_swap M B (between_distinct_first M B A
-      (between_sym A M B h_bet))
+    congruent_swap M B (between_distinct_middle A M B h_bet)
   have h_BM_MB : seg_congruent B M M B :=
     congruent_sym M B B M h_swap
   have h_BM_AM : seg_congruent B M A M :=
@@ -515,10 +798,6 @@ def isosceles (A : Point) (B : Point) (C : Point) : Prop :=
 def equilateral (A : Point) (B : Point) (C : Point) : Prop :=
   And (seg_congruent A B B C) (seg_congruent B C C A)
 
--- -----------------------------------------------------------------
--- 11. Derived theorems
--- -----------------------------------------------------------------
-
 -- Collinearity is preserved under permutation of points
 theorem collinear_perm : forall (A : Point), forall (B : Point), forall (C : Point),
   collinear A B C -> collinear B A C := by
@@ -526,5 +805,18 @@ theorem collinear_perm : forall (A : Point), forall (B : Point), forall (C : Poi
   intro B
   intro C
   intro h
-  exact h
+  exact (exists_elim_prop Line
+    (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l)))
+    (collinear B A C)
+    (fun l : Line =>
+      fun hl : And (on_line A l) (And (on_line B l) (on_line C l)) =>
+        Exists.intro Line (fun m : Line => And (on_line B m) (And (on_line A m) (on_line C m))) l
+          (And.conj (on_line B l) (And (on_line A l) (on_line C l))
+            (and_fst (on_line B l) (on_line C l)
+              (and_snd (on_line A l) (And (on_line B l) (on_line C l)) hl))
+            (And.conj (on_line A l) (on_line C l)
+              (and_fst (on_line A l) (And (on_line B l) (on_line C l)) hl)
+              (and_snd (on_line B l) (on_line C l)
+                (and_snd (on_line A l) (And (on_line B l) (on_line C l)) hl)))))
+    h)
 

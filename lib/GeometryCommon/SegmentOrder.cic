@@ -1,0 +1,159 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+
+-- =====================================================================
+-- Segment ordering helpers
+-- =====================================================================
+
+-- Congruence preserves segment ordering in the small (left) segment.
+theorem segment_less_preserve_congruent_left : forall (A B C D E F : Point),
+  segment_less A B C D ->
+  seg_congruent A B E F ->
+  segment_less E F C D := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro h_less
+  intro h_AB_EF
+  have h_G_ex : exists (G : Point), And (between C G D) (seg_congruent A B C G) := h_less
+  have G : Point := choice Point (fun G : Point =>
+    And (between C G D) (seg_congruent A B C G)) h_G_ex
+  have h_G_spec : And (between C G D) (seg_congruent A B C G) :=
+    choice_spec Point (fun G : Point =>
+      And (between C G D) (seg_congruent A B C G)) h_G_ex
+  have h_CGD : between C G D :=
+    and_fst (between C G D) (seg_congruent A B C G) h_G_spec
+  have h_AB_CG : seg_congruent A B C G :=
+    and_snd (between C G D) (seg_congruent A B C G) h_G_spec
+  have h_EF_AB : seg_congruent E F A B := congruent_sym A B E F h_AB_EF
+  have h_EF_CG : seg_congruent E F C G :=
+    congruent_trans E F A B C G h_EF_AB h_AB_CG
+  exact (Exists.intro Point
+    (fun H : Point => And (between C H D) (seg_congruent E F C H)) G
+    (And.conj (between C G D) (seg_congruent E F C G) h_CGD h_EF_CG))
+
+-- The right piece of a segment is shorter than the whole.
+theorem between_implies_segment_less_right : forall (A B C : Point),
+  between A B C -> segment_less B C A C := by
+  intro A
+  intro B
+  intro C
+  intro h_ABC
+  have h_CBA : between C B A := between_sym A B C h_ABC
+  have h_CB_CA : segment_less C B C A := between_implies_segment_less C B A h_CBA
+  have h_BC_ne : Not (Eq Point B C) := between_distinct_middle A B C h_ABC
+  have h_CB_BC : seg_congruent C B B C :=
+    congruent_sym B C C B (congruent_swap B C h_BC_ne)
+  have h_BC_CA : segment_less B C C A :=
+    segment_less_preserve_congruent_left C B C A B C h_CB_CA h_CB_BC
+  have h_AC_ne : Not (Eq Point A C) := between_distinct_ends A B C h_ABC
+  have h_CA_AC : seg_congruent C A A C :=
+    congruent_sym A C C A (congruent_swap A C h_AC_ne)
+  exact (segment_less_preserve_congruent B C C A A C h_BC_CA h_CA_AC)
+
+-- Addition of strict segment inequalities: if AB < A'B' and BC < B'C'
+-- (with B between A and C, and B' between A' and C'), then AC < A'C'.
+theorem segment_less_add : forall (A B C A' B' C' : Point),
+  between A B C ->
+  between A' B' C' ->
+  segment_less A B A' B' ->
+  segment_less B C B' C' ->
+  segment_less A C A' C' := by
+  intro A
+  intro B
+  intro C
+  intro A'
+  intro B'
+  intro C'
+  intro h_ABC
+  intro h_A'B'C'
+  intro h_AB_less
+  intro h_BC_less
+  -- Witness for AB < A'B': G between A' and B' with A'G = AB.
+  have h_G_ex : exists (G : Point), And (between A' G B') (seg_congruent A B A' G) := h_AB_less
+  have G : Point := choice Point (fun G : Point =>
+    And (between A' G B') (seg_congruent A B A' G)) h_G_ex
+  have h_G_spec : And (between A' G B') (seg_congruent A B A' G) :=
+    choice_spec Point (fun G : Point =>
+      And (between A' G B') (seg_congruent A B A' G)) h_G_ex
+  have h_A'GB' : between A' G B' :=
+    and_fst (between A' G B') (seg_congruent A B A' G) h_G_spec
+  have h_AB_A'G : seg_congruent A B A' G :=
+    and_snd (between A' G B') (seg_congruent A B A' G) h_G_spec
+  -- Witness for BC < B'C': H between B' and C' with B'H = BC.
+  have h_H_ex : exists (H : Point), And (between B' H C') (seg_congruent B C B' H) := h_BC_less
+  have H : Point := choice Point (fun H : Point =>
+    And (between B' H C') (seg_congruent B C B' H)) h_H_ex
+  have h_H_spec : And (between B' H C') (seg_congruent B C B' H) :=
+    choice_spec Point (fun H : Point =>
+      And (between B' H C') (seg_congruent B C B' H)) h_H_ex
+  have h_B'HC' : between B' H C' :=
+    and_fst (between B' H C') (seg_congruent B C B' H) h_H_spec
+  have h_BC_B'H : seg_congruent B C B' H :=
+    and_snd (between B' H C') (seg_congruent B C B' H) h_H_spec
+  -- Transfer BC from G past B': K with G-B'-K and GK = BC.
+  have h_BC_ne : Not (Eq Point B C) := between_distinct_middle A B C h_ABC
+  have h_GB'_ne : Not (Eq Point G B') := between_distinct_middle A' G B' h_A'GB'
+  have h_K_ex : exists (K : Point), And (between G B' K) (seg_congruent B C G K) :=
+    congruent_transfer B C G B' h_BC_ne h_GB'_ne
+  have K : Point := choice Point (fun K : Point =>
+    And (between G B' K) (seg_congruent B C G K)) h_K_ex
+  have h_K_spec : And (between G B' K) (seg_congruent B C G K) :=
+    choice_spec Point (fun K : Point =>
+      And (between G B' K) (seg_congruent B C G K)) h_K_ex
+  have h_GB'K : between G B' K :=
+    and_fst (between G B' K) (seg_congruent B C G K) h_K_spec
+  have h_BC_GK : seg_congruent B C G K :=
+    and_snd (between G B' K) (seg_congruent B C G K) h_K_spec
+  -- A'K = AB + BC = AC.
+  have h_A'GK : between A' G K := between_trans A' G B' K h_A'GB' h_GB'K
+  have h_AC_A'K : seg_congruent A C A' K :=
+    congruent_add A B C A' G K h_ABC h_A'GK h_AB_A'G h_BC_GK
+  -- K and C' lie on the same ray from B' (beyond B' from G).
+  have h_GB'C' : between G B' C' := between_inner A' G B' C' h_A'GB' h_A'B'C'
+  have h_GB'H : between G B' H :=
+    between_sym H B' G
+      (between_inner C' H B' G
+        (between_sym B' H C' h_B'HC')
+        (between_sym G B' C' h_GB'C'))
+  -- B'K < B'H (since GK = B'H and B'K < GK).
+  have h_B'K_GK : segment_less B' K G K := between_implies_segment_less_right G B' K h_GB'K
+  have h_GK_B'H : seg_congruent G K B' H :=
+    congruent_trans G K B C B' H (congruent_sym B C G K h_BC_GK) h_BC_B'H
+  have h_B'K_B'H : segment_less B' K B' H :=
+    segment_less_preserve_congruent B' K G K B' H h_B'K_GK h_GK_B'H
+  -- Compare K and H on the ray from B' (away from G): K comes first.
+  have h_side_KH : Or (between B' K H) (Or (between B' H K) (Eq Point K H)) :=
+    between_same_side G B' K H h_GB'K h_GB'H
+  have h_B'KH : between B' K H :=
+    or_elim (between B' K H) (Or (between B' H K) (Eq Point K H)) (between B' K H) h_side_KH
+      (fun h : between B' K H => h)
+      (fun h_rest : Or (between B' H K) (Eq Point K H) =>
+        or_elim (between B' H K) (Eq Point K H) (between B' K H) h_rest
+          (fun h_B'HK : between B' H K =>
+            let h_B'H_B'K : segment_less B' H B' K := between_implies_segment_less B' H K h_B'HK in
+            let h_B'H_B'H : segment_less B' H B' H :=
+              segment_less_trans B' H B' K B' H h_B'H_B'K h_B'K_B'H in
+            False_elim (between B' K H) (segment_less_irrefl B' H h_B'H_B'H))
+          (fun h_eq_KH : Eq Point K H =>
+            let h_B'K_B'K : segment_less B' K B' K :=
+              eq_subst Point H K (fun X : Point => segment_less B' K B' X)
+                (eq_sym Point K H h_eq_KH) h_B'K_B'H in
+            False_elim (between B' K H) (segment_less_irrefl B' K h_B'K_B'K)))
+  -- Climb up to C': B'-K-H-C' gives B'-K-C'.
+  have h_KHC' : between K H C' := between_inner B' K H C' h_B'KH h_B'HC'
+  have h_B'KC' : between B' K C' := between_trans B' K H C' h_B'KH h_KHC'
+  -- A'-B'-K and B'-K-C' give A'-K-C'.
+  have h_A'B'K : between A' B' K := between_trans A' G B' K h_A'GB' h_GB'K
+  have h_A'KC' : between A' K C' :=
+    between_sym C' K A'
+      (between_trans C' K B' A'
+        (between_sym B' K C' h_B'KC')
+        (between_sym A' B' K h_A'B'K))
+  -- Therefore AC < A'C' with witness K.
+  exact (Exists.intro Point
+    (fun X : Point => And (between A' X C') (seg_congruent A C A' X)) K
+    (And.conj (between A' K C') (seg_congruent A C A' K) h_A'KC' h_AC_A'K))

@@ -1040,7 +1040,8 @@ impl Parser {
         let col = tmp.current_col();
         let kw = ["def", "theorem", "solve", "inductive", "structure", "axiom",
                   "intro", "intros", "exact", "apply", "refl", "reflexivity", "rfl",
-                  "assumption", "rewrite", "rw", "induction", "cases", "have", "exists"]
+                  "assumption", "rewrite", "rw", "induction", "cases", "have", "exists",
+                  "import"]
             .iter()
             .find(|kw| tmp.starts_with_keyword(kw))
             .copied();
@@ -1772,6 +1773,7 @@ impl Parser {
                 || self.starts_with_keyword("inductive")
                 || self.starts_with_keyword("structure")
                 || self.starts_with_keyword("axiom")
+                || self.starts_with_keyword("import")
             {
                 break;
             }
@@ -1796,7 +1798,8 @@ impl Parser {
                         || self.starts_with_keyword("solve")
                         || self.starts_with_keyword("inductive")
                         || self.starts_with_keyword("structure")
-                        || self.starts_with_keyword("axiom"))
+                        || self.starts_with_keyword("axiom")
+                        || self.starts_with_keyword("import"))
                 {
                     break;
                 }
@@ -1821,7 +1824,7 @@ impl Parser {
                     // lower indentation as this tactic and is a known tactic or
                     // top-level declaration keyword.
                     let (next_col, next_kw) = self.peek_next_token_col();
-                    if next_col <= tactic_start_col
+                    let do_break = next_col <= tactic_start_col
                         && (next_kw.is_some()
                             || self.peek().is_none()
                             || self.starts_with_keyword("def")
@@ -1829,8 +1832,9 @@ impl Parser {
                             || self.starts_with_keyword("solve")
                             || self.starts_with_keyword("inductive")
                             || self.starts_with_keyword("structure")
-                            || self.starts_with_keyword("axiom"))
-                    {
+                            || self.starts_with_keyword("axiom")
+                            || self.starts_with_keyword("import"));
+                    if do_break {
                         break;
                     }
                     // Otherwise this is a continuation line: fall through and keep

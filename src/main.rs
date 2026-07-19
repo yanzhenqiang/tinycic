@@ -44,7 +44,7 @@ fn print_usage(prog: &str) {
     eprintln!("Commands:");
     eprintln!("  lean-check                   Run Lean kernel type checker tests");
     eprintln!("  repl                         Start interactive Lean REPL");
-    eprintln!("  check-files <file>...        Batch check .cic files");
+    eprintln!("  check-files [--trace] [--trace-format beautiful|ast] [--trace-file <path>] <file>...  Batch check .cic files");
     eprintln!("  tui <target> [deps...]       Interactive TUI goal viewer");
     eprintln!("  serve [port]                Start web server (default port: 8080)");
     eprintln!("");
@@ -219,8 +219,58 @@ fn run_lean_check() {
     println!("╚{}╝", line);
 }
 
-fn run_check_files(files: &[String]) {
+fn run_check_files(args: &[String]) {
+    let mut files = Vec::new();
+    let mut trace_enabled = false;
+    let mut trace_format: Option<tinycic::type_checker::TraceFormat> = None;
+    let mut trace_path: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--trace" => {
+                trace_enabled = true;
+            }
+            "--trace-format" => {
+                if i + 1 >= args.len() {
+                    eprintln!("Usage: {} check-files [--trace] [--trace-format beautiful|ast] [--trace-file <path>] <file1.cic> [file2.cic] ...", env::args().next().unwrap_or_else(|| "tinycic".to_string()));
+                    std::process::exit(1);
+                }
+                match args[i + 1].as_str() {
+                    "beautiful" => trace_format = Some(tinycic::type_checker::TraceFormat::Beautiful),
+                    "ast" => trace_format = Some(tinycic::type_checker::TraceFormat::Ast),
+                    other => {
+                        eprintln!("Unknown trace format: {}. Expected 'beautiful' or 'ast'.", other);
+                        std::process::exit(1);
+                    }
+                }
+                i += 1;
+            }
+            "--trace-file" => {
+                if i + 1 >= args.len() {
+                    eprintln!("Usage: {} check-files [--trace] [--trace-format beautiful|ast] [--trace-file <path>] <file1.cic> [file2.cic] ...", env::args().next().unwrap_or_else(|| "tinycic".to_string()));
+                    std::process::exit(1);
+                }
+                trace_path = Some(args[i + 1].clone());
+                i += 1;
+            }
+            _ => files.push(args[i].clone()),
+        }
+        i += 1;
+    }
+    if files.is_empty() {
+        eprintln!("Usage: {} check-files [--trace] [--trace-format beautiful|ast] [--trace-file <path>] <file1.cic> [file2.cic] ...", env::args().next().unwrap_or_else(|| "tinycic".to_string()));
+        std::process::exit(1);
+    }
     let mut repl = tinycic::repl::Repl::new();
+    if trace_enabled {
+        repl.set_trace_enabled(true);
+    }
+    if let Some(format) = trace_format {
+        repl.set_trace_format(format);
+    }
+    if let Some(path) = trace_path {
+        repl.set_trace_path(path);
+    }
     match repl.check_files(&files.iter().map(|s| s.as_str()).collect::<Vec<_>>()) {
         Ok(()) => println!("OK"),
         Err(e) => {

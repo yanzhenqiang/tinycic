@@ -1,0 +1,447 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+import GeometryCommon.Angle
+import GeometryCommon.SegmentOrder
+
+-- =====================================================================
+-- Midpoint construction helpers
+-- =====================================================================
+-- This file collects the midpoint-free pieces of a midpoint construction:
+--   * an off-line / non-collinear point exists for any segment;
+--   * the isosceles base-angle converse (an AAS copy kept here to avoid
+--     importing Geometry.cic);
+--   * the core reduction: an isosceles apex over AB yields the midpoint of
+--     AB (angle bisector + SAS).
+-- The remaining input to a fully de-axiomatized `midpoint_exists` is an
+-- equidistant off-line point over AB (an isosceles apex); producing one
+-- needs plane-separation machinery (a side predicate and a Pasch-based
+-- "two rays meet" theorem) and is developed separately.
+
+-- ---------------------------------------------------------------------
+-- Off-line and non-collinear points
+-- ---------------------------------------------------------------------
+
+-- Some point lies off any given line.
+theorem exists_point_off_line : forall (l : Line),
+  exists (P : Point), Not (on_line P l) := by
+  intro l
+  have h_tri : exists (A : Point), exists (B : Point), exists (C : Point),
+    And (Not (Eq Point A B))
+      (And (Not (Eq Point B C))
+        (And (Not (Eq Point A C))
+          (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')))) :=
+    three_non_collinear
+  exact (exists_elim_prop Point
+    (fun A : Point => exists (B : Point), exists (C : Point),
+      And (Not (Eq Point A B))
+        (And (Not (Eq Point B C))
+          (And (Not (Eq Point A C))
+            (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')))))
+    (exists (P : Point), Not (on_line P l))
+    (fun A : Point =>
+      fun hA : exists (B : Point), exists (C : Point),
+        And (Not (Eq Point A B))
+          (And (Not (Eq Point B C))
+            (And (Not (Eq Point A C))
+              (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')))) =>
+      exists_elim_prop Point
+        (fun B : Point => exists (C : Point),
+          And (Not (Eq Point A B))
+            (And (Not (Eq Point B C))
+              (And (Not (Eq Point A C))
+                (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')))))
+        (exists (P : Point), Not (on_line P l))
+        (fun B : Point =>
+          fun hB : exists (C : Point),
+            And (Not (Eq Point A B))
+              (And (Not (Eq Point B C))
+                (And (Not (Eq Point A C))
+                  (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')))) =>
+          exists_elim_prop Point
+            (fun C : Point =>
+              And (Not (Eq Point A B))
+                (And (Not (Eq Point B C))
+                  (And (Not (Eq Point A C))
+                    (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')))))
+            (exists (P : Point), Not (on_line P l))
+            (fun C : Point =>
+              fun hC : And (Not (Eq Point A B))
+                (And (Not (Eq Point B C))
+                  (And (Not (Eq Point A C))
+                    (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')))) =>
+              let h_nocol : forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l') :=
+                and_snd (Not (Eq Point A C))
+                  (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l'))
+                  (and_snd (Not (Eq Point B C))
+                    (And (Not (Eq Point A C))
+                      (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l')))
+                    (and_snd (Not (Eq Point A B))
+                      (And (Not (Eq Point B C))
+                        (And (Not (Eq Point A C))
+                          (forall (l' : Line), on_line A l' -> on_line B l' -> Not (on_line C l'))))
+                      hC))
+              in
+              let h_emA : Or (on_line A l) (Not (on_line A l)) :=
+                excluded_middle (on_line A l) in
+              or_elim (on_line A l) (Not (on_line A l))
+                (exists (P : Point), Not (on_line P l)) h_emA
+                (fun h_Aon : on_line A l =>
+                  let h_emB : Or (on_line B l) (Not (on_line B l)) :=
+                    excluded_middle (on_line B l) in
+                  or_elim (on_line B l) (Not (on_line B l))
+                    (exists (P : Point), Not (on_line P l)) h_emB
+                    (fun h_Bon : on_line B l =>
+                      let h_Coff : Not (on_line C l) := h_nocol l h_Aon h_Bon in
+                      Exists.intro Point (fun P : Point => Not (on_line P l)) C h_Coff)
+                    (fun h_Boff : Not (on_line B l) =>
+                      Exists.intro Point (fun P : Point => Not (on_line P l)) B h_Boff))
+                (fun h_Aoff : Not (on_line A l) =>
+                  Exists.intro Point (fun P : Point => Not (on_line P l)) A h_Aoff))
+            hB)
+        hA)
+    h_tri)
+
+-- A point off the line through A and B is not collinear with A and B.
+theorem not_on_line_not_collinear : forall (A B P : Point) (l : Line),
+  Not (Eq Point A B) ->
+  on_line A l -> on_line B l ->
+  Not (on_line P l) ->
+  Not (collinear A B P) := by
+  intro A
+  intro B
+  intro P
+  intro l
+  intro h_AB
+  intro h_Aon
+  intro h_Bon
+  intro h_Poff
+  intro h_col
+  have h_m_ex : exists (m : Line),
+    And (on_line A m) (And (on_line B m) (on_line P m)) := h_col
+  have m : Line := choice Line (fun m : Line =>
+    And (on_line A m) (And (on_line B m) (on_line P m))) h_m_ex
+  have h_m_spec : And (on_line A m) (And (on_line B m) (on_line P m)) :=
+    choice_spec Line (fun m : Line =>
+      And (on_line A m) (And (on_line B m) (on_line P m))) h_m_ex
+  have h_Aon_m : on_line A m :=
+    and_fst (on_line A m) (And (on_line B m) (on_line P m)) h_m_spec
+  have h_Bon_m : on_line B m :=
+    and_fst (on_line B m) (on_line P m)
+      (and_snd (on_line A m) (And (on_line B m) (on_line P m)) h_m_spec)
+  have h_Pon_m : on_line P m :=
+    and_snd (on_line B m) (on_line P m)
+      (and_snd (on_line A m) (And (on_line B m) (on_line P m)) h_m_spec)
+  have h_eq_lm : Eq Line l m :=
+    line_unique A B l m h_AB h_Aon h_Bon h_Aon_m h_Bon_m
+  have h_Pon_l : on_line P l :=
+    eq_subst Line m l (fun x : Line => on_line P x)
+      (eq_sym Line l m h_eq_lm) h_Pon_m
+  exact (h_Poff h_Pon_l)
+
+-- For any two distinct points there is a point not collinear with them.
+theorem exists_non_collinear_point : forall (A B : Point),
+  Not (Eq Point A B) -> exists (P : Point), Not (collinear A B P) := by
+  intro A
+  intro B
+  intro h_AB
+  have h_l_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l : Line := choice Line (fun l : Line =>
+    And (on_line A l) (on_line B l)) h_l_ex
+  have h_l_spec : And (on_line A l) (on_line B l) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_l_ex
+  have h_Aon : on_line A l :=
+    and_fst (on_line A l) (on_line B l) h_l_spec
+  have h_Bon : on_line B l :=
+    and_snd (on_line A l) (on_line B l) h_l_spec
+  have h_P_ex : exists (P : Point), Not (on_line P l) := exists_point_off_line l
+  exact (exists_elim_prop Point
+    (fun P : Point => Not (on_line P l))
+    (exists (P : Point), Not (collinear A B P))
+    (fun P : Point =>
+      fun h_Poff : Not (on_line P l) =>
+      Exists.intro Point (fun Q : Point => Not (collinear A B Q)) P
+        (not_on_line_not_collinear A B P l h_AB h_Aon h_Bon h_Poff))
+    h_P_ex)
+
+-- ---------------------------------------------------------------------
+-- Isosceles base-angle converse (AAS copy, midpoint-free)
+-- ---------------------------------------------------------------------
+
+-- If the base angles at B and C are congruent, then AB ≅ AC.
+theorem isosceles_converse_core : forall (A B C : Point),
+  Not (collinear A B C) ->
+  angle_congruent A B C A C B ->
+  seg_congruent A B A C := by
+  intro A
+  intro B
+  intro C
+  intro h_nd
+  intro h
+  exact (and_fst (seg_congruent A B A C)
+    (And (seg_congruent A C A B) (angle_congruent A C B A B C))
+    (AAS A B C A C B
+      (angle_vertex_swap A B C)
+      h
+      (congruent_swap B C
+        (and_fst (Not (Eq Point B C)) (Not (Eq Point A C))
+          (and_snd (Not (Eq Point A B))
+            (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+            (triangle_nondegenerate A B C h_nd))))))
+
+-- ---------------------------------------------------------------------
+-- Core reduction: an isosceles apex over AB yields the midpoint of AB
+-- ---------------------------------------------------------------------
+
+-- Given P off line AB with PA ≅ PB, the bisector of the apex angle meets
+-- AB at its midpoint (SAS on the two resulting triangles).
+theorem midpoint_of_isosceles : forall (A B P : Point),
+  Not (Eq Point A B) ->
+  Not (collinear A B P) ->
+  seg_congruent P A P B ->
+  exists (M : Point), midpoint M A B := by
+  intro A
+  intro B
+  intro P
+  intro h_AB
+  intro h_nocol
+  intro h_PA_PB
+  -- Distinctness facts for the apex angle at P.
+  have h_dist : And (Not (Eq Point A B))
+    (And (Not (Eq Point B P)) (Not (Eq Point A P))) :=
+    triangle_nondegenerate A B P h_nocol
+  have h_BP : Not (Eq Point B P) :=
+    and_fst (Not (Eq Point B P)) (Not (Eq Point A P))
+      (and_snd (Not (Eq Point A B))
+        (And (Not (Eq Point B P)) (Not (Eq Point A P))) h_dist)
+  have h_AP : Not (Eq Point A P) :=
+    and_snd (Not (Eq Point B P)) (Not (Eq Point A P))
+      (and_snd (Not (Eq Point A B))
+        (And (Not (Eq Point B P)) (Not (Eq Point A P))) h_dist)
+  have h_PB : Not (Eq Point P B) :=
+    fun h_eq : Eq Point P B => h_BP (eq_sym Point P B h_eq)
+  have h_nocol_APB : Not (collinear A P B) :=
+    fun h : collinear A P B => h_nocol (collinear_perm2 A P B h)
+  -- Bisect the apex angle at P; the bisector meets AB at D.
+  have h_D_ex : exists (D : Point),
+    And (between A D B)
+      (And (collinear A D B) (angle_congruent A P D D P B)) :=
+    angle_bisector_exists A P B h_AP h_PB h_nocol_APB
+  have D : Point := choice Point (fun D : Point =>
+    And (between A D B)
+      (And (collinear A D B) (angle_congruent A P D D P B))) h_D_ex
+  have h_D_spec : And (between A D B)
+    (And (collinear A D B) (angle_congruent A P D D P B)) :=
+    choice_spec Point (fun D : Point =>
+      And (between A D B)
+        (And (collinear A D B) (angle_congruent A P D D P B))) h_D_ex
+  have h_ADB : between A D B :=
+    and_fst (between A D B)
+      (And (collinear A D B) (angle_congruent A P D D P B)) h_D_spec
+  have h_rest : And (collinear A D B) (angle_congruent A P D D P B) :=
+    and_snd (between A D B)
+      (And (collinear A D B) (angle_congruent A P D D P B)) h_D_spec
+  have h_col_ADB : collinear A D B :=
+    and_fst (collinear A D B) (angle_congruent A P D D P B) h_rest
+  have h_bisect : angle_congruent A P D D P B :=
+    and_snd (collinear A D B) (angle_congruent A P D D P B) h_rest
+  -- P is off line AB while D lies on it, so P <> D.
+  have h_PD : Not (Eq Point P D) :=
+    fun h_eq : Eq Point P D =>
+      let h_col_APB : collinear A P B :=
+        eq_subst Point D P (fun X : Point => collinear A X B)
+          (eq_sym Point P D h_eq) h_col_ADB in
+      h_nocol_APB h_col_APB
+  -- Orient the bisector angle as angle_congruent A P D B P D for SAS.
+  have h_DPB_BPD : angle_congruent D P B B P D :=
+    angle_sym B P D D P B (angle_vertex_swap P B D)
+  have h_bisect_sas : angle_congruent A P D B P D :=
+    angle_trans A P D D P B B P D h_bisect h_DPB_BPD
+  -- SAS on triangles APD and BPD around the bisector at P.
+  have h_sas : And (seg_congruent A D B D)
+    (And (angle_congruent P A D P B D) (angle_congruent P D A P D B)) :=
+    SAS P A D P B D h_PA_PB h_bisect_sas (congruent_refl P D h_PD)
+  have h_AD_BD : seg_congruent A D B D :=
+    and_fst (seg_congruent A D B D)
+      (And (angle_congruent P A D P B D) (angle_congruent P D A P D B)) h_sas
+  -- Convert AD ≅ BD to AD ≅ DB.
+  have h_DB : Not (Eq Point D B) := between_distinct_middle A D B h_ADB
+  have h_BD_ne : Not (Eq Point B D) :=
+    fun h_eq : Eq Point B D => h_DB (eq_sym Point B D h_eq)
+  have h_AD_DB : seg_congruent A D D B :=
+    congruent_trans A D B D D B h_AD_BD (congruent_swap B D h_BD_ne)
+  have h_mid : midpoint D A B :=
+    And.conj (between A D B) (seg_congruent A D D B) h_ADB h_AD_DB
+  exact (Exists.intro Point (fun M : Point => midpoint M A B) D h_mid)
+
+-- (opposite_side_line / same_side_line now live in GeometryAxioms.cic §9,
+--  so that Angle.cic can use them in the full Hilbert III4 axiom.)
+
+-- ------------------------------------------------------------------
+-- Construction of an isosceles apex (foundational geometric existence)
+-- ------------------------------------------------------------------
+-- midpoint_exists (below) is proved by bisecting the apex angle of an
+-- isosceles triangle over AB.  The one geometric input it needs is a point
+-- P off line AB with PA ≅ PB (the apex).  Producing such a P is *not*
+-- derivable from incidence/order/congruence alone: every construction
+-- (erect a perpendicular at the midpoint, intersect two equal-radius
+-- circles, or draw two equal-base-angle rays until they meet) bottoms out
+-- at the same missing plane-separation fact -- namely that at a point on a
+-- line the perpendicular ray is unique (equivalently, two equal-base-angle
+-- rays on the same side meet, a Pasch/side statement).
+--
+-- We therefore keep isosceles_apex_exists as a primitive-grade geometric-
+-- existence axiom, on the same footing as perpendicular_exists and
+-- circle_line_meet.  It is the one existence input feeding the proved
+-- theorem midpoint_exists; adding a side predicate with perpendicular-ray
+-- uniqueness would turn it into a theorem and remove it.
+
+axiom isosceles_apex_exists : forall (A B : Point),
+  Not (Eq Point A B) -> exists (P : Point),
+    And (Not (collinear A B P)) (seg_congruent P A P B)
+
+-- Every segment has a midpoint.
+theorem midpoint_exists : forall (A B : Point),
+  Not (Eq Point A B) -> exists (M : Point), midpoint M A B := by
+  intro A
+  intro B
+  intro h_AB
+  have h_P_ex : exists (P : Point),
+    And (Not (collinear A B P)) (seg_congruent P A P B) :=
+    isosceles_apex_exists A B h_AB
+  exact (exists_elim_prop Point
+    (fun P : Point => And (Not (collinear A B P)) (seg_congruent P A P B))
+    (exists (M : Point), midpoint M A B)
+    (fun P : Point =>
+      fun h_P_spec : And (Not (collinear A B P)) (seg_congruent P A P B) =>
+      let h_nocol : Not (collinear A B P) :=
+        and_fst (Not (collinear A B P)) (seg_congruent P A P B) h_P_spec in
+      let h_eq : seg_congruent P A P B :=
+        and_snd (Not (collinear A B P)) (seg_congruent P A P B) h_P_spec in
+      midpoint_of_isosceles A B P h_AB h_nocol h_eq)
+    h_P_ex)
+
+-- Loader-facing alias (so files importing via GeometryCommon see the
+-- same name they used when midpoint_exists was an axiom).
+theorem midpoint_exists_thm : forall (A B : Point),
+  Not (Eq Point A B) -> exists (M : Point), midpoint M A B :=
+  midpoint_exists
+
+-- ------------------------------------------------------------------
+-- Segment trichotomy for the two pieces of a split segment
+-- ------------------------------------------------------------------
+
+-- On a ray OX, two points P and Q both lie on the same side of O, so O
+-- cannot be strictly between them.
+theorem not_between_origin : forall (O X P Q : Point),
+  between O X P -> between O X Q -> Not (between P O Q) := by
+  intro O
+  intro X
+  intro P
+  intro Q
+  intro h_OXP
+  intro h_OXQ
+  intro h_POQ
+  have h_QOP : between Q O P := between_sym P O Q h_POQ
+  have h_QXO : between Q X O := between_sym O X Q h_OXQ
+  have h_XOP : between X O P := between_inner Q X O P h_QXO h_QOP
+  have h_PXO : between P X O := between_sym O X P h_OXP
+  have h_POX : between P O X := between_sym X O P h_XOP
+  exact (between_not_both P X O h_PXO h_POX)
+
+-- For M between A and B, exactly one of AM < MB, AM ≅ MB, MB < AM holds.
+-- We prove the "or" form; mutual exclusivity follows from
+-- segment_less_irrefl / segment_congruent_not_less.
+theorem segment_trichotomy_on_segment : forall (A B M : Point),
+  between A M B ->
+  Or (segment_less A M M B)
+    (Or (seg_congruent A M M B) (segment_less M B A M)) := by
+  intro A
+  intro B
+  intro M
+  intro h_AMB
+  have h_AM : Not (Eq Point A M) := between_distinct_first A M B h_AMB
+  have h_MB : Not (Eq Point M B) := between_distinct_middle A M B h_AMB
+  -- Lay AM and MB off on the same ray from A through M.
+  have h_P_ex : exists (P : Point), And (between A M P) (seg_congruent A M A P) :=
+    congruent_transfer A M A M h_AM h_AM
+  have P : Point := choice Point (fun P : Point =>
+    And (between A M P) (seg_congruent A M A P)) h_P_ex
+  have h_P_spec : And (between A M P) (seg_congruent A M A P) :=
+    choice_spec Point (fun P : Point =>
+      And (between A M P) (seg_congruent A M A P)) h_P_ex
+  have h_AMP : between A M P :=
+    and_fst (between A M P) (seg_congruent A M A P) h_P_spec
+  have h_AM_AP : seg_congruent A M A P :=
+    and_snd (between A M P) (seg_congruent A M A P) h_P_spec
+  have h_Q_ex : exists (Q : Point), And (between A M Q) (seg_congruent M B A Q) :=
+    congruent_transfer M B A M h_MB h_AM
+  have Q : Point := choice Point (fun Q : Point =>
+    And (between A M Q) (seg_congruent M B A Q)) h_Q_ex
+  have h_Q_spec : And (between A M Q) (seg_congruent M B A Q) :=
+    choice_spec Point (fun Q : Point =>
+      And (between A M Q) (seg_congruent M B A Q)) h_Q_ex
+  have h_AMQ : between A M Q :=
+    and_fst (between A M Q) (seg_congruent M B A Q) h_Q_spec
+  have h_MB_AQ : seg_congruent M B A Q :=
+    and_snd (between A M Q) (seg_congruent M B A Q) h_Q_spec
+  -- P and Q both lie on ray A->M, hence collinear with A and distinct from A.
+  have h_AP : Not (Eq Point A P) := between_distinct_ends A M P h_AMP
+  have h_AQ : Not (Eq Point A Q) := between_distinct_ends A M Q h_AMQ
+  have h_col_APQ : collinear A P Q :=
+    collinear_shared_merge_fst A M P Q
+      (between_implies_collinear A M P h_AMP)
+      (between_implies_collinear A M Q h_AMQ)
+      h_AM
+  -- Case split on whether P = Q.
+  have h_em_PQ : Or (Eq Point P Q) (Not (Eq Point P Q)) := excluded_middle (Eq Point P Q)
+  exact (or_elim (Eq Point P Q) (Not (Eq Point P Q))
+    (Or (segment_less A M M B)
+      (Or (seg_congruent A M M B) (segment_less M B A M))) h_em_PQ
+    (fun h_PQ : Eq Point P Q =>
+      -- AP = AQ, so AM = MB.
+      let h_AM_AQ : seg_congruent A M A Q :=
+        eq_subst Point P Q (fun X : Point => seg_congruent A M A X) h_PQ h_AM_AP in
+      let h_AQ_MB : seg_congruent A Q M B := congruent_sym M B A Q h_MB_AQ in
+      let h_AM_MB : seg_congruent A M M B :=
+        congruent_trans A M A Q M B h_AM_AQ h_AQ_MB in
+      Or.inr (segment_less A M M B)
+        (Or (seg_congruent A M M B) (segment_less M B A M))
+        (Or.inl (seg_congruent A M M B) (segment_less M B A M) h_AM_MB))
+    (fun h_PQ_ne : Not (Eq Point P Q) =>
+      let h_order : Or (between A P Q) (Or (between P Q A) (between P A Q)) :=
+        between_unique A P Q h_AP h_PQ_ne h_AQ h_col_APQ in
+      or_elim (between A P Q) (Or (between P Q A) (between P A Q))
+        (Or (segment_less A M M B)
+          (Or (seg_congruent A M M B) (segment_less M B A M))) h_order
+        (fun h_APQ : between A P Q =>
+          -- AP < AQ, hence AM < MB.
+          let h_OP_OQ : segment_less A P A Q := between_implies_segment_less A P Q h_APQ in
+          let h_AM_MB : segment_less A M M B :=
+            segment_less_preserve_congruent_left A P A Q A M
+              (segment_less_preserve_congruent A P A Q M B h_OP_OQ
+                (congruent_sym M B A Q h_MB_AQ))
+              (congruent_sym A M A P h_AM_AP) in
+          Or.inl (segment_less A M M B)
+            (Or (seg_congruent A M M B) (segment_less M B A M)) h_AM_MB)
+        (fun h_rest : Or (between P Q A) (between P A Q) =>
+          or_elim (between P Q A) (between P A Q)
+            (Or (segment_less A M M B)
+              (Or (seg_congruent A M M B) (segment_less M B A M))) h_rest
+            (fun h_PQA : between P Q A =>
+              -- between P Q A  ==  between A Q P (sym), so AQ < AP, MB < AM.
+              let h_AQP : between A Q P := between_sym P Q A h_PQA in
+              let h_OQ_OP : segment_less A Q A P := between_implies_segment_less A Q P h_AQP in
+              let h_MB_AM : segment_less M B A M :=
+                segment_less_preserve_congruent_left A Q A P M B
+                  (segment_less_preserve_congruent A Q A P A M h_OQ_OP
+                    (congruent_sym A M A P h_AM_AP))
+                  (congruent_sym M B A Q h_MB_AQ) in
+              Or.inr (segment_less A M M B)
+                (Or (seg_congruent A M M B) (segment_less M B A M))
+                (Or.inr (seg_congruent A M M B) (segment_less M B A M) h_MB_AM))
+            (fun h_PAQ : between P A Q =>
+              False_elim (Or (segment_less A M M B)
+                (Or (seg_congruent A M M B) (segment_less M B A M)))
+                (not_between_origin A M P Q h_AMP h_AMQ h_PAQ)))))
+
+

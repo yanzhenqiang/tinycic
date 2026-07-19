@@ -1,0 +1,1122 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+import GeometryCommon.PlaneSeparation
+import GeometryCommon.Crossbar
+import GeometryCommon.Angle
+import GeometryCommon.AngleAddition
+import GeometryCommon.AngleOrder
+import GeometryCommon.SegmentOrder
+
+-- =====================================================================
+-- right_angles_equal (Hilbert Theorem 12): all right angles are
+-- congruent.  Built from Pasch, crossbar, III4 uniqueness, SAS and the
+-- segment/angle order facts; replaces the former axiom in
+-- GeometryCommon.Angle.
+--
+-- Proof outline: suppose right angles ∠ABC and ∠DEF are not congruent.
+-- Transfer ∠DEF along ray BA to the C-side; the transferred ray BG is
+-- either interior to ∠ABC or has BC interior to it (ray trichotomy).
+-- Either way the supplement chain (∠GBD ≅ ∠DEF via supplement_congruent
+-- and the right-angle property) plus interior_angle_less and
+-- angle_less_trans/irrefl yields a proper angle congruent to itself.
+-- The order facts rest on interior_transfer: angle interiors are
+-- preserved by angle congruence (proved by two SAS applications and a
+-- betweenness chase).
+-- =====================================================================
+
+-- Interior of an angle is symmetric in the two side rays.
+theorem ray_interior_sym : forall (A B C M : Point),
+  ray_interior A B C M -> ray_interior C B A M := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro h
+  exact (exists_elim_prop Point
+    (fun Y : Point => And (between A Y C) (on_ray B M Y))
+    (ray_interior C B A M)
+    (fun Y : Point =>
+      fun hY : And (between A Y C) (on_ray B M Y) =>
+        Exists.intro Point (fun Z : Point => And (between C Z A) (on_ray B M Z)) Y
+          (And.conj (between C Y A) (on_ray B M Y)
+            (between_sym A Y C (and_fst (between A Y C) (on_ray B M Y) hY))
+            (and_snd (between A Y C) (on_ray B M Y) hY)))
+    h)
+
+-- An interior ray of a non-degenerate angle is not collinear with the
+-- first side.
+theorem ray_interior_not_collinear : forall (A B C M : Point),
+  Not (collinear A B C) -> ray_interior A B C M -> Not (collinear A B M) := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro h_nc
+  intro h_int
+  intro h_col_ABM
+  exact (exists_elim_prop Point
+    (fun Y : Point => And (between A Y C) (on_ray B M Y))
+    False
+    (fun Y : Point =>
+      fun hY : And (between A Y C) (on_ray B M Y) =>
+        let h_AYC : between A Y C := and_fst (between A Y C) (on_ray B M Y) hY in
+        let h_onray : on_ray B M Y := and_snd (between A Y C) (on_ray B M Y) hY in
+        let h_ne_BM : Not (Eq Point B M) :=
+          fun h_eq : Eq Point B M =>
+            or_elim (between B M Y) (Or (between B Y M) (Eq Point Y M)) False h_onray
+              (fun h_BMY : between B M Y =>
+                and_fst (Not (Eq Point B B)) (And (Not (Eq Point B Y)) (Not (Eq Point B Y)))
+                  (between_not_eq B B Y (eq_subst Point M B (fun Z : Point => between B Z Y) (eq_sym Point B M h_eq) h_BMY))
+                  (refl Point B))
+              (fun h_rest : Or (between B Y M) (Eq Point Y M) =>
+                or_elim (between B Y M) (Eq Point Y M) False h_rest
+                  (fun h_BYM : between B Y M =>
+                    and_fst (Not (Eq Point B B)) (And (Not (Eq Point Y B)) (Not (Eq Point B B)))
+                      (between_not_eq B Y B (eq_subst Point M B (fun Z : Point => between B Y Z) (eq_sym Point B M h_eq) h_BYM))
+                      (refl Point B))
+                  (fun h_YM : Eq Point Y M =>
+                    let h_YB : Eq Point Y B :=
+                      eq_subst Point M B (fun Z : Point => Eq Point Y Z) (eq_sym Point B M h_eq) h_YM in
+                    h_nc (between_implies_collinear A B C
+                      (eq_subst Point Y B (fun Z : Point => between A Z C) h_YB h_AYC)))) in
+        let h_col_BMY : collinear B M Y :=
+          or_elim (between B M Y) (Or (between B Y M) (Eq Point Y M)) (collinear B M Y) h_onray
+            (fun h_BMY : between B M Y => between_implies_collinear B M Y h_BMY)
+            (fun h_rest : Or (between B Y M) (Eq Point Y M) =>
+              or_elim (between B Y M) (Eq Point Y M) (collinear B M Y) h_rest
+                (fun h_BYM : between B Y M =>
+                  collinear_perm3 Y M B (between_implies_collinear B Y M h_BYM))
+                (fun h_YM : Eq Point Y M =>
+                  exists_elim_prop Line (fun n : Line => And (on_line B n) (on_line M n)) (collinear B M Y)
+                    (fun n : Line =>
+                      fun hn : And (on_line B n) (on_line M n) =>
+                        eq_subst Point Y M (fun Z : Point => collinear B M Z) h_YM
+                          (Exists.intro Line
+                            (fun m : Line => And (on_line B m) (And (on_line M m) (on_line M m))) n
+                            (And.conj (on_line B n) (And (on_line M n) (on_line M n))
+                              (and_fst (on_line B n) (on_line M n) hn)
+                              (And.conj (on_line M n) (on_line M n)
+                                (and_snd (on_line B n) (on_line M n) hn)
+                                (and_snd (on_line B n) (on_line M n) hn)))))
+                    (line_exists B M))) in
+        exists_elim_prop Line
+          (fun n : Line => And (on_line A n) (And (on_line B n) (on_line M n)))
+          False
+          (fun n : Line =>
+            fun hn : And (on_line A n) (And (on_line B n) (on_line M n)) =>
+              let h_A_n : on_line A n := and_fst (on_line A n) (And (on_line B n) (on_line M n)) hn in
+              let h_B_n : on_line B n := and_fst (on_line B n) (on_line M n)
+                (and_snd (on_line A n) (And (on_line B n) (on_line M n)) hn) in
+              let h_M_n : on_line M n := and_snd (on_line B n) (on_line M n)
+                (and_snd (on_line A n) (And (on_line B n) (on_line M n)) hn) in
+              let h_Y_n : on_line Y n :=
+                collinear_point_on_line Y B M n h_col_BMY h_B_n h_M_n h_ne_BM in
+              let h_ne_AY : Not (Eq Point A Y) :=
+                and_fst (Not (Eq Point A Y)) (And (Not (Eq Point Y C)) (Not (Eq Point A C)))
+                  (between_not_eq A Y C h_AYC) in
+              let h_C_n : on_line C n :=
+                collinear_point_on_line C A Y n (between_implies_collinear A Y C h_AYC)
+                  h_A_n h_Y_n h_ne_AY in
+              h_nc (Exists.intro Line
+                (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) n
+                (And.conj (on_line A n) (And (on_line B n) (on_line C n)) h_A_n
+                  (And.conj (on_line B n) (on_line C n) h_B_n h_C_n))))
+          h_col_ABM)
+    h_int)
+
+-- An interior ray of a non-degenerate angle is not collinear with the
+-- second side either.
+theorem ray_interior_not_collinear_snd : forall (A B C M : Point),
+  Not (collinear A B C) -> ray_interior A B C M -> Not (collinear M B C) := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro h_nc
+  intro h_int
+  have h_nc_CBA : Not (collinear C B A) :=
+    fun h : collinear C B A => h_nc (collinear_perm3 A C B (collinear_perm2 A B C h))
+  have h_int_CBA : ray_interior C B A M := ray_interior_sym A B C M h_int
+  have h_nc_CBM : Not (collinear C B M) := ray_interior_not_collinear C B A M h_nc_CBA h_int_CBA
+  exact (fun h : collinear M B C =>
+    h_nc_CBM (collinear_perm3 B C M (collinear_perm2 B M C h)))
+
+-- The interior point lies on C's side of line AB.
+theorem ray_interior_same_side_fst : forall (A B C M : Point) (l : Line),
+  Not (collinear A B C) -> on_line A l -> on_line B l ->
+  ray_interior A B C M -> same_side_line l M C := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro l
+  intro h_nc
+  intro h_A_l
+  intro h_B_l
+  intro h_int
+  have h_C_off : Not (on_line C l) :=
+    fun h : on_line C l =>
+      h_nc (Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l
+        (And.conj (on_line A l) (And (on_line B l) (on_line C l)) h_A_l
+          (And.conj (on_line B l) (on_line C l) h_B_l h)))
+  have h_M_off : Not (on_line M l) :=
+    fun h : on_line M l =>
+      ray_interior_not_collinear A B C M h_nc h_int
+        (Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line M m))) l
+          (And.conj (on_line A l) (And (on_line B l) (on_line M l)) h_A_l
+            (And.conj (on_line B l) (on_line M l) h_B_l h)))
+  have h_ne_BA : Not (Eq Point B A) :=
+    fun h : Eq Point B A =>
+      h_nc (exists_elim_prop Line (fun n : Line => And (on_line A n) (on_line C n)) (collinear A B C)
+        (fun n : Line =>
+          fun hn : And (on_line A n) (on_line C n) =>
+            Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) n
+              (And.conj (on_line A n) (And (on_line B n) (on_line C n))
+                (and_fst (on_line A n) (on_line C n) hn)
+                (And.conj (on_line B n) (on_line C n)
+                  (eq_subst Point B A (fun Z : Point => on_line Z n) h (and_fst (on_line A n) (on_line C n) hn))
+                  (and_snd (on_line A n) (on_line C n) hn))))
+        (line_exists A C))
+  exact (exists_elim_prop Point
+    (fun Y : Point => And (between A Y C) (on_ray B M Y))
+    (same_side_line l M C)
+    (fun Y : Point =>
+      fun hY : And (between A Y C) (on_ray B M Y) =>
+        let h_AYC : between A Y C := and_fst (between A Y C) (on_ray B M Y) hY in
+        let h_onray : on_ray B M Y := and_snd (between A Y C) (on_ray B M Y) hY in
+        let h_Y_off : Not (on_line Y l) :=
+          fun h_Y_l : on_line Y l =>
+            let h_ne_AY : Not (Eq Point A Y) :=
+              and_fst (Not (Eq Point A Y)) (And (Not (Eq Point Y C)) (Not (Eq Point A C)))
+                (between_not_eq A Y C h_AYC) in
+            exists_elim_prop Line
+              (fun n : Line => And (on_line A n) (And (on_line Y n) (on_line C n)))
+              False
+              (fun n : Line =>
+                fun hn : And (on_line A n) (And (on_line Y n) (on_line C n)) =>
+                  let h_A_n : on_line A n := and_fst (on_line A n) (And (on_line Y n) (on_line C n)) hn in
+                  let h_Y_n : on_line Y n := and_fst (on_line Y n) (on_line C n)
+                    (and_snd (on_line A n) (And (on_line Y n) (on_line C n)) hn) in
+                  let h_C_n : on_line C n := and_snd (on_line Y n) (on_line C n)
+                    (and_snd (on_line A n) (And (on_line Y n) (on_line C n)) hn) in
+                  let h_eq : Eq Line l n := line_unique A Y l n h_ne_AY h_A_l h_Y_l h_A_n h_Y_n in
+                  h_C_off (eq_subst Line n l (fun m : Line => on_line C m) (eq_sym Line l n h_eq) h_C_n))
+              (between_implies_collinear A Y C h_AYC) in
+        let h_same_YC : same_side_line l Y C :=
+          point_on_segment_same_side l A C Y h_A_l h_C_off h_AYC h_Y_off in
+        or_elim (between B M Y) (Or (between B Y M) (Eq Point Y M)) (same_side_line l M C) h_onray
+          (fun h_BMY : between B M Y =>
+            let h_same_MY : same_side_line l M Y :=
+              ray_point_same_side l B A M Y h_B_l h_A_l h_ne_BA h_M_off h_BMY in
+            let h_nc_MYC : Not (collinear M Y C) :=
+              fun h : collinear M Y C =>
+                ray_interior_not_collinear_snd A B C M h_nc h_int
+                  (collinear_shared_merge_fst M Y B C
+                    (collinear_perm3 B Y M (collinear_perm2 B M Y (between_implies_collinear B M Y h_BMY)))
+                    h
+                    (and_fst (Not (Eq Point M Y)) (Not (Eq Point B Y))
+                      (and_snd (Not (Eq Point B M)) (And (Not (Eq Point M Y)) (Not (Eq Point B Y)))
+                        (between_not_eq B M Y h_BMY)))) in
+            same_side_line_trans l M Y C h_same_MY h_same_YC h_nc_MYC)
+          (fun h_rest : Or (between B Y M) (Eq Point Y M) =>
+            or_elim (between B Y M) (Eq Point Y M) (same_side_line l M C) h_rest
+              (fun h_BYM : between B Y M =>
+                let h_same_YM : same_side_line l Y M :=
+                  ray_point_same_side l B A Y M h_B_l h_A_l h_ne_BA h_Y_off h_BYM in
+                let h_nc_MYC : Not (collinear M Y C) :=
+                  fun h : collinear M Y C =>
+                    let h_ne_YM : Not (Eq Point Y M) :=
+                      and_fst (Not (Eq Point Y M)) (Not (Eq Point B M))
+                        (and_snd (Not (Eq Point B Y)) (And (Not (Eq Point Y M)) (Not (Eq Point B M)))
+                          (between_not_eq B Y M h_BYM)) in
+                    ray_interior_not_collinear_snd A B C M h_nc h_int
+                      (collinear_shared_merge_fst M Y B C
+                        (collinear_perm3 B Y M (between_implies_collinear B Y M h_BYM))
+                        h
+                        (fun h_eq : Eq Point M Y => h_ne_YM (eq_sym Point M Y h_eq))) in
+                same_side_line_trans l M Y C (same_side_line_sym l Y M h_same_YM) h_same_YC h_nc_MYC)
+              (fun h_YM : Eq Point Y M =>
+                eq_subst Point Y M (fun Z : Point => same_side_line l Z C) h_YM h_same_YC)))
+    h_int)
+
+-- The interior point lies on A's side of line BC.
+theorem ray_interior_same_side_snd : forall (A B C M : Point) (l : Line),
+  Not (collinear A B C) -> on_line B l -> on_line C l ->
+  ray_interior A B C M -> same_side_line l M A := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro l
+  intro h_nc
+  intro h_B_l
+  intro h_C_l
+  intro h_int
+  have h_nc_CBA : Not (collinear C B A) :=
+    fun h : collinear C B A => h_nc (collinear_perm3 A C B (collinear_perm2 A B C h))
+  exact (ray_interior_same_side_fst C B A M l h_nc_CBA h_C_l h_B_l
+    (ray_interior_sym A B C M h_int))
+
+-- If ray BM is interior to angle ABC and D lies on the extension of BA
+-- past B, then ray BC is interior to the supplementary angle MBD.
+-- Pasch on triangle A-D-M with line BC (cutting AD at B): the A-M cut
+-- is impossible because M and A are on the same side of line BC
+-- (ray_interior_same_side_snd), so BC meets DM at some E; E lies on ray
+-- BC because E and C are on the same side of line AB.
+theorem opposite_interior : forall (A B C D M : Point) (l_AB l_BC : Line),
+  Not (collinear A B C) ->
+  on_line A l_AB -> on_line B l_AB ->
+  on_line B l_BC -> on_line C l_BC ->
+  ray_interior A B C M -> between A B D ->
+  ray_interior M B D C := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro M
+  intro l_AB
+  intro l_BC
+  intro h_nc
+  intro h_A_lAB
+  intro h_B_lAB
+  intro h_B_lBC
+  intro h_C_lBC
+  intro h_int
+  intro h_ABD
+  have h_nc_ABM : Not (collinear A B M) := ray_interior_not_collinear A B C M h_nc h_int
+  have h_nc_MBC : Not (collinear M B C) := ray_interior_not_collinear_snd A B C M h_nc h_int
+  have h_col_ABD : collinear A B D := between_implies_collinear A B D h_ABD
+  have h_ne_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B D)) (Not (Eq Point A D)))
+      (between_not_eq A B D h_ABD)
+  have h_ne_BD : Not (Eq Point B D) :=
+    and_fst (Not (Eq Point B D)) (Not (Eq Point A D))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B D)) (Not (Eq Point A D)))
+        (between_not_eq A B D h_ABD))
+  have h_ne_AD : Not (Eq Point A D) :=
+    and_snd (Not (Eq Point B D)) (Not (Eq Point A D))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B D)) (Not (Eq Point A D)))
+        (between_not_eq A B D h_ABD))
+  have h_col_BDA : collinear B D A := collinear_perm3 A D B (collinear_perm2 A B D h_col_ABD)
+  have h_M_off_AB : Not (on_line M l_AB) :=
+    fun h : on_line M l_AB =>
+      h_nc_ABM (Exists.intro Line
+        (fun m : Line => And (on_line A m) (And (on_line B m) (on_line M m))) l_AB
+        (And.conj (on_line A l_AB) (And (on_line B l_AB) (on_line M l_AB)) h_A_lAB
+          (And.conj (on_line B l_AB) (on_line M l_AB) h_B_lAB h)))
+  have h_C_off_AB : Not (on_line C l_AB) :=
+    fun h : on_line C l_AB =>
+      h_nc (Exists.intro Line
+        (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l_AB
+        (And.conj (on_line A l_AB) (And (on_line B l_AB) (on_line C l_AB)) h_A_lAB
+          (And.conj (on_line B l_AB) (on_line C l_AB) h_B_lAB h)))
+  have h_A_off_BC : Not (on_line A l_BC) :=
+    fun h : on_line A l_BC =>
+      h_nc (Exists.intro Line
+        (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l_BC
+        (And.conj (on_line A l_BC) (And (on_line B l_BC) (on_line C l_BC)) h
+          (And.conj (on_line B l_BC) (on_line C l_BC) h_B_lBC h_C_lBC)))
+  have h_M_off_BC : Not (on_line M l_BC) :=
+    fun h : on_line M l_BC =>
+      h_nc_MBC (Exists.intro Line
+        (fun m : Line => And (on_line M m) (And (on_line B m) (on_line C m))) l_BC
+        (And.conj (on_line M l_BC) (And (on_line B l_BC) (on_line C l_BC)) h
+          (And.conj (on_line B l_BC) (on_line C l_BC) h_B_lBC h_C_lBC)))
+  have h_D_off_BC : Not (on_line D l_BC) :=
+    fun h : on_line D l_BC =>
+      h_nc (collinear_perm2 A C B (collinear_perm3 B C A (collinear_perm2 B A C
+        (collinear_shared_merge_fst B D A C h_col_BDA
+          (Exists.intro Line
+            (fun m : Line => And (on_line B m) (And (on_line D m) (on_line C m))) l_BC
+            (And.conj (on_line B l_BC) (And (on_line D l_BC) (on_line C l_BC)) h_B_lBC
+              (And.conj (on_line D l_BC) (on_line C l_BC) h h_C_lBC)))
+          h_ne_BD))))
+  have h_same_MA_BC : same_side_line l_BC M A :=
+    ray_interior_same_side_snd A B C M l_BC h_nc h_B_lBC h_C_lBC h_int
+  have h_pasch : Exists Point (fun E : Point => And (on_line E l_BC) (Or (between A E M) (between D E M))) :=
+    pasch A D M l_BC B
+      (fun l' : Line =>
+        fun h_A_l' : on_line A l' =>
+          fun h_D_l' : on_line D l' =>
+            fun h_M_l' : on_line M l' =>
+              h_nc_ABM (collinear_shared_merge_fst A D B M
+                (collinear_perm2 A B D h_col_ABD)
+                (Exists.intro Line
+                  (fun m : Line => And (on_line A m) (And (on_line D m) (on_line M m))) l'
+                  (And.conj (on_line A l') (And (on_line D l') (on_line M l')) h_A_l'
+                    (And.conj (on_line D l') (on_line M l') h_D_l' h_M_l')))
+                h_ne_AD))
+      h_A_off_BC h_D_off_BC h_M_off_BC h_B_lBC h_ABD
+  exact (exists_elim_prop Point
+    (fun E : Point => And (on_line E l_BC) (Or (between A E M) (between D E M)))
+    (ray_interior M B D C)
+    (fun E : Point =>
+      fun hE : And (on_line E l_BC) (Or (between A E M) (between D E M)) =>
+        let h_E_lBC : on_line E l_BC :=
+          and_fst (on_line E l_BC) (Or (between A E M) (between D E M)) hE in
+        let h_or : Or (between A E M) (between D E M) :=
+          and_snd (on_line E l_BC) (Or (between A E M) (between D E M)) hE in
+        or_elim (between A E M) (between D E M) (ray_interior M B D C) h_or
+          (fun h_AEM : between A E M =>
+            let h_opp : opposite_side_line l_BC M A :=
+              Exists.intro Point (fun X : Point => And (on_line X l_BC) (between M X A)) E
+                (And.conj (on_line E l_BC) (between M E A) h_E_lBC (between_sym A E M h_AEM)) in
+            False_elim (ray_interior M B D C)
+              (and_snd (Not (on_line A l_BC)) (Not (opposite_side_line l_BC M A))
+                (and_snd (Not (on_line M l_BC))
+                  (And (Not (on_line A l_BC)) (Not (opposite_side_line l_BC M A)))
+                  h_same_MA_BC) h_opp))
+          (fun h_DEM : between D E M =>
+            let h_MED : between M E D := between_sym D E M h_DEM in
+            let h_ne_EB : Not (Eq Point E B) :=
+              fun h_eq : Eq Point E B =>
+                h_nc_ABM (collinear_perm2 A M B (collinear_perm3 B M A
+                  (collinear_shared_merge_fst B D M A
+                    (collinear_perm2 B M D (collinear_perm3 D M B (collinear_perm2 D B M
+                      (between_implies_collinear D B M
+                        (eq_subst Point E B (fun Z : Point => between D Z M) h_eq h_DEM)))))
+                    h_col_BDA h_ne_BD))) in
+            or_elim (Eq Point E C) (Not (Eq Point E C)) (ray_interior M B D C)
+              (excluded_middle (Eq Point E C))
+              (fun h_EC : Eq Point E C =>
+                Exists.intro Point (fun W : Point => And (between M W D) (on_ray B C W)) E
+                  (And.conj (between M E D) (on_ray B C E) h_MED
+                    (Or.inr (between B C E) (Or (between B E C) (Eq Point E C))
+                      (Or.inr (between B E C) (Eq Point E C) h_EC))))
+              (fun h_nEC : Not (Eq Point E C) =>
+                let h_E_off_AB : Not (on_line E l_AB) :=
+                  fun h_E_lAB : on_line E l_AB =>
+                    let h_eqline : Eq Line l_AB l_BC :=
+                      line_unique E B l_AB l_BC h_ne_EB h_E_lAB h_B_lAB h_E_lBC h_B_lBC in
+                    h_C_off_AB (eq_subst Line l_BC l_AB (fun m : Line => on_line C m)
+                      (eq_sym Line l_AB l_BC h_eqline) h_C_lBC) in
+                let h_D_lAB : on_line D l_AB :=
+                  collinear_point_on_line D A B l_AB h_col_ABD h_A_lAB h_B_lAB h_ne_AB in
+                let h_same_EM_AB : same_side_line l_AB E M :=
+                  point_on_segment_same_side l_AB D M E h_D_lAB h_M_off_AB h_DEM h_E_off_AB in
+                let h_same_MC_AB : same_side_line l_AB M C :=
+                  ray_interior_same_side_fst A B C M l_AB h_nc h_A_lAB h_B_lAB h_int in
+                let h_nc_EMC : Not (collinear E M C) :=
+                  fun h_EMC : collinear E M C =>
+                    exists_elim_prop Line
+                      (fun n : Line => And (on_line E n) (And (on_line M n) (on_line C n)))
+                      False
+                      (fun n : Line =>
+                        fun hn : And (on_line E n) (And (on_line M n) (on_line C n)) =>
+                          let h_E_n : on_line E n :=
+                            and_fst (on_line E n) (And (on_line M n) (on_line C n)) hn in
+                          let h_M_n : on_line M n :=
+                            and_fst (on_line M n) (on_line C n)
+                              (and_snd (on_line E n) (And (on_line M n) (on_line C n)) hn) in
+                          let h_C_n : on_line C n :=
+                            and_snd (on_line M n) (on_line C n)
+                              (and_snd (on_line E n) (And (on_line M n) (on_line C n)) hn) in
+                          let h_eqn : Eq Line l_BC n :=
+                            line_unique E C l_BC n h_nEC h_E_lBC h_C_lBC h_E_n h_C_n in
+                          h_M_off_BC (eq_subst Line n l_BC (fun m : Line => on_line M m)
+                            (eq_sym Line l_BC n h_eqn) h_M_n))
+                      h_EMC in
+                let h_same_EC_AB : same_side_line l_AB E C :=
+                  same_side_line_trans l_AB E M C h_same_EM_AB h_same_MC_AB h_nc_EMC in
+                let h_col_BEC : collinear B E C :=
+                  Exists.intro Line
+                    (fun m : Line => And (on_line B m) (And (on_line E m) (on_line C m))) l_BC
+                    (And.conj (on_line B l_BC) (And (on_line E l_BC) (on_line C l_BC)) h_B_lBC
+                      (And.conj (on_line E l_BC) (on_line C l_BC) h_E_lBC h_C_lBC)) in
+                let h_sr : same_ray B E C :=
+                  same_side_collinear_same_ray B E C l_AB h_B_lAB h_E_off_AB h_C_off_AB
+                    h_same_EC_AB h_col_BEC h_nEC in
+                let h_onray : on_ray B C E :=
+                  or_elim (between B E C) (between B C E) (on_ray B C E) h_sr
+                    (fun h_BEC : between B E C =>
+                      Or.inr (between B C E) (Or (between B E C) (Eq Point E C))
+                        (Or.inl (between B E C) (Eq Point E C) h_BEC))
+                    (fun h_BCE : between B C E =>
+                      Or.inl (between B C E) (Or (between B E C) (Eq Point E C)) h_BCE) in
+                Exists.intro Point (fun W : Point => And (between M W D) (on_ray B C W)) E
+                  (And.conj (between M E D) (on_ray B C E) h_MED h_onray))))
+    h_pasch)
+
+-- Angle interior only depends on the two side rays: moving the endpoints
+-- A, C along their rays does not change the interior.
+-- Proof: crossbar after transferring same-side facts along the rays;
+-- the degenerate case (A1, M, C1 collinear) is settled by between_unique
+-- plus side contradictions, giving M itself as the witness.
+theorem ray_interior_endpoint : forall (A B C M A1 C1 : Point) (l_AB l_BC : Line),
+  Not (collinear A B C) ->
+  on_line A l_AB -> on_line B l_AB ->
+  on_line B l_BC -> on_line C l_BC ->
+  ray_interior A B C M ->
+  on_ray B A A1 -> on_ray B C C1 ->
+  ray_interior A1 B C1 M := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro A1
+  intro C1
+  intro l_AB
+  intro l_BC
+  intro h_nc
+  intro h_A_lAB
+  intro h_B_lAB
+  intro h_B_lBC
+  intro h_C_lBC
+  intro h_int
+  intro h_ray_A
+  intro h_ray_C
+  have h_ne_BA : Not (Eq Point B A) :=
+    fun h : Eq Point B A =>
+      h_nc (exists_elim_prop Line (fun n : Line => And (on_line A n) (on_line C n)) (collinear A B C)
+        (fun n : Line =>
+          fun hn : And (on_line A n) (on_line C n) =>
+            Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) n
+              (And.conj (on_line A n) (And (on_line B n) (on_line C n))
+                (and_fst (on_line A n) (on_line C n) hn)
+                (And.conj (on_line B n) (on_line C n)
+                  (eq_subst Point B A (fun Z : Point => on_line Z n) h (and_fst (on_line A n) (on_line C n) hn))
+                  (and_snd (on_line A n) (on_line C n) hn))))
+        (line_exists A C))
+  have h_ne_BC : Not (Eq Point B C) :=
+    fun h : Eq Point B C =>
+      h_nc (exists_elim_prop Line (fun n : Line => And (on_line A n) (on_line B n)) (collinear A B C)
+        (fun n : Line =>
+          fun hn : And (on_line A n) (on_line B n) =>
+            Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) n
+              (And.conj (on_line A n) (And (on_line B n) (on_line C n))
+                (and_fst (on_line A n) (on_line B n) hn)
+                (And.conj (on_line B n) (on_line C n)
+                  (and_snd (on_line A n) (on_line B n) hn)
+                  (eq_subst Point B C (fun Z : Point => on_line Z n) h (and_snd (on_line A n) (on_line B n) hn)))))
+        (line_exists A B))
+  have h_C_off_AB : Not (on_line C l_AB) :=
+    fun h : on_line C l_AB =>
+      h_nc (Exists.intro Line
+        (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l_AB
+        (And.conj (on_line A l_AB) (And (on_line B l_AB) (on_line C l_AB)) h_A_lAB
+          (And.conj (on_line B l_AB) (on_line C l_AB) h_B_lAB h)))
+  have h_A_off_BC : Not (on_line A l_BC) :=
+    fun h : on_line A l_BC =>
+      h_nc (Exists.intro Line
+        (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l_BC
+        (And.conj (on_line A l_BC) (And (on_line B l_BC) (on_line C l_BC)) h
+          (And.conj (on_line B l_BC) (on_line C l_BC) h_B_lBC h_C_lBC)))
+  have h_col_BAA1 : collinear B A A1 :=
+    or_elim (between B A A1) (Or (between B A1 A) (Eq Point A1 A)) (collinear B A A1) h_ray_A
+      (fun h : between B A A1 => between_implies_collinear B A A1 h)
+      (fun h : Or (between B A1 A) (Eq Point A1 A) =>
+        or_elim (between B A1 A) (Eq Point A1 A) (collinear B A A1) h
+          (fun h2 : between B A1 A =>
+            collinear_perm3 A A1 B (collinear_perm2 A B A1
+              (between_implies_collinear B A1 A h2)))
+          (fun h2 : Eq Point A1 A =>
+            exists_elim_prop Line (fun n : Line => And (on_line B n) (on_line A n)) (collinear B A A1)
+              (fun n : Line =>
+                fun hn : And (on_line B n) (on_line A n) =>
+                  Exists.intro Line (fun m : Line => And (on_line B m) (And (on_line A m) (on_line A1 m))) n
+                    (And.conj (on_line B n) (And (on_line A n) (on_line A1 n))
+                      (and_fst (on_line B n) (on_line A n) hn)
+                      (And.conj (on_line A n) (on_line A1 n)
+                        (and_snd (on_line B n) (on_line A n) hn)
+                        (eq_subst Point A1 A (fun Z : Point => on_line Z n) h2 (and_snd (on_line B n) (on_line A n) hn)))))
+              (line_exists B A)))
+  have h_col_BCC1 : collinear B C C1 :=
+    or_elim (between B C C1) (Or (between B C1 C) (Eq Point C1 C)) (collinear B C C1) h_ray_C
+      (fun h : between B C C1 => between_implies_collinear B C C1 h)
+      (fun h : Or (between B C1 C) (Eq Point C1 C) =>
+        or_elim (between B C1 C) (Eq Point C1 C) (collinear B C C1) h
+          (fun h2 : between B C1 C =>
+            collinear_perm3 C C1 B (collinear_perm2 C B C1
+              (between_implies_collinear B C1 C h2)))
+          (fun h2 : Eq Point C1 C =>
+            exists_elim_prop Line (fun n : Line => And (on_line B n) (on_line C n)) (collinear B C C1)
+              (fun n : Line =>
+                fun hn : And (on_line B n) (on_line C n) =>
+                  Exists.intro Line (fun m : Line => And (on_line B m) (And (on_line C m) (on_line C1 m))) n
+                    (And.conj (on_line B n) (And (on_line C n) (on_line C1 n))
+                      (and_fst (on_line B n) (on_line C n) hn)
+                      (And.conj (on_line C n) (on_line C1 n)
+                        (and_snd (on_line B n) (on_line C n) hn)
+                        (eq_subst Point C1 C (fun Z : Point => on_line Z n) h2 (and_snd (on_line B n) (on_line C n) hn)))))
+              (line_exists B C)))
+  have h_A1_onAB : on_line A1 l_AB :=
+    collinear_point_on_line A1 B A l_AB h_col_BAA1 h_B_lAB h_A_lAB h_ne_BA
+  have h_C1_onBC : on_line C1 l_BC :=
+    collinear_point_on_line C1 B C l_BC h_col_BCC1 h_B_lBC h_C_lBC h_ne_BC
+  have h_ne_A1B : Not (Eq Point A1 B) :=
+    or_elim (between B A A1) (Or (between B A1 A) (Eq Point A1 A)) (Not (Eq Point A1 B)) h_ray_A
+      (fun h : between B A A1 =>
+        fun h_eq : Eq Point A1 B =>
+          and_fst (Not (Eq Point B A1)) (And (Not (Eq Point A A1)) (Not (Eq Point B A1)))
+            (between_not_eq B A A1 h) (eq_sym Point A1 B h_eq))
+      (fun h : Or (between B A1 A) (Eq Point A1 A) =>
+        or_elim (between B A1 A) (Eq Point A1 A) (Not (Eq Point A1 B)) h
+          (fun h2 : between B A1 A =>
+            fun h_eq : Eq Point A1 B =>
+              and_fst (Not (Eq Point B A1)) (And (Not (Eq Point A1 A)) (Not (Eq Point B A)))
+                (between_not_eq B A1 A h2) (eq_sym Point A1 B h_eq))
+          (fun h2 : Eq Point A1 A =>
+            fun h_eq : Eq Point A1 B =>
+              h_ne_BA (eq_subst Point A1 B (fun Z : Point => Eq Point Z A) h_eq h2)))
+  have h_ne_C1B : Not (Eq Point C1 B) :=
+    or_elim (between B C C1) (Or (between B C1 C) (Eq Point C1 C)) (Not (Eq Point C1 B)) h_ray_C
+      (fun h : between B C C1 =>
+        fun h_eq : Eq Point C1 B =>
+          and_fst (Not (Eq Point B C1)) (And (Not (Eq Point C C1)) (Not (Eq Point B C1)))
+            (between_not_eq B C C1 h) (eq_sym Point C1 B h_eq))
+      (fun h : Or (between B C1 C) (Eq Point C1 C) =>
+        or_elim (between B C1 C) (Eq Point C1 C) (Not (Eq Point C1 B)) h
+          (fun h2 : between B C1 C =>
+            fun h_eq : Eq Point C1 B =>
+              and_fst (Not (Eq Point B C1)) (And (Not (Eq Point C1 C)) (Not (Eq Point B C)))
+                (between_not_eq B C1 C h2) (eq_sym Point C1 B h_eq))
+          (fun h2 : Eq Point C1 C =>
+            fun h_eq : Eq Point C1 B =>
+              h_ne_BC (eq_subst Point C1 B (fun Z : Point => Eq Point Z C) h_eq h2)))
+  have h_C1_off_AB : Not (on_line C1 l_AB) :=
+    fun h : on_line C1 l_AB =>
+      let h_eqline : Eq Line l_AB l_BC :=
+        line_unique C1 B l_AB l_BC h_ne_C1B h h_B_lAB h_C1_onBC h_B_lBC in
+      h_C_off_AB (eq_subst Line l_BC l_AB (fun m : Line => on_line C m)
+        (eq_sym Line l_AB l_BC h_eqline) h_C_lBC)
+  have h_A1_off_BC : Not (on_line A1 l_BC) :=
+    fun h : on_line A1 l_BC =>
+      let h_eqline : Eq Line l_AB l_BC :=
+        line_unique A1 B l_AB l_BC h_ne_A1B h_A1_onAB h_B_lAB h h_B_lBC in
+      h_A_off_BC (eq_subst Line l_AB l_BC (fun m : Line => on_line A m)
+        h_eqline h_A_lAB)
+  have h_nc_A1BC1 : Not (collinear A1 B C1) :=
+    fun h : collinear A1 B C1 =>
+      exists_elim_prop Line
+        (fun n : Line => And (on_line A1 n) (And (on_line B n) (on_line C1 n)))
+        False
+        (fun n : Line =>
+          fun hn : And (on_line A1 n) (And (on_line B n) (on_line C1 n)) =>
+            let h_A1_n : on_line A1 n := and_fst (on_line A1 n) (And (on_line B n) (on_line C1 n)) hn in
+            let h_B_n : on_line B n := and_fst (on_line B n) (on_line C1 n)
+              (and_snd (on_line A1 n) (And (on_line B n) (on_line C1 n)) hn) in
+            let h_C1_n : on_line C1 n := and_snd (on_line B n) (on_line C1 n)
+              (and_snd (on_line A1 n) (And (on_line B n) (on_line C1 n)) hn) in
+            let h_eqn : Eq Line n l_AB :=
+              line_unique A1 B n l_AB h_ne_A1B h_A1_n h_B_n h_A1_onAB h_B_lAB in
+            h_C1_off_AB (eq_subst Line n l_AB (fun m : Line => on_line C1 m) h_eqn h_C1_n))
+        h
+  have h_same_MC : same_side_line l_AB M C :=
+    ray_interior_same_side_fst A B C M l_AB h_nc h_A_lAB h_B_lAB h_int
+  have h_same_MA : same_side_line l_BC M A :=
+    ray_interior_same_side_snd A B C M l_BC h_nc h_B_lBC h_C_lBC h_int
+  have h_same_MC1 : same_side_line l_AB M C1 :=
+    or_elim (between B C C1) (Or (between B C1 C) (Eq Point C1 C)) (same_side_line l_AB M C1) h_ray_C
+      (fun h : between B C C1 =>
+        let h_ne_CC1 : Not (Eq Point C C1) :=
+          and_fst (Not (Eq Point C C1)) (Not (Eq Point B C1))
+            (and_snd (Not (Eq Point B C)) (And (Not (Eq Point C C1)) (Not (Eq Point B C1)))
+              (between_not_eq B C C1 h)) in
+        let h_nc_MCC1 : Not (collinear M C C1) :=
+          fun h2 : collinear M C C1 =>
+            exists_elim_prop Line
+              (fun n : Line => And (on_line M n) (And (on_line C n) (on_line C1 n)))
+              False
+              (fun n : Line =>
+                fun hn : And (on_line M n) (And (on_line C n) (on_line C1 n)) =>
+                  let h_M_n : on_line M n := and_fst (on_line M n) (And (on_line C n) (on_line C1 n)) hn in
+                  let h_C_n : on_line C n := and_fst (on_line C n) (on_line C1 n)
+                    (and_snd (on_line M n) (And (on_line C n) (on_line C1 n)) hn) in
+                  let h_C1_n : on_line C1 n := and_snd (on_line C n) (on_line C1 n)
+                    (and_snd (on_line M n) (And (on_line C n) (on_line C1 n)) hn) in
+                  let h_eqn : Eq Line l_BC n :=
+                    line_unique C C1 l_BC n h_ne_CC1 h_C_lBC h_C1_onBC h_C_n h_C1_n in
+                  ray_interior_not_collinear_snd A B C M h_nc h_int
+                    (Exists.intro Line (fun m : Line => And (on_line M m) (And (on_line B m) (on_line C m))) l_BC
+                      (And.conj (on_line M l_BC) (And (on_line B l_BC) (on_line C l_BC))
+                        (eq_subst Line n l_BC (fun m : Line => on_line M m) (eq_sym Line l_BC n h_eqn) h_M_n)
+                        (And.conj (on_line B l_BC) (on_line C l_BC) h_B_lBC h_C_lBC))))
+              h2 in
+        same_side_line_trans l_AB M C C1 h_same_MC
+          (ray_point_same_side l_AB B A C C1 h_B_lAB h_A_lAB h_ne_BA h_C_off_AB h)
+          h_nc_MCC1)
+      (fun h : Or (between B C1 C) (Eq Point C1 C) =>
+        or_elim (between B C1 C) (Eq Point C1 C) (same_side_line l_AB M C1) h
+          (fun h2 : between B C1 C =>
+            let h_ne_C1C : Not (Eq Point C1 C) :=
+              and_fst (Not (Eq Point C1 C)) (Not (Eq Point B C))
+                (and_snd (Not (Eq Point B C1)) (And (Not (Eq Point C1 C)) (Not (Eq Point B C)))
+                  (between_not_eq B C1 C h2)) in
+            let h_ne_CC1 : Not (Eq Point C C1) :=
+              fun h_eq : Eq Point C C1 => h_ne_C1C (eq_sym Point C C1 h_eq) in
+            let h_nc_MCC1 : Not (collinear M C C1) :=
+              fun h3 : collinear M C C1 =>
+                exists_elim_prop Line
+                  (fun n : Line => And (on_line M n) (And (on_line C n) (on_line C1 n)))
+                  False
+                  (fun n : Line =>
+                    fun hn : And (on_line M n) (And (on_line C n) (on_line C1 n)) =>
+                      let h_M_n : on_line M n := and_fst (on_line M n) (And (on_line C n) (on_line C1 n)) hn in
+                      let h_C_n : on_line C n := and_fst (on_line C n) (on_line C1 n)
+                        (and_snd (on_line M n) (And (on_line C n) (on_line C1 n)) hn) in
+                      let h_C1_n : on_line C1 n := and_snd (on_line C n) (on_line C1 n)
+                        (and_snd (on_line M n) (And (on_line C n) (on_line C1 n)) hn) in
+                      let h_eqn : Eq Line l_BC n :=
+                        line_unique C C1 l_BC n h_ne_CC1 h_C_lBC h_C1_onBC h_C_n h_C1_n in
+                      ray_interior_not_collinear_snd A B C M h_nc h_int
+                        (Exists.intro Line (fun m : Line => And (on_line M m) (And (on_line B m) (on_line C m))) l_BC
+                          (And.conj (on_line M l_BC) (And (on_line B l_BC) (on_line C l_BC))
+                            (eq_subst Line n l_BC (fun m : Line => on_line M m) (eq_sym Line l_BC n h_eqn) h_M_n)
+                            (And.conj (on_line B l_BC) (on_line C l_BC) h_B_lBC h_C_lBC))))
+                  h3 in
+            same_side_line_trans l_AB M C C1 h_same_MC
+              (same_side_line_sym l_AB C1 C
+                (ray_point_same_side l_AB B A C1 C h_B_lAB h_A_lAB h_ne_BA h_C1_off_AB h2))
+              h_nc_MCC1)
+          (fun h2 : Eq Point C1 C =>
+            eq_subst Point C1 C (fun Z : Point => same_side_line l_AB M Z) h2 h_same_MC))
+  have h_same_MA1 : same_side_line l_BC M A1 :=
+    or_elim (between B A A1) (Or (between B A1 A) (Eq Point A1 A)) (same_side_line l_BC M A1) h_ray_A
+      (fun h : between B A A1 =>
+        let h_ne_AA1 : Not (Eq Point A A1) :=
+          and_fst (Not (Eq Point A A1)) (Not (Eq Point B A1))
+            (and_snd (Not (Eq Point B A)) (And (Not (Eq Point A A1)) (Not (Eq Point B A1)))
+              (between_not_eq B A A1 h)) in
+        let h_nc_MAA1 : Not (collinear M A A1) :=
+          fun h2 : collinear M A A1 =>
+            exists_elim_prop Line
+              (fun n : Line => And (on_line M n) (And (on_line A n) (on_line A1 n)))
+              False
+              (fun n : Line =>
+                fun hn : And (on_line M n) (And (on_line A n) (on_line A1 n)) =>
+                  let h_M_n : on_line M n := and_fst (on_line M n) (And (on_line A n) (on_line A1 n)) hn in
+                  let h_A_n : on_line A n := and_fst (on_line A n) (on_line A1 n)
+                    (and_snd (on_line M n) (And (on_line A n) (on_line A1 n)) hn) in
+                  let h_A1_n : on_line A1 n := and_snd (on_line A n) (on_line A1 n)
+                    (and_snd (on_line M n) (And (on_line A n) (on_line A1 n)) hn) in
+                  let h_eqn : Eq Line l_AB n :=
+                    line_unique A A1 l_AB n h_ne_AA1 h_A_lAB h_A1_onAB h_A_n h_A1_n in
+                  ray_interior_not_collinear A B C M h_nc h_int
+                    (Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line M m))) l_AB
+                      (And.conj (on_line A l_AB) (And (on_line B l_AB) (on_line M l_AB)) h_A_lAB
+                        (And.conj (on_line B l_AB) (on_line M l_AB) h_B_lAB
+                          (eq_subst Line n l_AB (fun m : Line => on_line M m) (eq_sym Line l_AB n h_eqn) h_M_n)))))
+              h2 in
+        same_side_line_trans l_BC M A A1 h_same_MA
+          (ray_point_same_side l_BC B C A A1 h_B_lBC h_C_lBC h_ne_BC h_A_off_BC h)
+          h_nc_MAA1)
+      (fun h : Or (between B A1 A) (Eq Point A1 A) =>
+        or_elim (between B A1 A) (Eq Point A1 A) (same_side_line l_BC M A1) h
+          (fun h2 : between B A1 A =>
+            let h_ne_A1A : Not (Eq Point A1 A) :=
+              and_fst (Not (Eq Point A1 A)) (Not (Eq Point B A))
+                (and_snd (Not (Eq Point B A1)) (And (Not (Eq Point A1 A)) (Not (Eq Point B A)))
+                  (between_not_eq B A1 A h2)) in
+            let h_ne_AA1 : Not (Eq Point A A1) :=
+              fun h_eq : Eq Point A A1 => h_ne_A1A (eq_sym Point A A1 h_eq) in
+            let h_nc_MAA1 : Not (collinear M A A1) :=
+              fun h3 : collinear M A A1 =>
+                exists_elim_prop Line
+                  (fun n : Line => And (on_line M n) (And (on_line A n) (on_line A1 n)))
+                  False
+                  (fun n : Line =>
+                    fun hn : And (on_line M n) (And (on_line A n) (on_line A1 n)) =>
+                      let h_M_n : on_line M n := and_fst (on_line M n) (And (on_line A n) (on_line A1 n)) hn in
+                      let h_A_n : on_line A n := and_fst (on_line A n) (on_line A1 n)
+                        (and_snd (on_line M n) (And (on_line A n) (on_line A1 n)) hn) in
+                      let h_A1_n : on_line A1 n := and_snd (on_line A n) (on_line A1 n)
+                        (and_snd (on_line M n) (And (on_line A n) (on_line A1 n)) hn) in
+                      let h_eqn : Eq Line l_AB n :=
+                        line_unique A A1 l_AB n h_ne_AA1 h_A_lAB h_A1_onAB h_A_n h_A1_n in
+                      ray_interior_not_collinear A B C M h_nc h_int
+                        (Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line M m))) l_AB
+                          (And.conj (on_line A l_AB) (And (on_line B l_AB) (on_line M l_AB)) h_A_lAB
+                            (And.conj (on_line B l_AB) (on_line M l_AB) h_B_lAB
+                              (eq_subst Line n l_AB (fun m : Line => on_line M m) (eq_sym Line l_AB n h_eqn) h_M_n)))))
+                  h3 in
+            same_side_line_trans l_BC M A A1 h_same_MA
+              (same_side_line_sym l_BC A1 A
+                (ray_point_same_side l_BC B C A1 A h_B_lBC h_C_lBC h_ne_BC h_A1_off_BC h2))
+              h_nc_MAA1)
+          (fun h2 : Eq Point A1 A =>
+            eq_subst Point A1 A (fun Z : Point => same_side_line l_BC M Z) h2 h_same_MA))
+  have h_nc_BMC1 : Not (collinear B M C1) :=
+    fun h : collinear B M C1 =>
+      exists_elim_prop Line
+        (fun n : Line => And (on_line B n) (And (on_line M n) (on_line C1 n)))
+        False
+        (fun n : Line =>
+          fun hn : And (on_line B n) (And (on_line M n) (on_line C1 n)) =>
+            let h_B_n : on_line B n := and_fst (on_line B n) (And (on_line M n) (on_line C1 n)) hn in
+            let h_M_n : on_line M n := and_fst (on_line M n) (on_line C1 n)
+              (and_snd (on_line B n) (And (on_line M n) (on_line C1 n)) hn) in
+            let h_C1_n : on_line C1 n := and_snd (on_line M n) (on_line C1 n)
+              (and_snd (on_line B n) (And (on_line M n) (on_line C1 n)) hn) in
+            let h_eqn : Eq Line n l_BC :=
+              line_unique B C1 n l_BC
+                (fun h_eq : Eq Point B C1 => h_ne_C1B (eq_sym Point B C1 h_eq))
+                h_B_n h_C1_n h_B_lBC h_C1_onBC in
+            ray_interior_not_collinear_snd A B C M h_nc h_int
+              (Exists.intro Line (fun m : Line => And (on_line M m) (And (on_line B m) (on_line C m))) l_BC
+                (And.conj (on_line M l_BC) (And (on_line B l_BC) (on_line C l_BC))
+                  (eq_subst Line n l_BC (fun m : Line => on_line M m) h_eqn h_M_n)
+                  (And.conj (on_line B l_BC) (on_line C l_BC) h_B_lBC h_C_lBC))))
+        h
+  exact (or_elim (collinear A1 M C1) (Not (collinear A1 M C1)) (ray_interior A1 B C1 M)
+    (excluded_middle (collinear A1 M C1))
+    (fun h_col : collinear A1 M C1 =>
+      let h_ne_A1M : Not (Eq Point A1 M) :=
+        fun h_eq : Eq Point A1 M =>
+          ray_interior_not_collinear A B C M h_nc h_int
+            (Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line M m))) l_AB
+              (And.conj (on_line A l_AB) (And (on_line B l_AB) (on_line M l_AB)) h_A_lAB
+                (And.conj (on_line B l_AB) (on_line M l_AB) h_B_lAB
+                  (eq_subst Point A1 M (fun Z : Point => on_line Z l_AB) h_eq h_A1_onAB)))) in
+      let h_ne_MC1 : Not (Eq Point M C1) :=
+        fun h_eq : Eq Point M C1 =>
+          ray_interior_not_collinear_snd A B C M h_nc h_int
+            (Exists.intro Line (fun m : Line => And (on_line M m) (And (on_line B m) (on_line C m))) l_BC
+              (And.conj (on_line M l_BC) (And (on_line B l_BC) (on_line C l_BC))
+                (eq_subst Point C1 M (fun Z : Point => on_line Z l_BC) (eq_sym Point M C1 h_eq) h_C1_onBC)
+                (And.conj (on_line B l_BC) (on_line C l_BC) h_B_lBC h_C_lBC))) in
+      let h_ne_A1C1 : Not (Eq Point A1 C1) :=
+        fun h_eq : Eq Point A1 C1 =>
+          let h_eqline : Eq Line l_AB l_BC :=
+            line_unique A1 B l_AB l_BC h_ne_A1B h_A1_onAB h_B_lAB
+              (eq_subst Point C1 A1 (fun Z : Point => on_line Z l_BC) (eq_sym Point A1 C1 h_eq) h_C1_onBC) h_B_lBC in
+          h_C_off_AB (eq_subst Line l_BC l_AB (fun m : Line => on_line C m)
+            (eq_sym Line l_AB l_BC h_eqline) h_C_lBC) in
+      or_elim (between A1 M C1) (Or (between M C1 A1) (between M A1 C1)) (ray_interior A1 B C1 M)
+        (between_unique A1 M C1 h_ne_A1M h_ne_MC1 h_ne_A1C1 h_col)
+        (fun h_bet : between A1 M C1 =>
+          Exists.intro Point (fun W : Point => And (between A1 W C1) (on_ray B M W)) M
+            (And.conj (between A1 M C1) (on_ray B M M) h_bet
+              (Or.inr (between B M M) (Or (between B M M) (Eq Point M M))
+                (Or.inr (between B M M) (Eq Point M M) (refl Point M)))))
+        (fun h_rest : Or (between M C1 A1) (between M A1 C1) =>
+          or_elim (between M C1 A1) (between M A1 C1) (ray_interior A1 B C1 M) h_rest
+            (fun h_bet : between M C1 A1 =>
+              let h_opp : opposite_side_line l_BC M A1 :=
+                Exists.intro Point (fun X : Point => And (on_line X l_BC) (between M X A1)) C1
+                  (And.conj (on_line C1 l_BC) (between M C1 A1) h_C1_onBC h_bet) in
+              False_elim (ray_interior A1 B C1 M)
+                (and_snd (Not (on_line A1 l_BC)) (Not (opposite_side_line l_BC M A1))
+                  (and_snd (Not (on_line M l_BC))
+                    (And (Not (on_line A1 l_BC)) (Not (opposite_side_line l_BC M A1)))
+                    h_same_MA1) h_opp))
+            (fun h_bet : between M A1 C1 =>
+              let h_opp : opposite_side_line l_AB M C1 :=
+                Exists.intro Point (fun X : Point => And (on_line X l_AB) (between M X C1)) A1
+                  (And.conj (on_line A1 l_AB) (between M A1 C1) h_A1_onAB h_bet) in
+              False_elim (ray_interior A1 B C1 M)
+                (and_snd (Not (on_line C1 l_AB)) (Not (opposite_side_line l_AB M C1))
+                  (and_snd (Not (on_line M l_AB))
+                    (And (Not (on_line C1 l_AB)) (Not (opposite_side_line l_AB M C1)))
+                    h_same_MC1) h_opp))))
+    (fun h_nc3 : Not (collinear A1 M C1) =>
+      crossbar A1 B C1 M l_AB l_BC h_nc_A1BC1 h_B_lAB h_A1_onAB h_B_lBC h_C1_onBC
+        h_same_MC1 h_same_MA1 h_nc_BMC1 h_nc3))
+
+-- A point on a ray defines the same angle as the ray's defining point.
+theorem on_ray_angle_congruent : forall (V P Q X : Point),
+  on_ray V P Q -> angle_congruent X V P X V Q := by
+  intro V
+  intro P
+  intro Q
+  intro X
+  intro h_ray
+  exact (or_elim (between V P Q) (Or (between V Q P) (Eq Point Q P))
+    (angle_congruent X V P X V Q) h_ray
+    (fun h : between V P Q =>
+      angle_trans X V P P V X X V Q
+        (angle_vertex_swap V X P)
+        (angle_trans P V X Q V X X V Q
+          (angle_congruent_same_ray V P Q X (Or.inl (between V P Q) (between V Q P) h))
+          (angle_vertex_swap V Q X)))
+    (fun h : Or (between V Q P) (Eq Point Q P) =>
+      or_elim (between V Q P) (Eq Point Q P) (angle_congruent X V P X V Q) h
+        (fun h2 : between V Q P =>
+          angle_trans X V P P V X X V Q
+            (angle_vertex_swap V X P)
+            (angle_trans P V X Q V X X V Q
+              (angle_congruent_same_ray V P Q X (Or.inr (between V P Q) (between V Q P) h2))
+              (angle_vertex_swap V Q X)))
+        (fun h2 : Eq Point Q P =>
+          eq_subst Point P Q (fun Z : Point => angle_congruent X V P X V Z)
+            (eq_sym Point Q P h2)
+            (angle_refl V X P))))
+
+-- Angle interiors transfer across angle congruence: if ray BM is interior
+-- to angle ABC and angle ABC is congruent to angle A'B'C', then there is
+-- a ray B'M' interior to angle A'B'C' with angle ABM congruent to A'B'M'.
+-- Proof: mark A1 on ray B'A' with B'A1 congruent BA and C1 on ray B'C'
+-- with B'C1 congruent BC; SAS gives triangle ABC congruent triangle
+-- A1B'C1; the witness Y (between A Y C) transfers to Y1 on A1C1 via the
+-- segment order; a second SAS gives angle ABY congruent A1B'Y1; finally
+-- ray_interior_endpoint moves A1, C1 back onto the original rays.
+theorem interior_transfer : forall (A B C M A' B' C' : Point) (l_AB l_BC l_A'B' l_B'C' : Line),
+  Not (collinear A B C) ->
+  Not (collinear A' B' C') ->
+  on_line A l_AB -> on_line B l_AB ->
+  on_line B l_BC -> on_line C l_BC ->
+  on_line A' l_A'B' -> on_line B' l_A'B' ->
+  on_line B' l_B'C' -> on_line C' l_B'C' ->
+  angle_congruent A B C A' B' C' ->
+  ray_interior A B C M ->
+  Exists Point (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M')) := by
+  intro A
+  intro B
+  intro C
+  intro M
+  intro A'
+  intro B'
+  intro C'
+  intro l_AB
+  intro l_BC
+  intro l_A'B'
+  intro l_B'C'
+  intro h_nc
+  intro h_nc'
+  intro h_A_lAB
+  intro h_B_lAB
+  intro h_B_lBC
+  intro h_C_lBC
+  intro h_A'_lA'B'
+  intro h_B'_lA'B'
+  intro h_B'_lB'C'
+  intro h_C'_lB'C'
+  intro h_congr
+  intro h_int
+  have h_ne_BA : Not (Eq Point B A) :=
+    fun h : Eq Point B A =>
+      h_nc (exists_elim_prop Line (fun n : Line => And (on_line A n) (on_line C n)) (collinear A B C)
+        (fun n : Line =>
+          fun hn : And (on_line A n) (on_line C n) =>
+            Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) n
+              (And.conj (on_line A n) (And (on_line B n) (on_line C n))
+                (and_fst (on_line A n) (on_line C n) hn)
+                (And.conj (on_line B n) (on_line C n)
+                  (eq_subst Point B A (fun Z : Point => on_line Z n) h (and_fst (on_line A n) (on_line C n) hn))
+                  (and_snd (on_line A n) (on_line C n) hn))))
+        (line_exists A C))
+  have h_ne_BC : Not (Eq Point B C) :=
+    fun h : Eq Point B C =>
+      h_nc (exists_elim_prop Line (fun n : Line => And (on_line A n) (on_line B n)) (collinear A B C)
+        (fun n : Line =>
+          fun hn : And (on_line A n) (on_line B n) =>
+            Exists.intro Line (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) n
+              (And.conj (on_line A n) (And (on_line B n) (on_line C n))
+                (and_fst (on_line A n) (on_line B n) hn)
+                (And.conj (on_line B n) (on_line C n)
+                  (and_snd (on_line A n) (on_line B n) hn)
+                  (eq_subst Point B C (fun Z : Point => on_line Z n) h (and_snd (on_line A n) (on_line B n) hn)))))
+        (line_exists A B))
+  have h_ne_B'A' : Not (Eq Point B' A') :=
+    fun h : Eq Point B' A' =>
+      h_nc' (exists_elim_prop Line (fun n : Line => And (on_line A' n) (on_line C' n)) (collinear A' B' C')
+        (fun n : Line =>
+          fun hn : And (on_line A' n) (on_line C' n) =>
+            Exists.intro Line (fun m : Line => And (on_line A' m) (And (on_line B' m) (on_line C' m))) n
+              (And.conj (on_line A' n) (And (on_line B' n) (on_line C' n))
+                (and_fst (on_line A' n) (on_line C' n) hn)
+                (And.conj (on_line B' n) (on_line C' n)
+                  (eq_subst Point B' A' (fun Z : Point => on_line Z n) h (and_fst (on_line A' n) (on_line C' n) hn))
+                  (and_snd (on_line A' n) (on_line C' n) hn))))
+        (line_exists A' C'))
+  have h_ne_B'C' : Not (Eq Point B' C') :=
+    fun h : Eq Point B' C' =>
+      h_nc' (exists_elim_prop Line (fun n : Line => And (on_line A' n) (on_line B' n)) (collinear A' B' C')
+        (fun n : Line =>
+          fun hn : And (on_line A' n) (on_line B' n) =>
+            Exists.intro Line (fun m : Line => And (on_line A' m) (And (on_line B' m) (on_line C' m))) n
+              (And.conj (on_line A' n) (And (on_line B' n) (on_line C' n))
+                (and_fst (on_line A' n) (on_line B' n) hn)
+                (And.conj (on_line B' n) (on_line C' n)
+                  (and_snd (on_line A' n) (on_line B' n) hn)
+                  (eq_subst Point B' C' (fun Z : Point => on_line Z n) h (and_snd (on_line A' n) (on_line B' n) hn)))))
+        (line_exists A' B'))
+  exact (exists_elim_prop Point
+    (fun Y : Point => And (between A Y C) (on_ray B M Y))
+    (Exists Point (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M')))
+    (fun Y : Point =>
+      fun hY : And (between A Y C) (on_ray B M Y) =>
+        let h_AYC : between A Y C := and_fst (between A Y C) (on_ray B M Y) hY in
+        let h_onray : on_ray B M Y := and_snd (between A Y C) (on_ray B M Y) hY in
+        exists_elim_prop Point
+          (fun A1 : Point => And (between B' A' A1) (seg_congruent B A B' A1))
+          (Exists Point (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M')))
+          (fun A1 : Point =>
+            fun hA1 : And (between B' A' A1) (seg_congruent B A B' A1) =>
+              let h_B'A'A1 : between B' A' A1 := and_fst (between B' A' A1) (seg_congruent B A B' A1) hA1 in
+              let h_BA_B'A1 : seg_congruent B A B' A1 := and_snd (between B' A' A1) (seg_congruent B A B' A1) hA1 in
+              exists_elim_prop Point
+                (fun C1 : Point => And (between B' C' C1) (seg_congruent B C B' C1))
+                (Exists Point (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M')))
+                (fun C1 : Point =>
+                  fun hC1 : And (between B' C' C1) (seg_congruent B C B' C1) =>
+                    let h_B'C'C1 : between B' C' C1 := and_fst (between B' C' C1) (seg_congruent B C B' C1) hC1 in
+                    let h_BC_B'C1 : seg_congruent B C B' C1 := and_snd (between B' C' C1) (seg_congruent B C B' C1) hC1 in
+                    let h_ne_B'A1 : Not (Eq Point B' A1) :=
+                      and_fst (Not (Eq Point B' A1)) (And (Not (Eq Point A' A1)) (Not (Eq Point B' A1)))
+                        (between_not_eq B' A' A1 h_B'A'A1) in
+                    let h_ne_B'C1 : Not (Eq Point B' C1) :=
+                      and_fst (Not (Eq Point B' C1)) (And (Not (Eq Point C' C1)) (Not (Eq Point B' C1)))
+                        (between_not_eq B' C' C1 h_B'C'C1) in
+                    let h_congr_A1B'C1 : angle_congruent A B C A1 B' C1 :=
+                      angle_trans A B C A' B' C' A1 B' C1 h_congr
+                        (angle_congruent_same_ray_both B' A' A1 C' C1
+                          (Or.inl (between B' A' A1) (between B' A1 A') h_B'A'A1)
+                          (Or.inl (between B' C' C1) (between B' C1 C') h_B'C'C1)) in
+                    let h_sas1 : And (seg_congruent A C A1 C1)
+                        (And (angle_congruent B A C B' A1 C1) (angle_congruent B C A B' C1 A1)) :=
+                      SAS B A C B' A1 C1 h_BA_B'A1 h_congr_A1B'C1 h_BC_B'C1 in
+                    let h_AC_A1C1 : seg_congruent A C A1 C1 :=
+                      and_fst (seg_congruent A C A1 C1)
+                        (And (angle_congruent B A C B' A1 C1) (angle_congruent B C A B' C1 A1)) h_sas1 in
+                    let h_BAC_B'A1C1 : angle_congruent B A C B' A1 C1 :=
+                      and_fst (angle_congruent B A C B' A1 C1) (angle_congruent B C A B' C1 A1)
+                        (and_snd (seg_congruent A C A1 C1)
+                          (And (angle_congruent B A C B' A1 C1) (angle_congruent B C A B' C1 A1)) h_sas1) in
+                    let h_less : segment_less A Y A1 C1 :=
+                      segment_less_preserve_congruent A Y A C A1 C1
+                        (between_implies_segment_less A Y C h_AYC) h_AC_A1C1 in
+                    exists_elim_prop Point
+                      (fun Y1 : Point => And (between A1 Y1 C1) (seg_congruent A Y A1 Y1))
+                      (Exists Point (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M')))
+                      (fun Y1 : Point =>
+                        fun hY1 : And (between A1 Y1 C1) (seg_congruent A Y A1 Y1) =>
+                          let h_A1Y1C1 : between A1 Y1 C1 :=
+                            and_fst (between A1 Y1 C1) (seg_congruent A Y A1 Y1) hY1 in
+                          let h_AY_A1Y1 : seg_congruent A Y A1 Y1 :=
+                            and_snd (between A1 Y1 C1) (seg_congruent A Y A1 Y1) hY1 in
+                          let h_AB_A1B' : seg_congruent A B A1 B' :=
+                            congruent_swap_both B A B' A1 h_ne_BA h_ne_B'A1 h_BA_B'A1 in
+                          let h_BAY_BAC : angle_congruent B A Y B A C :=
+                            angle_sym A B C A B Y
+                              (on_ray_angle_congruent A C Y B
+                                (Or.inr (between A C Y) (Or (between A Y C) (Eq Point Y C))
+                                  (Or.inl (between A Y C) (Eq Point Y C) h_AYC))) in
+                          let h_B'A1Y1_B'A1C1 : angle_congruent B' A1 Y1 B' A1 C1 :=
+                            angle_sym A1 B' C1 A1 B' Y1
+                              (on_ray_angle_congruent A1 C1 Y1 B'
+                                (Or.inr (between A1 C1 Y1) (Or (between A1 Y1 C1) (Eq Point Y1 C1))
+                                  (Or.inl (between A1 Y1 C1) (Eq Point Y1 C1) h_A1Y1C1))) in
+                          let h_BAY_B'A1Y1 : angle_congruent B A Y B' A1 Y1 :=
+                            angle_trans B A Y B A C B' A1 Y1 h_BAY_BAC
+                              (angle_trans B A C B' A1 C1 B' A1 Y1 h_BAC_B'A1C1
+                                (angle_sym B' A1 Y1 B' A1 C1 h_B'A1Y1_B'A1C1)) in
+                          let h_sas2 : And (seg_congruent B Y B' Y1)
+                              (And (angle_congruent A B Y A1 B' Y1) (angle_congruent A Y B A1 Y1 B')) :=
+                            SAS A B Y A1 B' Y1 h_AB_A1B' h_BAY_B'A1Y1 h_AY_A1Y1 in
+                          let h_ABY_A1B'Y1 : angle_congruent A B Y A1 B' Y1 :=
+                            and_fst (angle_congruent A B Y A1 B' Y1) (angle_congruent A Y B A1 Y1 B')
+                              (and_snd (seg_congruent B Y B' Y1)
+                                (And (angle_congruent A B Y A1 B' Y1) (angle_congruent A Y B A1 Y1 B')) h_sas2) in
+                          let h_ABM_ABY : angle_congruent A B M A B Y :=
+                            on_ray_angle_congruent B M Y A h_onray in
+                          let h_A1B'Y1_A'B'Y1 : angle_congruent A1 B' Y1 A' B' Y1 :=
+                            angle_congruent_same_ray B' A1 A' Y1
+                              (Or.inr (between B' A1 A') (between B' A' A1) h_B'A'A1) in
+                          let h_ABM_A'B'Y1 : angle_congruent A B M A' B' Y1 :=
+                            angle_trans A B M A B Y A' B' Y1 h_ABM_ABY
+                              (angle_trans A B Y A1 B' Y1 A' B' Y1 h_ABY_A1B'Y1 h_A1B'Y1_A'B'Y1) in
+                          let h_A1_lA'B' : on_line A1 l_A'B' :=
+                            collinear_point_on_line A1 B' A' l_A'B'
+                              (between_implies_collinear B' A' A1 h_B'A'A1)
+                              h_B'_lA'B' h_A'_lA'B' h_ne_B'A' in
+                          let h_C1_lB'C' : on_line C1 l_B'C' :=
+                            collinear_point_on_line C1 B' C' l_B'C'
+                              (between_implies_collinear B' C' C1 h_B'C'C1)
+                              h_B'_lB'C' h_C'_lB'C' h_ne_B'C' in
+                          let h_nc_A1B'C1 : Not (collinear A1 B' C1) :=
+                            fun h : collinear A1 B' C1 =>
+                              let h_A1_lB'C' : on_line A1 l_B'C' :=
+                                collinear_point_on_line A1 B' C1 l_B'C' h h_B'_lB'C'
+                                  (collinear_point_on_line C1 B' C' l_B'C'
+                                    (between_implies_collinear B' C' C1 h_B'C'C1)
+                                    h_B'_lB'C' h_C'_lB'C' h_ne_B'C') h_ne_B'C1 in
+                              let h_eqline : Eq Line l_A'B' l_B'C' :=
+                                line_unique A1 B' l_A'B' l_B'C'
+                                  (fun h_eq : Eq Point A1 B' => h_ne_B'A1 (eq_sym Point A1 B' h_eq))
+                                  h_A1_lA'B' h_B'_lA'B' h_A1_lB'C' h_B'_lB'C' in
+                              h_nc' (Exists.intro Line
+                                (fun m : Line => And (on_line A' m) (And (on_line B' m) (on_line C' m))) l_A'B'
+                                (And.conj (on_line A' l_A'B') (And (on_line B' l_A'B') (on_line C' l_A'B')) h_A'_lA'B'
+                                  (And.conj (on_line B' l_A'B') (on_line C' l_A'B') h_B'_lA'B'
+                                    (eq_subst Line l_B'C' l_A'B' (fun m : Line => on_line C' m)
+                                      (eq_sym Line l_A'B' l_B'C' h_eqline) h_C'_lB'C')))) in
+                          let h_int_Y1 : ray_interior A' B' C' Y1 :=
+                            ray_interior_endpoint A1 B' C1 Y1 A' C' l_A'B' l_B'C'
+                              h_nc_A1B'C1 h_A1_lA'B' h_B'_lA'B' h_B'_lB'C' h_C1_lB'C'
+                              (Exists.intro Point (fun W : Point => And (between A1 W C1) (on_ray B' Y1 W)) Y1
+                                (And.conj (between A1 Y1 C1) (on_ray B' Y1 Y1) h_A1Y1C1
+                                  (Or.inr (between B' Y1 Y1) (Or (between B' Y1 Y1) (Eq Point Y1 Y1))
+                                    (Or.inr (between B' Y1 Y1) (Eq Point Y1 Y1) (refl Point Y1)))))
+                              (Or.inl (between B' A' A1) (Or (between B' A1 A') (Eq Point A1 A')) h_B'A'A1)
+                              (Or.inl (between B' C' C1) (Or (between B' C1 C') (Eq Point C1 C')) h_B'C'C1) in
+                          Exists.intro Point
+                            (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M')) Y1
+                            (And.conj (ray_interior A' B' C' Y1) (angle_congruent A B M A' B' Y1)
+                              h_int_Y1 h_ABM_A'B'Y1))
+                      h_less)
+                (congruent_transfer B C B' C' h_ne_BC h_ne_B'C'))
+          (congruent_transfer B A B' A' h_ne_BA h_ne_B'A'))
+    h_int)
+
+-- =====================================================================
+-- Right-angle supplement congruence
+-- =====================================================================
+
+-- The supplement of a right angle is congruent to the right angle itself.
+-- Proof: the definition gives some witness D' on the ray opposite BA;
+-- any other extension D lies on the same closed ray from B as D', so the
+-- angle DBC is the same as D'BC by same-ray invariance.
+theorem right_angle_supplement_congruent : forall (A B C D : Point),
+  right_angle A B C -> between A B D ->
+  And (angle_congruent A B C D B C) (angle_congruent A B C C B D) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro h_r
+  intro h_ABD
+  have h_Dp_ex : exists (Dp : Point),
+    And (between A B Dp)
+      (And (angle_congruent A B C Dp B C)
+           (angle_congruent A B C C B Dp)) :=
+    and_snd (Not (collinear A B C))
+      (exists (Dp : Point),
+        And (between A B Dp)
+          (And (angle_congruent A B C Dp B C)
+               (angle_congruent A B C C B Dp)))
+      h_r
+  have Dp : Point := choice Point (fun Dp : Point =>
+    And (between A B Dp)
+      (And (angle_congruent A B C Dp B C)
+           (angle_congruent A B C C B Dp))) h_Dp_ex
+  have h_Dp_spec : And (between A B Dp)
+    (And (angle_congruent A B C Dp B C)
+         (angle_congruent A B C C B Dp)) :=
+    choice_spec Point (fun Dp : Point =>
+      And (between A B Dp)
+        (And (angle_congruent A B C Dp B C)
+             (angle_congruent A B C C B Dp))) h_Dp_ex
+  have h_ABDp : between A B Dp :=
+    and_fst (between A B Dp)
+      (And (angle_congruent A B C Dp B C) (angle_congruent A B C C B Dp))
+      h_Dp_spec
+  have h_h1 : And (angle_congruent A B C Dp B C) (angle_congruent A B C C B Dp) :=
+    and_snd (between A B Dp)
+      (And (angle_congruent A B C Dp B C) (angle_congruent A B C C B Dp))
+      h_Dp_spec
+  have h_abc_Dpbc : angle_congruent A B C Dp B C :=
+    and_fst (angle_congruent A B C Dp B C) (angle_congruent A B C C B Dp) h_h1
+  have h_abc_CbDp : angle_congruent A B C C B Dp :=
+    and_snd (angle_congruent A B C Dp B C) (angle_congruent A B C C B Dp) h_h1
+  have h_same : Or (between B D Dp) (between B Dp D) :=
+    between_same_side A B D Dp h_ABD h_ABDp
+  have h_Dpbc_Dbc : angle_congruent Dp B C D B C :=
+    angle_congruent_same_ray B D Dp C h_same
+  have h_abc_Dbc : angle_congruent A B C D B C :=
+    angle_trans A B C Dp B C D B C h_abc_Dpbc h_Dpbc_Dbc
+  have h_CbDp_CbD : angle_congruent C B Dp C B D :=
+    angle_congruent_same_ray B D Dp C h_same
+  have h_abc_CbD : angle_congruent A B C C B D :=
+    angle_trans A B C C B Dp C B D h_abc_CbDp h_CbDp_CbD
+  exact (And.conj (angle_congruent A B C D B C) (angle_congruent A B C C B D)
+    h_abc_Dbc h_abc_CbD)

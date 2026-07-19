@@ -1,0 +1,1494 @@
+import GeometryAxioms
+import GeometryCommon.Collinearity
+import GeometryCommon.Angle
+import GeometryCommon.Midpoint
+
+-- Canonical line through two points.
+def line : Point -> Point -> Line :=
+  fun A : Point => fun B : Point =>
+    choice Line (fun l : Line => And (on_line A l) (on_line B l))
+      (line_exists A B)
+
+theorem line_through_P : forall (A B : Point), on_line A (line A B) := by
+  intro A
+  intro B
+  exact (and_fst (on_line A (line A B)) (on_line B (line A B))
+    (choice_spec Line (fun l : Line => And (on_line A l) (on_line B l))
+      (line_exists A B)))
+
+theorem line_through_Q : forall (A B : Point), on_line B (line A B) := by
+  intro A
+  intro B
+  exact (and_snd (on_line A (line A B)) (on_line B (line A B))
+    (choice_spec Line (fun l : Line => And (on_line A l) (on_line B l))
+      (line_exists A B)))
+
+-- A point between the endpoints of a segment lies on the canonical line through those endpoints.
+theorem between_on_line : forall (A B C : Point),
+  between A B C -> on_line B (line A C) := by
+  intro A
+  intro B
+  intro C
+  intro h_bet
+  have h_col : collinear A B C := between_implies_collinear A B C h_bet
+  have h_l : exists (l : Line), And (on_line A l) (And (on_line B l) (on_line C l)) := h_col
+  have l0 : Line := choice Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) h_l
+  have h_l0_spec : And (on_line A l0) (And (on_line B l0) (on_line C l0)) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) h_l
+  have h_AC : Not (Eq Point A C) := between_distinct_ends A B C h_bet
+  have h_l0_eq_lineAC : Eq Line l0 (line A C) :=
+    line_unique A C l0 (line A C) h_AC
+      (and_fst (on_line A l0) (And (on_line B l0) (on_line C l0)) h_l0_spec)
+      (and_snd (on_line B l0) (on_line C l0)
+        (and_snd (on_line A l0) (And (on_line B l0) (on_line C l0)) h_l0_spec))
+      (line_through_P A C) (line_through_Q A C)
+  exact (eq_subst Line l0 (line A C) (fun l : Line => on_line B l) h_l0_eq_lineAC
+    (and_fst (on_line B l0) (on_line C l0) (and_snd (on_line A l0) (And (on_line B l0) (on_line C l0)) h_l0_spec)))
+
+-- Canonical midpoint of a non-degenerate segment.
+def midpoint_of : forall (A B : Point), Not (Eq Point A B) -> Point :=
+  fun A : Point => fun B : Point => fun h_AB : Not (Eq Point A B) =>
+    choice Point (fun M : Point => midpoint M A B)
+      (midpoint_exists A B h_AB)
+
+theorem midpoint_of_spec : forall (A B : Point) (h_AB : Not (Eq Point A B)),
+  midpoint (midpoint_of A B h_AB) A B := by
+  intro A
+  intro B
+  intro h_AB
+  exact (choice_spec Point (fun M : Point => midpoint M A B)
+    (midpoint_exists A B h_AB))
+
+-- The canonical midpoint lies on the canonical base line.
+theorem midpoint_on_base_line : forall (A B : Point) (h_AB : Not (Eq Point A B)),
+  on_line (midpoint_of A B h_AB) (line A B) := by
+  intro A
+  intro B
+  intro h_AB
+  have h_M_mid : midpoint (midpoint_of A B h_AB) A B := midpoint_of_spec A B h_AB
+  have h_bet : between A (midpoint_of A B h_AB) B :=
+    and_fst (between A (midpoint_of A B h_AB) B)
+      (seg_congruent A (midpoint_of A B h_AB) (midpoint_of A B h_AB) B)
+      h_M_mid
+  have h_col_and : And (Not (Eq Point A (midpoint_of A B h_AB)))
+    (And (Not (Eq Point (midpoint_of A B h_AB) B))
+      (And (Not (Eq Point A B))
+        (exists (l : Line),
+          And (on_line A l) (And (on_line (midpoint_of A B h_AB) l) (on_line B l))))) :=
+    between_collinear A (midpoint_of A B h_AB) B h_bet
+  have h_col : exists (l : Line),
+    And (on_line A l) (And (on_line (midpoint_of A B h_AB) l) (on_line B l)) :=
+    and_snd (Not (Eq Point A B))
+      (exists (l : Line),
+        And (on_line A l) (And (on_line (midpoint_of A B h_AB) l) (on_line B l)))
+      (and_snd (Not (Eq Point (midpoint_of A B h_AB) B))
+        (And (Not (Eq Point A B))
+          (exists (l : Line),
+            And (on_line A l) (And (on_line (midpoint_of A B h_AB) l) (on_line B l))))
+        (and_snd (Not (Eq Point A (midpoint_of A B h_AB)))
+          (And (Not (Eq Point (midpoint_of A B h_AB) B))
+            (And (Not (Eq Point A B))
+              (exists (l : Line),
+                And (on_line A l) (And (on_line (midpoint_of A B h_AB) l) (on_line B l)))))
+          h_col_and))
+  have l0 : Line := choice Line (fun l : Line =>
+    And (on_line A l) (And (on_line (midpoint_of A B h_AB) l) (on_line B l))) h_col
+  have h_l0_spec : And (on_line A l0)
+    (And (on_line (midpoint_of A B h_AB) l0) (on_line B l0)) :=
+    choice_spec Line (fun l : Line =>
+      And (on_line A l) (And (on_line (midpoint_of A B h_AB) l) (on_line B l))) h_col
+  have h_A_l0 : on_line A l0 :=
+    and_fst (on_line A l0)
+      (And (on_line (midpoint_of A B h_AB) l0) (on_line B l0))
+      h_l0_spec
+  have h_B_l0 : on_line B l0 :=
+    and_snd (on_line (midpoint_of A B h_AB) l0) (on_line B l0)
+      (and_snd (on_line A l0)
+        (And (on_line (midpoint_of A B h_AB) l0) (on_line B l0))
+        h_l0_spec)
+  have h_M_l0 : on_line (midpoint_of A B h_AB) l0 :=
+    and_fst (on_line (midpoint_of A B h_AB) l0) (on_line B l0)
+      (and_snd (on_line A l0)
+        (And (on_line (midpoint_of A B h_AB) l0) (on_line B l0))
+        h_l0_spec)
+  have h_eq : Eq Line l0 (line A B) :=
+    line_unique A B l0 (line A B) h_AB h_A_l0 h_B_l0
+      (line_through_P A B) (line_through_Q A B)
+  exact (eq_subst Line l0 (line A B)
+    (fun x : Line => on_line (midpoint_of A B h_AB) x) h_eq h_M_l0)
+
+-- =====================================================================
+-- 17. Perpendicular lines
+-- =====================================================================
+
+-- Two lines are perpendicular if they intersect at a right angle
+def perpendicular (l : Line) (m : Line) : Prop :=
+  exists (P : Point),
+    And (on_line P l)
+      (And (on_line P m)
+        (exists (A : Point), exists (B : Point),
+          And (on_line A l) (And (on_line B m)
+            (And (Not (Eq Point P A)) (And (Not (Eq Point P B))
+              (right_angle A P B))))))
+
+-- Perpendicular bisector of segment AB: a line l through the midpoint of AB
+-- that is perpendicular to AB.
+def perpendicular_bisector (A : Point) (B : Point) (l : Line) : Prop :=
+  exists (M : Point),
+    And (midpoint M A B)
+      (And (on_line M l)
+        (exists (m : Line),
+          And (on_line A m)
+            (And (on_line B m) (perpendicular l m))))
+
+-- Perpendicular bisector existence
+-- Given segment AB, there exists a line perpendicular to AB at its midpoint
+
+-- Use a perpendicularity hypothesis without duplicating its definition.
+theorem perpendicular_use : forall (l m : Line),
+  perpendicular l m ->
+  exists (P : Point),
+    And (on_line P l)
+      (And (on_line P m)
+        (exists (A : Point), exists (B : Point),
+          And (on_line A l) (And (on_line B m)
+            (And (Not (Eq Point P A)) (And (Not (Eq Point P B))
+              (right_angle A P B)))))) := by
+  intro l
+  intro m
+  intro h
+  exact h
+
+-- Use a perpendicular-bisector hypothesis without duplicating its definition.
+theorem perpendicular_bisector_use : forall (A B : Point) (l : Line),
+  perpendicular_bisector A B l ->
+  exists (M : Point),
+    And (midpoint M A B)
+      (And (on_line M l)
+        (exists (m : Line),
+          And (on_line A m)
+            (And (on_line B m) (perpendicular l m)))) := by
+  intro A
+  intro B
+  intro l
+  intro h
+  exact h
+
+-- A perpendicular bisector yields the base line guaranteed by its definition.
+-- We eliminate the existential with rec.Exists (via exists_elim_prop) rather
+-- than choice, because the goal is a Prop and choice over this predicate is
+-- very slow to type-check.
+theorem perpendicular_bisector_base_perp : forall (A B : Point) (l : Line),
+  Not (Eq Point A B) -> perpendicular_bisector A B l ->
+  perpendicular l (line A B) := by
+  intro A
+  intro B
+  intro l
+  intro h_AB
+  intro h_pb
+  exact (exists_elim_prop Point
+    (fun M : Point =>
+      And (midpoint M A B)
+        (And (on_line M l)
+          (exists (m : Line),
+            And (on_line A m) (And (on_line B m) (perpendicular l m)))))
+    (perpendicular l (line A B))
+    (fun M : Point =>
+      fun h_M_spec : And (midpoint M A B)
+        (And (on_line M l)
+          (exists (m : Line),
+            And (on_line A m) (And (on_line B m) (perpendicular l m)))) =>
+      exists_elim_prop Line
+        (fun m : Line => And (on_line A m) (And (on_line B m) (perpendicular l m)))
+        (perpendicular l (line A B))
+        (fun m : Line =>
+          fun h_m_spec : And (on_line A m) (And (on_line B m) (perpendicular l m)) =>
+          let h_A_m : on_line A m :=
+            and_fst (on_line A m) (And (on_line B m) (perpendicular l m)) h_m_spec in
+          let h_B_m : on_line B m :=
+            and_fst (on_line B m) (perpendicular l m)
+              (and_snd (on_line A m) (And (on_line B m) (perpendicular l m)) h_m_spec) in
+          let h_perp : perpendicular l m :=
+            and_snd (on_line B m) (perpendicular l m)
+              (and_snd (on_line A m) (And (on_line B m) (perpendicular l m)) h_m_spec) in
+          let h_eq : Eq Line m (line A B) :=
+            line_unique A B m (line A B) h_AB h_A_m h_B_m
+              (line_through_P A B) (line_through_Q A B) in
+          eq_subst Line m (line A B) (fun x : Line => perpendicular l x) h_eq h_perp)
+        (and_snd (on_line M l)
+          (exists (m : Line),
+            And (on_line A m) (And (on_line B m) (perpendicular l m)))
+          (and_snd (midpoint M A B)
+            (And (on_line M l)
+              (exists (m : Line),
+                And (on_line A m) (And (on_line B m) (perpendicular l m))))
+            h_M_spec)))
+    h_pb)
+
+-- The canonical midpoint lies on every perpendicular bisector.
+theorem perpendicular_bisector_midpoint_on : forall (A B : Point) (h_AB : Not (Eq Point A B)) (l : Line),
+  perpendicular_bisector A B l ->
+  on_line (midpoint_of A B h_AB) l := by
+  intro A
+  intro B
+  intro h_AB
+  intro l
+  intro h_pb
+  exact (exists_elim_prop Point
+    (fun M : Point =>
+      And (midpoint M A B)
+        (And (on_line M l)
+          (exists (m : Line),
+            And (on_line A m) (And (on_line B m) (perpendicular l m)))))
+    (on_line (midpoint_of A B h_AB) l)
+    (fun M : Point =>
+      fun h_M_spec : And (midpoint M A B)
+        (And (on_line M l)
+          (exists (m : Line),
+            And (on_line A m) (And (on_line B m) (perpendicular l m)))) =>
+      let h_M_mid : midpoint M A B :=
+        and_fst (midpoint M A B)
+          (And (on_line M l)
+            (exists (m : Line),
+              And (on_line A m) (And (on_line B m) (perpendicular l m))))
+          h_M_spec in
+      let h_M_l : on_line M l :=
+        and_fst (on_line M l)
+          (exists (m : Line),
+            And (on_line A m) (And (on_line B m) (perpendicular l m)))
+          (and_snd (midpoint M A B)
+            (And (on_line M l)
+              (exists (m : Line),
+                And (on_line A m) (And (on_line B m) (perpendicular l m))))
+            h_M_spec) in
+      let h_Mo_mid : midpoint (midpoint_of A B h_AB) A B := midpoint_of_spec A B h_AB in
+      let h_eq : Eq Point M (midpoint_of A B h_AB) :=
+        midpoint_unique M (midpoint_of A B h_AB) A B h_M_mid h_Mo_mid in
+      eq_subst Point M (midpoint_of A B h_AB) (fun X : Point => on_line X l) h_eq h_M_l)
+    h_pb)
+
+-- There is only one perpendicular bisector of a segment.
+
+-- Predicate forms for constructing perpendicular existential proofs.
+-- Using defs avoids parsing the large `fun ... => exists ...` bodies as
+-- arguments to Exists.intro, which the surface parser misassociates.
+def perpendicular_pred (l : Line) (m : Line) (X : Point) : Prop :=
+  And (on_line X l) (And (on_line X m)
+    (exists (A0 : Point), exists (B0 : Point),
+      And (on_line A0 l) (And (on_line B0 m)
+        (And (Not (Eq Point X A0)) (And (Not (Eq Point X B0))
+          (right_angle A0 X B0))))))
+
+def perpendicular_A_pred (l : Line) (m : Line) (X : Point) (A0 : Point) : Prop :=
+  exists (B0 : Point),
+    And (on_line A0 l) (And (on_line B0 m)
+      (And (Not (Eq Point X A0)) (And (Not (Eq Point X B0))
+        (right_angle A0 X B0))))
+
+def perpendicular_B_pred (l : Line) (m : Line) (X : Point) (A : Point) (B0 : Point) : Prop :=
+  And (on_line A l) (And (on_line B0 m)
+    (And (Not (Eq Point X A)) (And (Not (Eq Point X B0))
+      (right_angle A X B0))))
+
+-- A right angle at the intersection of two lines makes them perpendicular.
+theorem right_angle_perpendicular : forall (P M A B : Point),
+  Not (Eq Point A B) ->
+  midpoint M A B ->
+  right_angle P M A ->
+  Not (Eq Point M P) ->
+  perpendicular (line P M) (line A B) := by
+  intro P
+  intro M
+  intro A
+  intro B
+  intro h_AB
+  intro h_mid
+  intro h_right
+  intro h_MP
+  have h_MA : Not (Eq Point A M) :=
+    between_distinct_first A M B (and_fst (between A M B) (seg_congruent A M M B) h_mid)
+  have h_MA_sym : Not (Eq Point M A) :=
+    (fun h_eq : Eq Point M A => h_MA (eq_sym Point M A h_eq))
+  have h_PM : on_line P (line P M) := line_through_P P M
+  have h_MM : on_line M (line P M) := line_through_Q P M
+  have h_M_AB : on_line M (line A B) := midpoint_on_base_line A B h_AB
+  have h_A_AB : on_line A (line A B) := line_through_P A B
+  exact (Exists.intro Point (perpendicular_pred (line P M) (line A B)) M
+    (And.conj (on_line M (line P M))
+      (And (on_line M (line A B))
+        (exists (A0 : Point), exists (B0 : Point),
+          And (on_line A0 (line P M)) (And (on_line B0 (line A B))
+            (And (Not (Eq Point M A0)) (And (Not (Eq Point M B0))
+              (right_angle A0 M B0))))))
+      h_MM
+      (And.conj (on_line M (line A B))
+        (exists (A0 : Point), exists (B0 : Point),
+          And (on_line A0 (line P M)) (And (on_line B0 (line A B))
+            (And (Not (Eq Point M A0)) (And (Not (Eq Point M B0))
+              (right_angle A0 M B0)))))
+        h_M_AB
+        (Exists.intro Point (perpendicular_A_pred (line P M) (line A B) M) P
+          (Exists.intro Point (perpendicular_B_pred (line P M) (line A B) M P) A
+            (And.conj (on_line P (line P M))
+              (And (on_line A (line A B))
+                (And (Not (Eq Point M P)) (And (Not (Eq Point M A))
+                  (right_angle P M A))))
+              h_PM
+              (And.conj (on_line A (line A B))
+                (And (Not (Eq Point M P)) (And (Not (Eq Point M A))
+                  (right_angle P M A)))
+                h_A_AB
+                (And.conj (Not (Eq Point M P))
+                  (And (Not (Eq Point M A)) (right_angle P M A))
+                  h_MP
+                  (And.conj (Not (Eq Point M A)) (right_angle P M A)
+                    h_MA_sym h_right)))))))))
+
+
+-- Predicate forms for the perpendicular-bisector existential proofs.
+def perp_bisector_pred (A B : Point) (l : Line) (M0 : Point) : Prop :=
+  And (midpoint M0 A B)
+    (And (on_line M0 l)
+      (exists (m : Line),
+        And (on_line A m) (And (on_line B m) (perpendicular l m))))
+
+def perp_bisector_m_pred (A B : Point) (l : Line) (m : Line) : Prop :=
+  And (on_line A m) (And (on_line B m) (perpendicular l m))
+
+-- Build a perpendicular bisector line from a right angle at the midpoint.
+theorem perpendicular_bisector_from_right_angle : forall (A B P M : Point),
+  Not (Eq Point A B) ->
+  midpoint M A B ->
+  right_angle P M A ->
+  Not (collinear A B P) ->
+  perpendicular_bisector A B (line P M) := by
+  intro A
+  intro B
+  intro P
+  intro M
+  intro h_AB
+  intro h_mid
+  intro h_right
+  intro h_nocol
+  have h_MP : Not (Eq Point M P) := fun h_eq : Eq Point M P =>
+    h_nocol
+      (eq_subst Point M P (fun X : Point => collinear A B X)
+        h_eq
+        (between_implies_collinear A M B (and_fst (between A M B) (seg_congruent A M M B) h_mid)))
+  have h_M_l : on_line M (line P M) := line_through_Q P M
+  have h_perp : perpendicular (line P M) (line A B) :=
+    right_angle_perpendicular P M A B h_AB h_mid h_right h_MP
+  exact (Exists.intro Point (perp_bisector_pred A B (line P M)) M
+    (And.conj (midpoint M A B)
+      (And (on_line M (line P M))
+        (exists (m : Line), And (on_line A m)
+          (And (on_line B m) (perpendicular (line P M) m))))
+      h_mid
+      (And.conj (on_line M (line P M))
+        (exists (m : Line), And (on_line A m)
+          (And (on_line B m) (perpendicular (line P M) m)))
+        h_M_l
+        (Exists.intro Line (perp_bisector_m_pred A B (line P M)) (line A B)
+          (And.conj (on_line A (line A B))
+            (And (on_line B (line A B)) (perpendicular (line P M) (line A B)))
+            (line_through_P A B)
+            (And.conj (on_line B (line A B))
+              (perpendicular (line P M) (line A B))
+              (line_through_Q A B) h_perp))))))
+
+-- A point equidistant from the endpoints is distinct from them.
+theorem equidistant_distinct : forall (A B P : Point),
+  Not (Eq Point A B) -> seg_congruent P A P B ->
+  And (Not (Eq Point P A)) (Not (Eq Point P B)) := by
+  intro A
+  intro B
+  intro P
+  intro h_AB
+  intro h_PA_PB
+  have h_PA : Not (Eq Point P A) := fun h_eq : Eq Point P A =>
+    congruent_nonzero A A B h_AB
+      (eq_subst Point P A (fun X : Point => seg_congruent X A X B)
+        h_eq h_PA_PB)
+  have h_PB : Not (Eq Point P B) := fun h_eq : Eq Point P B =>
+    congruent_nonzero B B A
+      (fun h_eq_BA : Eq Point B A => h_AB (eq_sym Point B A h_eq_BA))
+      (congruent_sym B A B B
+        (eq_subst Point P B (fun X : Point => seg_congruent X A X B)
+          h_eq h_PA_PB))
+  exact (And.conj (Not (Eq Point P A)) (Not (Eq Point P B)) h_PA h_PB)
+
+-- On line AB, only the midpoint is equidistant from A and B.
+theorem equidistant_collinear_midpoint : forall (A B P : Point) (h_AB : Not (Eq Point A B)),
+  seg_congruent P A P B ->
+  collinear A B P ->
+  Eq Point P (midpoint_of A B h_AB) := by
+  intro A
+  intro B
+  intro P
+  intro h_AB
+  intro h_PA_PB
+  intro h_col
+  have h_M_mid : midpoint (midpoint_of A B h_AB) A B := midpoint_of_spec A B h_AB
+  have h_dist : And (Not (Eq Point P A)) (Not (Eq Point P B)) :=
+    equidistant_distinct A B P h_AB h_PA_PB
+  have h_PA : Not (Eq Point P A) :=
+    and_fst (Not (Eq Point P A)) (Not (Eq Point P B)) h_dist
+  have h_PB : Not (Eq Point P B) :=
+    and_snd (Not (Eq Point P A)) (Not (Eq Point P B)) h_dist
+  have h_AP : Not (Eq Point A P) := fun h_eq : Eq Point A P =>
+    h_PA (eq_sym Point A P h_eq)
+  have h_side : Or (between A P B) (Or (between P B A) (between P A B)) :=
+    between_unique A P B h_AP h_PB h_AB h_col
+  exact (or_elim (between A P B) (Or (between P B A) (between P A B))
+    (Eq Point P (midpoint_of A B h_AB)) h_side
+    (fun h_APB : between A P B =>
+      -- Inside AB: P is also a midpoint of AB, so it coincides with h_M.
+      have h_AP_PA : seg_congruent A P P A :=
+        congruent_swap A P h_AP in
+      have h_AP_PB : seg_congruent A P P B :=
+        congruent_trans A P P A P B h_AP_PA h_PA_PB in
+      have h_P_mid : midpoint P A B :=
+        And.conj (between A P B) (seg_congruent A P P B) h_APB h_AP_PB in
+      midpoint_unique P (midpoint_of A B h_AB) A B h_P_mid h_M_mid))
+    (fun h_rest : Or (between P B A) (between P A B) =>
+      or_elim (between P B A) (between P A B)
+        (Eq Point P (midpoint_of A B h_AB)) h_rest
+        (fun h_PBA : between P B A =>
+          -- Outside: PB congruent to PA forces B = A, contradicting h_AB.
+          let h_eq : Eq Point B A :=
+            segment_transfer_unique P B P B A h_PB
+              (Or.inl (between P B A) (between P A B) h_PBA)
+              (congruent_refl P B h_PB)
+              (congruent_sym P A P B h_PA_PB) in
+          False_elim (Eq Point P (midpoint_of A B h_AB)) (h_AB (eq_sym Point B A h_eq)))
+        (fun h_PAB : between P A B =>
+          -- Outside: PA congruent to PB forces A = B, contradicting h_AB.
+          let h_eq : Eq Point A B :=
+            segment_transfer_unique P A P A B h_PA
+              (Or.inl (between P A B) (between P B A) h_PAB)
+              (congruent_refl P A h_PA) h_PA_PB in
+          False_elim (Eq Point P (midpoint_of A B h_AB)) (h_AB h_eq)))
+
+-- Perpendicular lines are distinct: a line cannot be perpendicular to itself.
+theorem perpendicular_point : forall (l m : Line),
+  perpendicular l m -> Point := by
+  intro l
+  intro m
+  intro h
+  exact (choice Point (fun P : Point =>
+    And (on_line P l)
+      (And (on_line P m)
+        (exists (A : Point), exists (B : Point),
+          And (on_line A l) (And (on_line B m)
+            (And (Not (Eq Point P A)) (And (Not (Eq Point P B))
+              (right_angle A P B))))))) (perpendicular_use l m h))
+
+theorem perpendicular_point_spec : forall (l m : Line) (h : perpendicular l m),
+  And (on_line (perpendicular_point l m h) l)
+    (And (on_line (perpendicular_point l m h) m)
+      (exists (A : Point), exists (B : Point),
+        And (on_line A l) (And (on_line B m)
+          (And (Not (Eq Point (perpendicular_point l m h) A))
+            (And (Not (Eq Point (perpendicular_point l m h) B))
+              (right_angle A (perpendicular_point l m h) B)))))) := by
+  intro l
+  intro m
+  intro h
+  exact (choice_spec Point (fun P : Point =>
+    And (on_line P l)
+      (And (on_line P m)
+        (exists (A : Point), exists (B : Point),
+          And (on_line A l) (And (on_line B m)
+            (And (Not (Eq Point P A)) (And (Not (Eq Point P B))
+              (right_angle A P B))))))) (perpendicular_use l m h))
+
+theorem perpendicular_point_on_l : forall (l m : Line) (h : perpendicular l m),
+  on_line (perpendicular_point l m h) l := by
+  intro l
+  intro m
+  intro h
+  exact (and_fst (on_line (perpendicular_point l m h) l)
+    (And (on_line (perpendicular_point l m h) m)
+      (exists (A : Point), exists (B : Point),
+        And (on_line A l) (And (on_line B m)
+          (And (Not (Eq Point (perpendicular_point l m h) A))
+            (And (Not (Eq Point (perpendicular_point l m h) B))
+              (right_angle A (perpendicular_point l m h) B))))))
+    (perpendicular_point_spec l m h))
+
+theorem perpendicular_point_on_m : forall (l m : Line) (h : perpendicular l m),
+  on_line (perpendicular_point l m h) m := by
+  intro l
+  intro m
+  intro h
+  exact (and_fst (on_line (perpendicular_point l m h) m)
+    (exists (A : Point), exists (B : Point),
+      And (on_line A l) (And (on_line B m)
+        (And (Not (Eq Point (perpendicular_point l m h) A))
+          (And (Not (Eq Point (perpendicular_point l m h) B))
+            (right_angle A (perpendicular_point l m h) B)))))
+    (and_snd (on_line (perpendicular_point l m h) l)
+      (And (on_line (perpendicular_point l m h) m)
+        (exists (A : Point), exists (B : Point),
+          And (on_line A l) (And (on_line B m)
+            (And (Not (Eq Point (perpendicular_point l m h) A))
+              (And (Not (Eq Point (perpendicular_point l m h) B))
+                (right_angle A (perpendicular_point l m h) B))))))
+      (perpendicular_point_spec l m h)))
+
+theorem perpendicular_witness_AB_ex : forall (l m : Line) (h : perpendicular l m),
+  exists (A : Point), exists (B : Point),
+    And (on_line A l) (And (on_line B m)
+      (And (Not (Eq Point (perpendicular_point l m h) A))
+        (And (Not (Eq Point (perpendicular_point l m h) B))
+          (right_angle A (perpendicular_point l m h) B)))) := by
+  intro l
+  intro m
+  intro h
+  exact (and_snd (on_line (perpendicular_point l m h) m)
+    (exists (A : Point), exists (B : Point),
+      And (on_line A l) (And (on_line B m)
+        (And (Not (Eq Point (perpendicular_point l m h) A))
+          (And (Not (Eq Point (perpendicular_point l m h) B))
+            (right_angle A (perpendicular_point l m h) B)))))
+    (and_snd (on_line (perpendicular_point l m h) l)
+      (And (on_line (perpendicular_point l m h) m)
+        (exists (A : Point), exists (B : Point),
+          And (on_line A l) (And (on_line B m)
+            (And (Not (Eq Point (perpendicular_point l m h) A))
+              (And (Not (Eq Point (perpendicular_point l m h) B))
+                (right_angle A (perpendicular_point l m h) B))))))
+      (perpendicular_point_spec l m h)))
+
+theorem perpendicular_witness_A : forall (l m : Line) (h : perpendicular l m), Point := by
+  intro l
+  intro m
+  intro h
+  exact (choice Point (fun A : Point => exists (B : Point),
+    And (on_line A l) (And (on_line B m)
+      (And (Not (Eq Point (perpendicular_point l m h) A))
+        (And (Not (Eq Point (perpendicular_point l m h) B))
+          (right_angle A (perpendicular_point l m h) B)))))
+    (perpendicular_witness_AB_ex l m h))
+
+theorem perpendicular_witness_A_spec : forall (l m : Line) (h : perpendicular l m),
+  exists (B : Point),
+    And (on_line (perpendicular_witness_A l m h) l) (And (on_line B m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) B))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) B)))) := by
+  intro l
+  intro m
+  intro h
+  exact (choice_spec Point (fun A : Point => exists (B : Point),
+    And (on_line A l) (And (on_line B m)
+      (And (Not (Eq Point (perpendicular_point l m h) A))
+        (And (Not (Eq Point (perpendicular_point l m h) B))
+          (right_angle A (perpendicular_point l m h) B)))))
+    (perpendicular_witness_AB_ex l m h))
+
+theorem perpendicular_witness_B : forall (l m : Line) (h : perpendicular l m), Point := by
+  intro l
+  intro m
+  intro h
+  exact (choice Point (fun B : Point =>
+    And (on_line (perpendicular_witness_A l m h) l) (And (on_line B m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) B))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) B)))))
+    (perpendicular_witness_A_spec l m h))
+
+theorem perpendicular_witness_B_spec : forall (l m : Line) (h : perpendicular l m),
+  And (on_line (perpendicular_witness_A l m h) l) (And (on_line (perpendicular_witness_B l m h) m)
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+        (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))))) := by
+  intro l
+  intro m
+  intro h
+  exact (choice_spec Point (fun B : Point =>
+    And (on_line (perpendicular_witness_A l m h) l) (And (on_line B m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) B))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) B)))))
+    (perpendicular_witness_A_spec l m h))
+
+theorem perpendicular_witness_A_on_l : forall (l m : Line) (h : perpendicular l m),
+  on_line (perpendicular_witness_A l m h) l := by
+  intro l
+  intro m
+  intro h
+  exact (and_fst (on_line (perpendicular_witness_A l m h) l)
+    (And (on_line (perpendicular_witness_B l m h) m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))))
+    (perpendicular_witness_B_spec l m h))
+
+theorem perpendicular_witness_B_on_m : forall (l m : Line) (h : perpendicular l m),
+  on_line (perpendicular_witness_B l m h) m := by
+  intro l
+  intro m
+  intro h
+  exact (and_fst (on_line (perpendicular_witness_B l m h) m)
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+        (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))))
+    (and_snd (on_line (perpendicular_witness_A l m h) l)
+      (And (on_line (perpendicular_witness_B l m h) m)
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+          (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+            (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))))
+      (perpendicular_witness_B_spec l m h)))
+
+theorem perpendicular_right_angle : forall (l m : Line) (h : perpendicular l m),
+  right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h) := by
+  intro l
+  intro m
+  intro h
+  have h_spec : And (on_line (perpendicular_witness_A l m h) l)
+    (And (on_line (perpendicular_witness_B l m h) m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))))) :=
+    perpendicular_witness_B_spec l m h
+  have h_rest1 : And (on_line (perpendicular_witness_B l m h) m)
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+        (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))) :=
+    and_snd (on_line (perpendicular_witness_A l m h) l)
+      (And (on_line (perpendicular_witness_B l m h) m)
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+          (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+            (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))))
+      h_spec
+  have h_rest2 : And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+      (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))) :=
+    and_snd (on_line (perpendicular_witness_B l m h) m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))))
+      h_rest1
+  have h_rest3 : And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+    (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)) :=
+    and_snd (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+        (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+      h_rest2
+  exact (and_snd (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+    (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))
+    h_rest3)
+
+theorem perpendicular_point_neq_A : forall (l m : Line) (h : perpendicular l m),
+  Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)) := by
+  intro l
+  intro m
+  intro h
+  have h_spec : And (on_line (perpendicular_witness_A l m h) l)
+    (And (on_line (perpendicular_witness_B l m h) m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))))) :=
+    perpendicular_witness_B_spec l m h
+  have h_rest1 : And (on_line (perpendicular_witness_B l m h) m)
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+        (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))) :=
+    and_snd (on_line (perpendicular_witness_A l m h) l)
+      (And (on_line (perpendicular_witness_B l m h) m)
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+          (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+            (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))))
+      h_spec
+  have h_rest2 : And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+      (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))) :=
+    and_snd (on_line (perpendicular_witness_B l m h) m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))))
+      h_rest1
+  exact (and_fst (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+      (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+    h_rest2)
+
+theorem perpendicular_point_neq_B : forall (l m : Line) (h : perpendicular l m),
+  Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)) := by
+  intro l
+  intro m
+  intro h
+  have h_spec : And (on_line (perpendicular_witness_A l m h) l)
+    (And (on_line (perpendicular_witness_B l m h) m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))))) :=
+    perpendicular_witness_B_spec l m h
+  have h_rest1 : And (on_line (perpendicular_witness_B l m h) m)
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+        (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))) :=
+    and_snd (on_line (perpendicular_witness_A l m h) l)
+      (And (on_line (perpendicular_witness_B l m h) m)
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+          (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+            (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))))
+      h_spec
+  have h_rest2 : And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+    (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+      (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))) :=
+    and_snd (on_line (perpendicular_witness_B l m h) m)
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+        (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+          (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))))
+      h_rest1
+  have h_rest3 : And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+    (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)) :=
+    and_snd (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_A l m h)))
+      (And (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+        (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+      h_rest2
+  exact (and_fst (Not (Eq Point (perpendicular_point l m h) (perpendicular_witness_B l m h)))
+    (right_angle (perpendicular_witness_A l m h) (perpendicular_point l m h) (perpendicular_witness_B l m h))
+    h_rest3)
+
+-- Build perpendicularity from explicit intersection/witness data.
+theorem perpendicular_intro : forall (l m : Line) (P A B : Point),
+  on_line P l ->
+  on_line P m ->
+  on_line A l ->
+  on_line B m ->
+  Not (Eq Point P A) ->
+  Not (Eq Point P B) ->
+  right_angle A P B ->
+  perpendicular l m := by
+  intro l
+  intro m
+  intro P
+  intro A
+  intro B
+  intro h_Pl
+  intro h_Pm
+  intro h_Al
+  intro h_Bm
+  intro h_neq_PA
+  intro h_neq_PB
+  intro h_right
+  exact (Exists.intro Point (perpendicular_pred l m) P
+    (And.conj (on_line P l)
+      (And (on_line P m)
+        (exists (A0 : Point), exists (B0 : Point),
+          And (on_line A0 l) (And (on_line B0 m)
+            (And (Not (Eq Point P A0)) (And (Not (Eq Point P B0))
+              (right_angle A0 P B0))))))
+      h_Pl
+      (And.conj (on_line P m)
+        (exists (A0 : Point), exists (B0 : Point),
+          And (on_line A0 l) (And (on_line B0 m)
+            (And (Not (Eq Point P A0)) (And (Not (Eq Point P B0))
+              (right_angle A0 P B0)))))
+        h_Pm
+        (Exists.intro Point (perpendicular_A_pred l m P) A
+          (Exists.intro Point (perpendicular_B_pred l m P A) B
+            (And.conj (on_line A l)
+              (And (on_line B m)
+                (And (Not (Eq Point P A)) (And (Not (Eq Point P B))
+                  (right_angle A P B))))
+              h_Al
+              (And.conj (on_line B m)
+                (And (Not (Eq Point P A)) (And (Not (Eq Point P B))
+                  (right_angle A P B)))
+                h_Bm
+                (And.conj (Not (Eq Point P A))
+                  (And (Not (Eq Point P B)) (right_angle A P B))
+                  h_neq_PA
+                  (And.conj (Not (Eq Point P B)) (right_angle A P B)
+                    h_neq_PB h_right)))))))))
+
+-- Perpendicularity is symmetric.
+theorem perpendicular_sym : forall (l m : Line),
+  perpendicular l m -> perpendicular m l := by
+  intro l
+  intro m
+  intro h
+  have P : Point := perpendicular_point l m h
+  have A_pt : Point := perpendicular_witness_A l m h
+  have B_pt : Point := perpendicular_witness_B l m h
+  have h_Pl : on_line P l := perpendicular_point_on_l l m h
+  have h_Pm : on_line P m := perpendicular_point_on_m l m h
+  have h_A_l : on_line A_pt l := perpendicular_witness_A_on_l l m h
+  have h_B_m : on_line B_pt m := perpendicular_witness_B_on_m l m h
+  have h_neq_PA : Not (Eq Point P A_pt) := perpendicular_point_neq_A l m h
+  have h_neq_PB : Not (Eq Point P B_pt) := perpendicular_point_neq_B l m h
+  have h_right : right_angle A_pt P B_pt := perpendicular_right_angle l m h
+  have h_right_swap : right_angle B_pt P A_pt := right_angle_sym A_pt P B_pt h_right
+  exact (perpendicular_intro m l P B_pt A_pt h_Pm h_Pl h_B_m h_A_l h_neq_PB h_neq_PA h_right_swap)
+
+-- Perpendicular bisector existence: construct the line through the midpoint
+-- perpendicular to the base AB.
+theorem perpendicular_bisector_exists : forall (A B : Point),
+  Not (Eq Point A B) -> exists (l : Line), perpendicular_bisector A B l := by
+  intro A
+  intro B
+  intro h_AB
+  have M : Point := midpoint_of A B h_AB
+  have h_M_mid : midpoint M A B := midpoint_of_spec A B h_AB
+  have h_M_AB : on_line M (line A B) := midpoint_on_base_line A B h_AB
+  have h_l_ex : exists (l : Line), And (on_line M l) (perpendicular (line A B) l) :=
+    perpendicular_exists (line A B) M
+  have l : Line := choice Line (fun l0 : Line => And (on_line M l0) (perpendicular (line A B) l0)) h_l_ex
+  have h_l_spec : And (on_line M l) (perpendicular (line A B) l) :=
+    choice_spec Line (fun l0 : Line => And (on_line M l0) (perpendicular (line A B) l0)) h_l_ex
+  have h_M_l : on_line M l :=
+    and_fst (on_line M l) (perpendicular (line A B) l) h_l_spec
+  have h_perp_AB_l : perpendicular (line A B) l :=
+    and_snd (on_line M l) (perpendicular (line A B) l) h_l_spec
+  have h_perp_l_AB : perpendicular l (line A B) :=
+    perpendicular_sym (line A B) l h_perp_AB_l
+  exact (Exists.intro Line (fun l0 : Line => perpendicular_bisector A B l0) l
+    (Exists.intro Point (perp_bisector_pred A B l) M
+      (And.conj (midpoint M A B)
+        (And (on_line M l)
+          (exists (m : Line),
+            And (on_line A m) (And (on_line B m) (perpendicular l m))))
+        h_M_mid
+        (And.conj (on_line M l)
+          (exists (m : Line),
+            And (on_line A m) (And (on_line B m) (perpendicular l m)))
+          h_M_l
+          (Exists.intro Line (perp_bisector_m_pred A B l) (line A B)
+            (And.conj (on_line A (line A B))
+              (And (on_line B (line A B)) (perpendicular l (line A B)))
+              (line_through_P A B)
+              (And.conj (on_line B (line A B))
+                (perpendicular l (line A B))
+                (line_through_Q A B)
+                h_perp_l_AB)))))))
+
+theorem perpendicular_bisector_unique : forall (A B : Point) (l m : Line),
+  Not (Eq Point A B) -> perpendicular_bisector A B l ->
+  perpendicular_bisector A B m -> Eq Line l m := by
+  intro A
+  intro B
+  intro l
+  intro m
+  intro h_AB
+  intro h_l
+  intro h_m
+  have h_M_l : on_line (midpoint_of A B h_AB) l :=
+    perpendicular_bisector_midpoint_on A B h_AB l h_l
+  have h_M_m : on_line (midpoint_of A B h_AB) m :=
+    perpendicular_bisector_midpoint_on A B h_AB m h_m
+  have h_l_perp : perpendicular l (line A B) :=
+    perpendicular_bisector_base_perp A B l h_AB h_l
+  have h_m_perp : perpendicular m (line A B) :=
+    perpendicular_bisector_base_perp A B m h_AB h_m
+  have h_AB_l : perpendicular (line A B) l := perpendicular_sym l (line A B) h_l_perp
+  have h_AB_m : perpendicular (line A B) m := perpendicular_sym m (line A B) h_m_perp
+  exact (perpendicular_unique (line A B) (midpoint_of A B h_AB) l m
+    (midpoint_on_base_line A B h_AB) h_M_l h_M_m h_AB_l h_AB_m)
+-- Perpendicular lines are distinct: a line cannot be perpendicular to itself.
+theorem perpendicular_neq : forall (l m : Line),
+  perpendicular l m -> Not (Eq Line l m) := by
+  intro l
+  intro m
+  intro h_perp
+  intro h_eq
+  have P : Point := perpendicular_point l m h_perp
+  have A_pt : Point := perpendicular_witness_A l m h_perp
+  have B_pt : Point := perpendicular_witness_B l m h_perp
+  have h_Pm : on_line P m := perpendicular_point_on_m l m h_perp
+  have h_A_l : on_line A_pt l := perpendicular_witness_A_on_l l m h_perp
+  have h_A_m : on_line A_pt m := eq_subst Line l m (fun x : Line => on_line A_pt x) h_eq h_A_l
+  have h_B_m : on_line B_pt m := perpendicular_witness_B_on_m l m h_perp
+  have h_ra : right_angle A_pt P B_pt := perpendicular_right_angle l m h_perp
+  have h_col : collinear A_pt P B_pt :=
+    Exists.intro Line (fun x : Line => And (on_line A_pt x) (And (on_line P x) (on_line B_pt x))) m
+      (And.conj (on_line A_pt m) (And (on_line P m) (on_line B_pt m))
+        h_A_m
+        (And.conj (on_line P m) (on_line B_pt m) h_Pm h_B_m))
+  exact ((right_angle_non_collinear A_pt P B_pt h_ra) h_col)
+
+-- If two perpendicular lines share two points, they are equal; but since they
+-- are distinct, they share at most one point. Formally: if P and Q both lie on
+-- perpendicular lines l and m, then P = Q.
+theorem perpendicular_intersection_unique : forall (l m : Line) (P Q : Point),
+  perpendicular l m -> on_line P l -> on_line P m -> on_line Q l -> on_line Q m ->
+  Eq Point P Q := by
+  intro l
+  intro m
+  intro P
+  intro Q
+  intro h_perp
+  intro h_Pl
+  intro h_Pm
+  intro h_Ql
+  intro h_Qm
+  have h_neq : Not (Eq Line l m) := perpendicular_neq l m h_perp
+  exact (or_elim (Eq Point P Q) (Not (Eq Point P Q)) (Eq Point P Q)
+    (excluded_middle (Eq Point P Q))
+    (fun h_eq : Eq Point P Q => h_eq)
+    (fun h_neq_PQ : Not (Eq Point P Q) =>
+      False_elim (Eq Point P Q) (h_neq (line_unique P Q l m h_neq_PQ h_Pl h_Ql h_Pm h_Qm))))
+
+-- Perpendicular lines are distinct: a line cannot be perpendicular to itself.
+theorem perpendicular_lines_distinct : forall (l m : Line),
+  perpendicular l m -> Not (Eq Line l m) := by
+  intro l
+  intro m
+  intro h_perp
+  exact (perpendicular_neq l m h_perp)
+
+-- Forward direction: every point on the perpendicular bisector is equidistant
+-- from A and B. Proved from the perpendicularity definition and SAS.
+theorem perpendicular_bisector_equidistant : forall (A B P : Point) (l : Line),
+  Not (Eq Point A B) ->
+  perpendicular_bisector A B l ->
+  on_line P l ->
+  seg_congruent P A P B := by
+  intro A
+  intro B
+  intro P
+  intro l
+  intro h_AB
+  intro h_pb
+  intro h_Pl
+  have h_l_AB : perpendicular l (line A B) :=
+    perpendicular_bisector_base_perp A B l h_AB h_pb
+  have h_M_l : on_line (midpoint_of A B h_AB) l :=
+    perpendicular_bisector_midpoint_on A B h_AB l h_pb
+  have h_M_AB : on_line (midpoint_of A B h_AB) (line A B) :=
+    midpoint_on_base_line A B h_AB
+  have X : Point := perpendicular_point l (line A B) h_l_AB
+  have A0 : Point := perpendicular_witness_A l (line A B) h_l_AB
+  have B0 : Point := perpendicular_witness_B l (line A B) h_l_AB
+  have h_X_l : on_line X l := perpendicular_point_on_l l (line A B) h_l_AB
+  have h_X_AB : on_line X (line A B) := perpendicular_point_on_m l (line A B) h_l_AB
+  have h_A0_l : on_line A0 l := perpendicular_witness_A_on_l l (line A B) h_l_AB
+  have h_B0_AB : on_line B0 (line A B) := perpendicular_witness_B_on_m l (line A B) h_l_AB
+  have h_right : right_angle A0 X B0 := perpendicular_right_angle l (line A B) h_l_AB
+  have h_eq_X_M : Eq Point X (midpoint_of A B h_AB) :=
+    perpendicular_intersection_unique l (line A B) X (midpoint_of A B h_AB) h_l_AB
+      h_X_l h_X_AB h_M_l h_M_AB
+  have h_M : Point := midpoint_of A B h_AB
+  have h_mid : midpoint h_M A B := midpoint_of_spec A B h_AB
+  have h_bet : between A h_M B :=
+    and_fst (between A h_M B) (seg_congruent A h_M h_M B) h_mid
+  have h_AM : Not (Eq Point A h_M) := between_distinct_first A h_M B h_bet
+  have h_MB : Not (Eq Point h_M B) := between_distinct_middle A h_M B h_bet
+  have h_AM_MB : seg_congruent A h_M h_M B :=
+    and_snd (between A h_M B) (seg_congruent A h_M h_M B) h_mid
+  have h_MA_MB : seg_congruent h_M A h_M B :=
+    congruent_trans h_M A A h_M h_M B
+      (congruent_sym A h_M h_M A (congruent_swap A h_M h_AM))
+      h_AM_MB
+  have h_ra_M : right_angle A0 h_M B0 :=
+    eq_subst Point X h_M (fun Y : Point => right_angle A0 Y B0) h_eq_X_M h_right
+  have h_case : Or (Eq Point P h_M) (Not (Eq Point P h_M)) :=
+    excluded_middle (Eq Point P h_M)
+  exact (or_elim (Eq Point P h_M) (Not (Eq Point P h_M))
+    (seg_congruent P A P B) h_case
+    (fun h_PM : Eq Point P h_M =>
+      eq_subst Point h_M P (fun Y : Point => seg_congruent Y A Y B)
+        (eq_sym Point P h_M h_PM)
+        h_MA_MB)
+    (fun h_PM_ne : Not (Eq Point P h_M) =>
+      let h_MP_ne : Not (Eq Point h_M P) :=
+        fun h_eq : Eq Point h_M P => h_PM_ne (eq_sym Point h_M P h_eq) in
+      let h_col_A0MP : collinear A0 h_M P :=
+        Exists.intro Line (fun x : Line => And (on_line A0 x) (And (on_line h_M x) (on_line P x))) l
+          (And.conj (on_line A0 l) (And (on_line h_M l) (on_line P l))
+            h_A0_l
+            (And.conj (on_line h_M l) (on_line P l) h_M_l h_Pl)) in
+      let h_ra_PMB0 : right_angle P h_M B0 :=
+        right_angle_collinear_transfer A0 h_M B0 P h_ra_M h_col_A0MP h_MP_ne in
+      let h_col_B0MA : collinear h_M B0 A :=
+        Exists.intro Line (fun x : Line => And (on_line h_M x) (And (on_line B0 x) (on_line A x))) (line A B)
+          (And.conj (on_line h_M (line A B)) (And (on_line B0 (line A B)) (on_line A (line A B)))
+            h_M_AB
+            (And.conj (on_line B0 (line A B)) (on_line A (line A B)) h_B0_AB (line_through_P A B))) in
+      let h_MA : Not (Eq Point h_M A) :=
+        fun h_eq : Eq Point h_M A => h_AM (eq_sym Point h_M A h_eq) in
+      let h_ra_PMA : right_angle P h_M A :=
+        right_angle_collinear_transfer_snd P h_M B0 A h_ra_PMB0 h_col_B0MA h_MA in
+      let h_col_B0MB : collinear h_M B0 B :=
+        Exists.intro Line (fun x : Line => And (on_line h_M x) (And (on_line B0 x) (on_line B x))) (line A B)
+          (And.conj (on_line h_M (line A B)) (And (on_line B0 (line A B)) (on_line B (line A B)))
+            h_M_AB
+            (And.conj (on_line B0 (line A B)) (on_line B (line A B)) h_B0_AB (line_through_Q A B))) in
+      let h_ra_PMB : right_angle P h_M B :=
+        right_angle_collinear_transfer_snd P h_M B0 B h_ra_PMB0 h_col_B0MB h_MB in
+      let h_angle : angle_congruent P h_M A P h_M B :=
+        right_angles_equal P h_M A P h_M B h_ra_PMA h_ra_PMB in
+      let h_PM_refl : seg_congruent h_M P h_M P :=
+        congruent_refl h_M P h_MP_ne in
+      and_fst (seg_congruent P A P B)
+        (And (angle_congruent h_M P A h_M P B) (angle_congruent h_M A P h_M B P))
+        (SAS h_M P A h_M P B h_PM_refl h_angle h_MA_MB)))
+
+-- Perpendicular lines cannot be parallel, because they share a point by
+-- definition and parallel lines share no point.
+theorem perpendicular_not_parallel : forall (l m : Line),
+  perpendicular l m -> Not (parallel l m) := by
+  intro l
+  intro m
+  intro h_perp
+  intro h_para
+  have P : Point := perpendicular_point l m h_perp
+  have h_Pl : on_line P l := perpendicular_point_on_l l m h_perp
+  have h_Pm : on_line P m := perpendicular_point_on_m l m h_perp
+  exact (h_para P (And.conj (on_line P l) (on_line P m) h_Pl h_Pm))
+
+-- Two distinct lines perpendicular to the same line are parallel.
+-- Proof: the common base line l is a transversal; at the two intersection
+-- points the alternate interior angles are right, hence congruent.
+theorem perpendicular_to_same_line_parallel : forall (l m n : Line),
+  perpendicular l m -> perpendicular l n -> Not (Eq Line m n) -> parallel m n := by
+  intro l
+  intro m
+  intro n
+  intro h_pm
+  intro h_pn
+  intro h_neq
+  -- Unpack the perpendicular witness for l and m using extraction helpers.
+  have P : Point := perpendicular_point l m h_pm
+  have A_pt : Point := perpendicular_witness_A l m h_pm
+  have B_pt : Point := perpendicular_witness_B l m h_pm
+  have h_Pl : on_line P l := perpendicular_point_on_l l m h_pm
+  have h_Pm : on_line P m := perpendicular_point_on_m l m h_pm
+  have h_A_l : on_line A_pt l := perpendicular_witness_A_on_l l m h_pm
+  have h_B_m : on_line B_pt m := perpendicular_witness_B_on_m l m h_pm
+  have h_ra_APB : right_angle A_pt P B_pt := perpendicular_right_angle l m h_pm
+
+  -- Unpack the perpendicular witness for l and n using extraction helpers.
+  have Q : Point := perpendicular_point l n h_pn
+  have C_pt : Point := perpendicular_witness_A l n h_pn
+  have D_pt : Point := perpendicular_witness_B l n h_pn
+  have h_Ql : on_line Q l := perpendicular_point_on_l l n h_pn
+  have h_Qn : on_line Q n := perpendicular_point_on_m l n h_pn
+  have h_C_l : on_line C_pt l := perpendicular_witness_A_on_l l n h_pn
+  have h_D_n : on_line D_pt n := perpendicular_witness_B_on_m l n h_pn
+  have h_ra_CQD : right_angle C_pt Q D_pt := perpendicular_right_angle l n h_pn
+
+  -- The two intersection points on l must be distinct, otherwise m and n
+  -- would be two perpendiculars to l at the same point.
+  have h_P_ne_Q : Not (Eq Point P Q) := fun h_eq : Eq Point P Q =>
+    let h_Pn : on_line P n := eq_subst Point Q P (fun X : Point => on_line X n) (eq_sym Point P Q h_eq) h_Qn in
+    h_neq (perpendicular_unique l P m n h_Pl h_Pm h_Pn h_pm h_pn)
+
+  -- Transfer the right angles to the common transversal l.
+  have h_col_APQ : collinear A_pt P Q :=
+    Exists.intro Line (fun x : Line => And (on_line A_pt x) (And (on_line P x) (on_line Q x))) l
+      (And.conj (on_line A_pt l) (And (on_line P l) (on_line Q l)) h_A_l
+        (And.conj (on_line P l) (on_line Q l) h_Pl h_Ql))
+  have h_ra_QPB : right_angle Q P B_pt :=
+    right_angle_collinear_transfer A_pt P B_pt Q h_ra_APB h_col_APQ h_P_ne_Q
+  have h_col_CQP : collinear C_pt Q P :=
+    Exists.intro Line (fun x : Line => And (on_line C_pt x) (And (on_line Q x) (on_line P x))) l
+      (And.conj (on_line C_pt l) (And (on_line Q l) (on_line P l)) h_C_l
+        (And.conj (on_line Q l) (on_line P l) h_Ql h_Pl))
+  have h_QP_ne : Not (Eq Point Q P) :=
+    fun h_eq : Eq Point Q P => h_P_ne_Q (eq_sym Point Q P h_eq)
+  have h_ra_PQD : right_angle P Q D_pt :=
+    right_angle_collinear_transfer C_pt Q D_pt P h_ra_CQD h_col_CQP h_QP_ne
+
+  -- The two right angles give congruent alternate interior angles.
+  have h_angle_right : angle_congruent Q P B_pt P Q D_pt :=
+    right_angles_equal Q P B_pt P Q D_pt h_ra_QPB h_ra_PQD
+  have h_angle_alt : angle_congruent B_pt P Q D_pt Q P :=
+    angle_trans B_pt P Q Q P B_pt D_pt Q P
+      (angle_vertex_swap P B_pt Q)
+      (angle_trans Q P B_pt P Q D_pt D_pt Q P h_angle_right (angle_vertex_swap Q P D_pt))
+
+  exact (alternate_interior_converse P Q B_pt D_pt m n l
+    h_Pm h_B_m h_Qn h_D_n h_Pl h_Ql h_P_ne_Q h_angle_alt)
+
+-- A line perpendicular to one of two parallel lines is perpendicular to the other.
+theorem perpendicular_parallel_transfer : forall (l m n : Line),
+  parallel l m -> perpendicular n l -> perpendicular n m := by
+  intro l
+  intro m
+  intro n
+  intro h_lm
+  intro h_nl
+
+  -- n cannot coincide with m, otherwise l would be parallel to a line
+  -- perpendicular to it.
+  have h_n_ne_m : Not (Eq Line n m) := fun h_eq : Eq Line n m =>
+    let h_nm : perpendicular n n := eq_subst Line m n (fun x : Line => perpendicular n x)
+      (eq_sym Line n m h_eq) h_nl in
+    (perpendicular_neq n n h_nm) (refl Line n)
+
+  -- n is not parallel to m.
+  have h_not_nm : Not (parallel n m) := fun h_nm_para : parallel n m =>
+    let h_ml : parallel m l := parallel_sym l m h_lm in
+    let h_nl_para : parallel n l := parallel_trans n m l h_nm_para h_ml
+      (perpendicular_neq n l h_nl) in
+    (perpendicular_not_parallel n l h_nl) h_nl_para
+
+  -- Therefore n meets m.
+  have h_Q_ex : exists (Q : Point), And (on_line Q n) (on_line Q m) :=
+    lines_meet n m h_not_nm
+  have Q : Point := choice Point (fun Q : Point => And (on_line Q n) (on_line Q m)) h_Q_ex
+  have h_Q_spec : And (on_line Q n) (on_line Q m) :=
+    choice_spec Point (fun Q : Point => And (on_line Q n) (on_line Q m)) h_Q_ex
+  have h_Qn : on_line Q n := and_fst (on_line Q n) (on_line Q m) h_Q_spec
+  have h_Qm : on_line Q m := and_snd (on_line Q n) (on_line Q m) h_Q_spec
+
+  -- Q cannot lie on l, since l and m are parallel.
+  have h_Q_not_l : Not (on_line Q l) := fun h_Ql : on_line Q l =>
+    h_lm Q (And.conj (on_line Q l) (on_line Q m) h_Ql h_Qm)
+
+  -- Through Q draw a line p perpendicular to n.
+  have h_p_ex : exists (p : Line), And (on_line Q p) (perpendicular n p) :=
+    perpendicular_exists n Q
+  have p : Line := choice Line (fun p : Line => And (on_line Q p) (perpendicular n p)) h_p_ex
+  have h_p_spec : And (on_line Q p) (perpendicular n p) :=
+    choice_spec Line (fun p : Line => And (on_line Q p) (perpendicular n p)) h_p_ex
+  have h_Qp : on_line Q p := and_fst (on_line Q p) (perpendicular n p) h_p_spec
+  have h_pn : perpendicular n p := and_snd (on_line Q p) (perpendicular n p) h_p_spec
+
+  -- p is distinct from l: Q lies on p but not on l.
+  have h_p_ne_l : Not (Eq Line p l) := fun h_eq : Eq Line p l =>
+    h_Q_not_l (eq_subst Line p l (fun x : Line => on_line Q x) h_eq h_Qp)
+
+  -- p is parallel to l because both are perpendicular to n.
+  have h_p_parallel_l : parallel p l :=
+    perpendicular_to_same_line_parallel n p l h_pn h_nl h_p_ne_l
+
+  -- By Playfair, the parallel to l through Q is unique, so p = m.
+  have h_playfair : exists (p0 : Line),
+    And (on_line Q p0) (And (parallel l p0)
+      (forall (m' : Line), on_line Q m' -> parallel l m' -> Eq Line p0 m')) :=
+    playfair l Q h_Q_not_l
+  have p0 : Line := choice Line (fun p0 : Line =>
+    And (on_line Q p0) (And (parallel l p0)
+      (forall (m' : Line), on_line Q m' -> parallel l m' -> Eq Line p0 m'))) h_playfair
+  have h_p0_spec : And (on_line Q p0) (And (parallel l p0)
+    (forall (m' : Line), on_line Q m' -> parallel l m' -> Eq Line p0 m')) :=
+    choice_spec Line (fun p0 : Line =>
+      And (on_line Q p0) (And (parallel l p0)
+        (forall (m' : Line), on_line Q m' -> parallel l m' -> Eq Line p0 m'))) h_playfair
+  have h_unique : forall (m' : Line), on_line Q m' -> parallel l m' -> Eq Line p0 m' :=
+    and_snd (parallel l p0)
+      (forall (m' : Line), on_line Q m' -> parallel l m' -> Eq Line p0 m')
+      (and_snd (on_line Q p0) (And (parallel l p0)
+        (forall (m' : Line), on_line Q m' -> parallel l m' -> Eq Line p0 m')) h_p0_spec)
+  have h_p0_eq_p : Eq Line p0 p :=
+    h_unique p h_Qp (parallel_sym p l h_p_parallel_l)
+  have h_p0_eq_m : Eq Line p0 m :=
+    h_unique m h_Qm h_lm
+  have h_p_eq_m : Eq Line p m :=
+    eq_subst Line p0 m (fun x : Line => Eq Line p x) h_p0_eq_m
+      (eq_sym Line p0 p h_p0_eq_p)
+
+  -- Since p is perpendicular to n, m is too.
+  exact (eq_subst Line p m (fun x : Line => perpendicular n x) h_p_eq_m h_pn)
+
+-- The perpendicular bisectors of two sides of a triangle are not parallel.
+theorem perpendicular_bisectors_not_parallel : forall (A B C : Point),
+  Not (collinear A B C) ->
+  forall (l m : Line),
+  perpendicular_bisector A B l -> perpendicular_bisector A C m ->
+  Not (parallel l m) := by
+  intro A
+  intro B
+  intro C
+  intro h_tri
+  intro l
+  intro m
+  intro h_pb_AB
+  intro h_pb_AC
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_tri
+  have h_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist
+  have h_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+  have h_lAB_ne_lAC : Not (Eq Line (line A B) (line A C)) := fun h_eq : Eq Line (line A B) (line A C) =>
+    h_tri (Exists.intro Line (fun x : Line => And (on_line A x) (And (on_line B x) (on_line C x))) (line A C)
+      (And.conj (on_line A (line A C)) (And (on_line B (line A C)) (on_line C (line A C)))
+        (line_through_P A C)
+        (And.conj (on_line B (line A C)) (on_line C (line A C))
+          (eq_subst Line (line A B) (line A C) (fun x : Line => on_line B x) h_eq (line_through_Q A B))
+          (line_through_Q A C))))
+  have h_l_perp_AB : perpendicular l (line A B) :=
+    perpendicular_bisector_base_perp A B l h_AB h_pb_AB
+  have h_m_perp_AC : perpendicular m (line A C) :=
+    perpendicular_bisector_base_perp A C m h_AC h_pb_AC
+  intro h_para
+  have h_AB_perp_l : perpendicular (line A B) l := perpendicular_sym l (line A B) h_l_perp_AB
+  have h_AB_perp_m : perpendicular (line A B) m :=
+    perpendicular_parallel_transfer l m (line A B) h_para h_AB_perp_l
+  have h_AB_parallel_AC : parallel (line A B) (line A C) :=
+    perpendicular_to_same_line_parallel m (line A B) (line A C) h_AB_perp_m h_m_perp_AC h_lAB_ne_lAC
+  exact (h_AB_parallel_AC A
+    (And.conj (on_line A (line A B)) (on_line A (line A C))
+      (line_through_P A B) (line_through_P A C)))
+
+-- Every triangle has a circumcenter: the perpendicular bisectors of two sides
+-- intersect at a point equidistant from all three vertices.
+theorem circumcenter_exists : forall (A B C : Point),
+  Not (collinear A B C) ->
+  exists (O : Point),
+    And (seg_congruent O A O B) (seg_congruent O B O C) := by
+  intro A
+  intro B
+  intro C
+  intro h_tri
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_tri
+  have h_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist
+  have h_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+
+  -- Perpendicular bisectors of AB and AC.
+  have h_l_ex : exists (l : Line), perpendicular_bisector A B l :=
+    perpendicular_bisector_exists A B h_AB
+  have l : Line := choice Line (fun l : Line => perpendicular_bisector A B l) h_l_ex
+  have h_l : perpendicular_bisector A B l :=
+    choice_spec Line (fun l : Line => perpendicular_bisector A B l) h_l_ex
+
+  have h_m_ex : exists (m : Line), perpendicular_bisector A C m :=
+    perpendicular_bisector_exists A C h_AC
+  have m : Line := choice Line (fun m : Line => perpendicular_bisector A C m) h_m_ex
+  have h_m : perpendicular_bisector A C m :=
+    choice_spec Line (fun m : Line => perpendicular_bisector A C m) h_m_ex
+
+  -- The bisectors meet because they are not parallel.
+  have h_not_para : Not (parallel l m) :=
+    perpendicular_bisectors_not_parallel A B C h_tri l m h_l h_m
+  have h_O_ex : exists (O : Point), And (on_line O l) (on_line O m) :=
+    lines_meet l m h_not_para
+  have O : Point := choice Point (fun O : Point => And (on_line O l) (on_line O m)) h_O_ex
+  have h_O_spec : And (on_line O l) (on_line O m) :=
+    choice_spec Point (fun O : Point => And (on_line O l) (on_line O m)) h_O_ex
+  have h_O_l : on_line O l := and_fst (on_line O l) (on_line O m) h_O_spec
+  have h_O_m : on_line O m := and_snd (on_line O l) (on_line O m) h_O_spec
+
+  -- Any point on a perpendicular bisector is equidistant from the endpoints.
+  have h_OA_OB : seg_congruent O A O B :=
+    perpendicular_bisector_equidistant A B O l h_AB h_l h_O_l
+  have h_OA_OC : seg_congruent O A O C :=
+    perpendicular_bisector_equidistant A C O m h_AC h_m h_O_m
+  have h_OB_OC : seg_congruent O B O C :=
+    congruent_trans O B O A O C
+      (congruent_sym O A O B h_OA_OB)
+      h_OA_OC
+
+  exact (Exists.intro Point (fun O' : Point =>
+    And (seg_congruent O' A O' B) (seg_congruent O' B O' C)) O
+    (And.conj (seg_congruent O A O B) (seg_congruent O B O C) h_OA_OB h_OB_OC))
+
+-- Two distinct lines share at most one point.
+theorem lines_intersect_unique : forall (l m : Line) (P Q : Point),
+  Not (Eq Line l m) -> on_line P l -> on_line P m -> on_line Q l -> on_line Q m ->
+  Eq Point P Q := by
+  intro l
+  intro m
+  intro P
+  intro Q
+  intro h_neq
+  intro h_Pl
+  intro h_Pm
+  intro h_Ql
+  intro h_Qm
+  exact (or_elim (Eq Point P Q) (Not (Eq Point P Q)) (Eq Point P Q)
+    (excluded_middle (Eq Point P Q))
+    (fun h_eq : Eq Point P Q => h_eq)
+    (fun h_neq_PQ : Not (Eq Point P Q) =>
+      False_elim (Eq Point P Q) (h_neq (line_unique P Q l m h_neq_PQ h_Pl h_Ql h_Pm h_Qm))))
+
+theorem perpendicular_bisector_converse : forall (A B D P : Point),
+  Not (Eq Point A B) ->
+  midpoint D A B ->
+  seg_congruent P A P B ->
+  Not (collinear A B P) ->
+  right_angle P D A := by
+  intro A
+  intro B
+  intro D
+  intro P
+  intro h_AB
+  intro h_mid
+  intro h_PA_PB
+  intro h_nocol
+  have h_bet : between A D B := and_fst (between A D B) (seg_congruent A D D B) h_mid
+  have h_AD_DB : seg_congruent A D D B := and_snd (between A D B) (seg_congruent A D D B) h_mid
+  have h_A_ne_D : Not (Eq Point A D) := between_distinct_first A D B h_bet
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B P)) (Not (Eq Point A P))) := triangle_nondegenerate A B P h_nocol
+  have h_BP_AP : And (Not (Eq Point B P)) (Not (Eq Point A P)) :=
+    and_snd (Not (Eq Point A B)) (And (Not (Eq Point B P)) (Not (Eq Point A P))) h_dist
+  have h_B_ne_P : Not (Eq Point B P) := and_fst (Not (Eq Point B P)) (Not (Eq Point A P)) h_BP_AP
+  have h_A_ne_P : Not (Eq Point A P) := and_snd (Not (Eq Point B P)) (Not (Eq Point A P)) h_BP_AP
+  have h_P_ne_A : Not (Eq Point P A) := fun h_eq : Eq Point P A => h_A_ne_P (eq_sym Point P A h_eq)
+  have h_P_ne_B : Not (Eq Point P B) := fun h_eq : Eq Point P B => h_B_ne_P (eq_sym Point P B h_eq)
+  have h_P_ne_D : Not (Eq Point P D) := fun h_eq : Eq Point P D =>
+    let h_col_ADB : collinear A D B := between_implies_collinear A D B h_bet in
+    let h_col_ADP : collinear A D P := eq_subst Point P D (fun X : Point => collinear A D X) h_eq h_col_ADB in
+    h_nocol (collinear_shared_merge_fst A D B P h_col_ADB h_col_ADP h_A_ne_D)
+  have h_AD_DA : seg_congruent A D D A := congruent_swap A D h_A_ne_D
+  have h_DA_AD : seg_congruent D A A D := congruent_sym A D D A h_AD_DA
+  have h_DA_DB : seg_congruent D A D B := congruent_trans D A A D D B h_DA_AD h_AD_DB
+  have h_AP_PA : seg_congruent A P P A := congruent_swap A P h_A_ne_P
+  have h_AP_PB : seg_congruent A P P B := congruent_trans A P P A P B h_AP_PA h_PA_PB
+  have h_PB_BP : seg_congruent P B B P := congruent_swap P B h_P_ne_B
+  have h_AP_BP : seg_congruent A P B P := congruent_trans A P P B B P h_AP_PB h_PB_BP
+  have h_PD_refl : seg_congruent P D P D := congruent_refl P D h_P_ne_D
+  have h_SSS : And (angle_congruent D P A D P B)
+    (And (angle_congruent P D A P D B)
+      (angle_congruent P A D P B D)) :=
+    SSS P D A P D B h_PD_refl h_DA_DB h_AP_BP
+  have h_angle_PDA_PDB : angle_congruent P D A P D B :=
+    and_fst (angle_congruent P D A P D B)
+      (angle_congruent P A D P B D)
+      (and_snd (angle_congruent D P A D P B)
+        (And (angle_congruent P D A P D B) (angle_congruent P A D P B D))
+        h_SSS)
+  have h_col_ADB : collinear A D B := between_implies_collinear A D B h_bet
+  have h_nocol_ADP : Not (collinear A D P) := fun h_col_ADP : collinear A D P =>
+    h_nocol (collinear_shared_merge_fst A D B P h_col_ADB h_col_ADP h_A_ne_D)
+  have h_nocol_PDA : Not (collinear P D A) :=
+    fun h_col_PDA : collinear P D A =>
+      h_nocol_ADP (collinear_perm3 P D A h_col_PDA)
+  have h_angle_ADP_PDA : angle_congruent A D P P D A := angle_vertex_swap D A P
+  have h_angle_PDB_PDA : angle_congruent P D B P D A := angle_sym P D A P D B h_angle_PDA_PDB
+  exact (right_angle_from_equal_sum A D B P P D A h_bet h_nocol_ADP h_nocol_PDA h_angle_ADP_PDA h_angle_PDB_PDA)
+
+
+-- If P is equidistant from A and B, then P lies on the perpendicular bisector of AB.
+theorem equidistant_on_perpendicular_bisector : forall (A B P : Point),
+  Not (Eq Point A B) -> seg_congruent P A P B ->
+  exists (l : Line), And (perpendicular_bisector A B l) (on_line P l) := by
+  intro A
+  intro B
+  intro P
+  intro h_AB
+  intro h_PA_PB
+  have h_M_ex : exists (M : Point), midpoint M A B := midpoint_exists A B h_AB
+  have M : Point := choice Point (fun M : Point => midpoint M A B) h_M_ex
+  have h_M_spec : midpoint M A B := choice_spec Point (fun M : Point => midpoint M A B) h_M_ex
+  have h_case_col : Or (collinear A B P) (Not (collinear A B P)) :=
+    excluded_middle (collinear A B P)
+  exact (or_elim (collinear A B P) (Not (collinear A B P))
+    (exists (l : Line), And (perpendicular_bisector A B l) (on_line P l)) h_case_col
+    (fun h_col : collinear A B P =>
+      let h_P_eq_M : Eq Point P M :=
+        equidistant_collinear_midpoint A B P h_AB h_PA_PB h_col in
+      let h_l_ex : exists (l : Line), perpendicular_bisector A B l :=
+        perpendicular_bisector_exists A B h_AB in
+      let l : Line := choice Line (fun l : Line => perpendicular_bisector A B l) h_l_ex in
+      let h_l : perpendicular_bisector A B l :=
+        choice_spec Line (fun l : Line => perpendicular_bisector A B l) h_l_ex in
+      let h_M_l : on_line M l :=
+        perpendicular_bisector_midpoint_on A B h_AB l h_l in
+      let h_P_l : on_line P l :=
+        eq_subst Point M P (fun X : Point => on_line X l) (eq_sym Point P M h_P_eq_M) h_M_l in
+      Exists.intro Line (fun l' : Line => And (perpendicular_bisector A B l') (on_line P l')) l
+        (And.conj (perpendicular_bisector A B l) (on_line P l) h_l h_P_l))
+    (fun h_nocol : Not (collinear A B P) =>
+      let h_right : right_angle P M A :=
+        perpendicular_bisector_converse A B M P h_AB h_M_spec h_PA_PB h_nocol in
+      let h_l : perpendicular_bisector A B (line P M) :=
+        perpendicular_bisector_from_right_angle A B P M h_AB h_M_spec h_right h_nocol in
+      let h_P_l : on_line P (line P M) := line_through_P P M in
+      Exists.intro Line (fun l' : Line => And (perpendicular_bisector A B l') (on_line P l')) (line P M)
+        (And.conj (perpendicular_bisector A B (line P M)) (on_line P (line P M)) h_l h_P_l)))
+
+-- Three non-collinear points determine a unique circumcenter.
+theorem circumcenter_unique : forall (A B C O M : Point),
+  Not (collinear A B C) ->
+  seg_congruent O A O B ->
+  seg_congruent O A O C ->
+  seg_congruent M A M B ->
+  seg_congruent M A M C ->
+  Eq Point O M := by
+  intro A
+  intro B
+  intro C
+  intro O
+  intro M
+  intro h_tri
+  intro h_OA_OB
+  intro h_OA_OC
+  intro h_MA_MB
+  intro h_MA_MC
+  have h_dist : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_tri
+  have h_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist
+  have h_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist)
+
+  -- O and M lie on perpendicular bisectors of AB and AC.
+  have h_O_AB : exists (l : Line), And (perpendicular_bisector A B l) (on_line O l) :=
+    equidistant_on_perpendicular_bisector A B O h_AB h_OA_OB
+  have l_O_AB : Line := choice Line (fun l : Line =>
+    And (perpendicular_bisector A B l) (on_line O l)) h_O_AB
+  have h_l_O_AB : And (perpendicular_bisector A B l_O_AB) (on_line O l_O_AB) :=
+    choice_spec Line (fun l : Line => And (perpendicular_bisector A B l) (on_line O l)) h_O_AB
+
+  have h_O_AC : exists (m : Line), And (perpendicular_bisector A C m) (on_line O m) :=
+    equidistant_on_perpendicular_bisector A C O h_AC h_OA_OC
+  have m_O_AC : Line := choice Line (fun m : Line =>
+    And (perpendicular_bisector A C m) (on_line O m)) h_O_AC
+  have h_m_O_AC : And (perpendicular_bisector A C m_O_AC) (on_line O m_O_AC) :=
+    choice_spec Line (fun m : Line => And (perpendicular_bisector A C m) (on_line O m)) h_O_AC
+
+  have h_M_AB : exists (l : Line), And (perpendicular_bisector A B l) (on_line M l) :=
+    equidistant_on_perpendicular_bisector A B M h_AB h_MA_MB
+  have l_M_AB : Line := choice Line (fun l : Line =>
+    And (perpendicular_bisector A B l) (on_line M l)) h_M_AB
+  have h_l_M_AB : And (perpendicular_bisector A B l_M_AB) (on_line M l_M_AB) :=
+    choice_spec Line (fun l : Line => And (perpendicular_bisector A B l) (on_line M l)) h_M_AB
+
+  have h_M_AC : exists (m : Line), And (perpendicular_bisector A C m) (on_line M m) :=
+    equidistant_on_perpendicular_bisector A C M h_AC h_MA_MC
+  have m_M_AC : Line := choice Line (fun m : Line =>
+    And (perpendicular_bisector A C m) (on_line M m)) h_M_AC
+  have h_m_M_AC : And (perpendicular_bisector A C m_M_AC) (on_line M m_M_AC) :=
+    choice_spec Line (fun m : Line => And (perpendicular_bisector A C m) (on_line M m)) h_M_AC
+
+  -- There is only one perpendicular bisector of AB.
+  have h_l_eq : Eq Line l_O_AB l_M_AB :=
+    perpendicular_bisector_unique A B l_O_AB l_M_AB h_AB
+      (and_fst (perpendicular_bisector A B l_O_AB) (on_line O l_O_AB) h_l_O_AB)
+      (and_fst (perpendicular_bisector A B l_M_AB) (on_line M l_M_AB) h_l_M_AB)
+
+  -- There is only one perpendicular bisector of AC.
+  have h_m_eq : Eq Line m_O_AC m_M_AC :=
+    perpendicular_bisector_unique A C m_O_AC m_M_AC h_AC
+      (and_fst (perpendicular_bisector A C m_O_AC) (on_line O m_O_AC) h_m_O_AC)
+      (and_fst (perpendicular_bisector A C m_M_AC) (on_line M m_M_AC) h_m_M_AC)
+
+  -- The two bisectors are distinct.
+  have h_not_para : Not (parallel l_O_AB m_O_AC) :=
+    perpendicular_bisectors_not_parallel A B C h_tri l_O_AB m_O_AC
+      (and_fst (perpendicular_bisector A B l_O_AB) (on_line O l_O_AB) h_l_O_AB)
+      (and_fst (perpendicular_bisector A C m_O_AC) (on_line O m_O_AC) h_m_O_AC)
+
+  have h_l_m_distinct : Not (Eq Line l_O_AB m_O_AC) :=
+    perpendicular_neq l_O_AB m_O_AC
+      (perpendicular_bisector_base_perp A B l_O_AB h_AB
+        (and_fst (perpendicular_bisector A B l_O_AB) (on_line O l_O_AB) h_l_O_AB))
+
+  -- O and M both lie on the two distinct lines l_O_AB and m_O_AC.
+  have h_O_l : on_line O l_O_AB :=
+    and_snd (perpendicular_bisector A B l_O_AB) (on_line O l_O_AB) h_l_O_AB
+  have h_O_m : on_line O m_O_AC :=
+    and_snd (perpendicular_bisector A C m_O_AC) (on_line O m_O_AC) h_m_O_AC
+  have h_M_l : on_line M l_O_AB :=
+    eq_subst Line l_M_AB l_O_AB (fun x : Line => on_line M x)
+      (eq_sym Line l_O_AB l_M_AB h_l_eq)
+      (and_snd (perpendicular_bisector A B l_M_AB) (on_line M l_M_AB) h_l_M_AB)
+  have h_M_m : on_line M m_O_AC :=
+    eq_subst Line m_M_AC m_O_AC (fun x : Line => on_line M x)
+      (eq_sym Line m_O_AC m_M_AC h_m_eq)
+      (and_snd (perpendicular_bisector A C m_M_AC) (on_line M m_M_AC) h_m_M_AC)
+
+  exact (lines_intersect_unique l_O_AB m_O_AC O M h_l_m_distinct h_O_l h_O_m h_M_l h_M_m)

@@ -1,0 +1,27 @@
+[δ-def]
+  nat_add
+  ~> fun m : Nat => fun n : Nat => rec.Nat (fun _2 : ? => Nat) n (fun m' : Nat => fun ih : Nat => succ ih) m
+[δ-def]
+  add
+  ~> fun m : Nat => fun n : Nat => rec.Nat (fun _2 : ? => Nat) n (fun m' : Nat => fun ih : Nat => succ ih) m
+[β]
+  add 0
+  ~> fun n : Nat => rec.Nat (fun _1 : ? => Nat) n (fun m' : Nat => fun ih : Nat => succ ih) 0
+[β]
+  (fun P0 : Type => fun m0 : Type => fun m1 : Type => m0) (fun _0 : ? => Nat)
+  ~> fun m0 : Type => fun m1 : Type => m0
+[β]
+  (fun P0 : Type => fun m0 : Type => fun m1 : Type => m0) (fun _0 : ? => Nat) _fresh_0
+  ~> fun m1 : Type => _fresh_0
+[β]
+  (fun P0 : Type => fun m0 : Type => fun m1 : Type => m0) (fun _0 : ? => Nat) _fresh_0 (fun m' : Nat => fun ih : Nat => succ ih)
+  ~> _fresh_0
+[recursor]
+  rec.Nat (fun _0 : ? => Nat) _fresh_0 (fun m' : Nat => fun ih : Nat => succ ih) 0
+  ~> _fresh_0
+[β]
+  0 + _fresh_0
+  ~> _fresh_0
+[δ-theorem-opaque]
+  add_zero_left
+  ~> add_zero_left

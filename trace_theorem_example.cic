@@ -1,0 +1,8 @@
+import Nat
+import Eq
+
+theorem add_zero_left (n : Nat) : Eq Nat (add zero n) n :=
+  refl Nat n
+
+theorem use_theorem_directly : Eq Nat (add zero (succ zero)) (succ zero) :=
+  add_zero_left (succ zero)

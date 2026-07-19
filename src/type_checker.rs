@@ -323,6 +323,13 @@ impl<'a> TypeChecker<'a> {
                 if !self.st.env().contains(name) {
                     return Err(format!("Constant not found: {:?}", name));
                 }
+                let is_theorem = {
+                    let info = self.st.env().get(name);
+                    info.is_theorem()
+                };
+                if self.trace && is_theorem {
+                    self.trace_step("δ-theorem-opaque", e, e);
+                }
                 let info = self.st.env().get(name);
                 if info.is_quot() {
                     return self.infer_quot_const(name, levels);
@@ -527,22 +534,24 @@ impl<'a> TypeChecker<'a> {
                 }
             }
             Expr::Const(name, levels) => {
-                let (should_expand, rule, instantiated) = if let Some(info) = self.st.env().find(name) {
+                let (should_expand, rule, instantiated, is_theorem) = if let Some(info) = self.st.env().find(name) {
                     // Theorems are opaque: do not expand their proof bodies during
                     // WHNF. This is essential to avoid exponential blow-up when
                     // proofs contain large witnesses (e.g. geometry existence proofs).
                     if info.is_definition() {
                         if let Some(val) = info.get_value(false) {
                             let instantiated = self.instantiate_univ_params(val, info.get_level_params(), levels);
-                            (true, "δ-def", Some(instantiated))
+                            (true, "δ-def", Some(instantiated), false)
                         } else {
-                            (false, "", None)
+                            (false, "", None, false)
                         }
+                    } else if info.is_theorem() {
+                        (false, "", None, true)
                     } else {
-                        (false, "", None)
+                        (false, "", None, false)
                     }
                 } else {
-                    (false, "", None)
+                    (false, "", None, false)
                 };
 
                 if should_expand {
@@ -552,6 +561,9 @@ impl<'a> TypeChecker<'a> {
                         self.trace_step(rule, e, &result);
                     }
                     return result;
+                }
+                if self.trace && is_theorem {
+                    self.trace_step("δ-theorem-opaque", e, e);
                 }
                 e.clone()
             }

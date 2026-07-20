@@ -1,6 +1,7 @@
 import GeometryAxioms
 import GeometryCommon.Collinearity
 import GeometryCommon.Angle
+import GeometryCommon.RightAnglesEqual
 import GeometryCommon.Parallelogram
 
 -- =====================================================================

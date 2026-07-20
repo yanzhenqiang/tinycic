@@ -1027,23 +1027,77 @@ impl Parser {
         line
     }
 
+    /// Skip whitespace and comments starting from `pos` without mutating the
+    /// parser or cloning the input. Returns the first position that is neither
+    /// whitespace nor inside a comment.
+    fn skip_ws_and_comments_at(&self, mut pos: usize) -> usize {
+        loop {
+            while pos < self.input.len() && self.input[pos].is_whitespace() {
+                pos += 1;
+            }
+            // Skip line comments: -- ...\n
+            if pos + 1 < self.input.len()
+                && self.input[pos] == '-'
+                && self.input[pos + 1] == '-'
+            {
+                while pos < self.input.len() && self.input[pos] != '\n' {
+                    pos += 1;
+                }
+                continue;
+            }
+            // Skip block comments: /- ... -/ (nested)
+            if pos + 1 < self.input.len()
+                && self.input[pos] == '/'
+                && self.input[pos + 1] == '-'
+            {
+                pos += 2;
+                let mut depth = 1;
+                while depth > 0 && pos + 1 < self.input.len() {
+                    if self.input[pos] == '/' && self.input[pos + 1] == '-' {
+                        pos += 2;
+                        depth += 1;
+                    } else if self.input[pos] == '-' && self.input[pos + 1] == '/' {
+                        pos += 2;
+                        depth -= 1;
+                    } else {
+                        pos += 1;
+                    }
+                }
+                continue;
+            }
+            break;
+        }
+        pos
+    }
+
     /// Peek the column of the next non-whitespace, non-comment token without
     /// advancing the parser. Returns (column, keyword_if_any).
     fn peek_next_token_col(&self) -> (usize, Option<&'static str>) {
-        let mut tmp = Parser {
-            input: self.input.clone(),
-            pos: self.pos,
-            infix_ops: self.infix_ops.clone(),
-            notations: self.notations.clone(),
-        };
-        tmp.skip_whitespace_and_comments();
-        let col = tmp.current_col();
+        let pos = self.skip_ws_and_comments_at(self.pos);
+        let col = pos - self.line_start(pos);
         let kw = ["def", "theorem", "solve", "inductive", "structure", "axiom",
                   "intro", "intros", "exact", "apply", "refl", "reflexivity", "rfl",
                   "assumption", "rewrite", "rw", "induction", "cases", "have", "exists",
                   "import"]
             .iter()
-            .find(|kw| tmp.starts_with_keyword(kw))
+            .find(|kw| {
+                let kw_chars: Vec<char> = kw.chars().collect();
+                if pos + kw_chars.len() > self.input.len() {
+                    return false;
+                }
+                for (i, kc) in kw_chars.iter().enumerate() {
+                    if self.input[pos + i] != *kc {
+                        return false;
+                    }
+                }
+                // Make sure it's not a prefix of a longer identifier
+                if let Some(&c) = self.input.get(pos + kw_chars.len()) {
+                    if c.is_alphanumeric() || c == '_' || c == '\'' {
+                        return false;
+                    }
+                }
+                true
+            })
             .copied();
         (col, kw)
     }
@@ -1786,21 +1840,9 @@ impl Parser {
             // Parse a single tactic command (everything until ';' or block end)
             let mut tactic_str = String::new();
             let mut paren_depth = 0;
+            let start_pos = self.pos;
             loop {
                 if self.peek().is_none() {
-                    break;
-                }
-
-                // Check for tactic-ending keywords at start of a token position
-                if paren_depth == 0
-                    && (self.starts_with_keyword("def")
-                        || self.starts_with_keyword("theorem")
-                        || self.starts_with_keyword("solve")
-                        || self.starts_with_keyword("inductive")
-                        || self.starts_with_keyword("structure")
-                        || self.starts_with_keyword("axiom")
-                        || self.starts_with_keyword("import"))
-                {
                     break;
                 }
 
@@ -1849,6 +1891,13 @@ impl Parser {
             let tactic_str = tactic_str.trim().to_string();
             if !tactic_str.is_empty() {
                 tactics.push(tactic_str);
+            }
+
+            // If the inner loop made no progress, we are stuck at a terminator
+            // (e.g. an unmatched ')') that does not belong to this tactic block.
+            // Stop parsing the block to avoid an infinite loop.
+            if self.pos == start_pos {
+                break;
             }
 
             // If we hit EOF without ';', stop
@@ -2609,21 +2658,22 @@ impl Parser {
     }
 
     fn starts_with_keyword(&self, kw: &str) -> bool {
-        let saved = self.pos;
-        let mut tmp = Parser { input: self.input.clone(), pos: saved, infix_ops: self.infix_ops.clone(), notations: self.notations.clone() };
-        tmp.skip_whitespace();
-        for expected in kw.chars() {
-            if let Some(c) = tmp.peek() {
-                if c != expected {
-                    return false;
-                }
-                tmp.advance();
-            } else {
+        // Skip leading whitespace without cloning the parser state.
+        let mut pos = self.pos;
+        while pos < self.input.len() && self.input[pos].is_whitespace() {
+            pos += 1;
+        }
+        let kw_chars: Vec<char> = kw.chars().collect();
+        if pos + kw_chars.len() > self.input.len() {
+            return false;
+        }
+        for (i, &kc) in kw_chars.iter().enumerate() {
+            if self.input[pos + i] != kc {
                 return false;
             }
         }
         // Make sure it's not a prefix of a longer identifier
-        if let Some(c) = tmp.peek() {
+        if let Some(&c) = self.input.get(pos + kw_chars.len()) {
             if c.is_alphanumeric() || c == '_' || c == '\'' {
                 return false;
             }

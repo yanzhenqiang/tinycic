@@ -34,11 +34,6 @@ axiom angle_congruent_same_ray : forall (A B B' C : Point),
   Or (between A B B') (between A B' B) ->
   angle_congruent B A C B' A C
 
--- All right angles are congruent (Hilbert's Theorem).
-axiom right_angles_equal : forall (A B C D E F : Point),
-  right_angle A B C -> right_angle D E F ->
-  angle_congruent A B C D E F
-
 axiom SAS : forall (A B C A' B' C' : Point),
   seg_congruent A B A' B' ->
   angle_congruent B A C B' A' C' ->

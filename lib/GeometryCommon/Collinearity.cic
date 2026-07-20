@@ -153,6 +153,48 @@ theorem triangle_perm : forall (A B C : Point),
   intro h_col
   exact (h (collinear_perm B A C h_col))
 
+-- If C is off line AB and Y lies between A and C, then B is also off line AY
+-- (equivalently A, B, Y are non-collinear).
+theorem not_collinear_between : forall (A B C Y : Point),
+  Not (collinear A B C) -> between A Y C -> Not (collinear A B Y) := by
+  intro A
+  intro B
+  intro C
+  intro Y
+  intro h_nc
+  intro h_AYC
+  have h_col_AYC : collinear A Y C := between_implies_collinear A Y C h_AYC
+  have h_ne_AY : Not (Eq Point A Y) := between_distinct_first A Y C h_AYC
+  intro h_col_ABY
+  exact (exists_elim_prop Line
+    (fun l1 : Line => And (on_line A l1) (And (on_line B l1) (on_line Y l1)))
+    False
+    (fun l1 : Line =>
+      fun h_l1 : And (on_line A l1) (And (on_line B l1) (on_line Y l1)) =>
+      exists_elim_prop Line
+        (fun l2 : Line => And (on_line A l2) (And (on_line Y l2) (on_line C l2)))
+        False
+        (fun l2 : Line =>
+          fun h_l2 : And (on_line A l2) (And (on_line Y l2) (on_line C l2)) =>
+          let h_A_l1 : on_line A l1 := and_fst (on_line A l1) (And (on_line B l1) (on_line Y l1)) h_l1 in
+          let h_Y_l1 : on_line Y l1 := and_snd (on_line B l1) (on_line Y l1)
+            (and_snd (on_line A l1) (And (on_line B l1) (on_line Y l1)) h_l1) in
+          let h_A_l2 : on_line A l2 := and_fst (on_line A l2) (And (on_line Y l2) (on_line C l2)) h_l2 in
+          let h_Y_l2 : on_line Y l2 := and_fst (on_line Y l2) (on_line C l2)
+            (and_snd (on_line A l2) (And (on_line Y l2) (on_line C l2)) h_l2) in
+          let h_C_l2 : on_line C l2 := and_snd (on_line Y l2) (on_line C l2)
+            (and_snd (on_line A l2) (And (on_line Y l2) (on_line C l2)) h_l2) in
+          let h_eq : Eq Line l1 l2 := line_unique A Y l1 l2 h_ne_AY h_A_l1 h_Y_l1 h_A_l2 h_Y_l2 in
+          let h_C_l1 : on_line C l1 := eq_subst Line l2 l1 (fun l : Line => on_line C l) (eq_sym Line l1 l2 h_eq) h_C_l2 in
+          let h_B_l1 : on_line B l1 := and_fst (on_line B l1) (on_line Y l1)
+            (and_snd (on_line A l1) (And (on_line B l1) (on_line Y l1)) h_l1) in
+          h_nc (Exists.intro Line
+            (fun l : Line => And (on_line A l) (And (on_line B l) (on_line C l))) l1
+            (And.conj (on_line A l1) (And (on_line B l1) (on_line C l1)) h_A_l1
+              (And.conj (on_line B l1) (on_line C l1) h_B_l1 h_C_l1))))
+        h_col_AYC)
+    h_col_ABY)
+
 -- Swap first and third vertices of a triangle.
 theorem triangle_perm2 : forall (A B C : Point),
   triangle A B C -> triangle C B A := by

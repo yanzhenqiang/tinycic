@@ -28,12 +28,20 @@ pub struct TypeCheckerState {
     infer_cache: HashMap<Expr, Expr>,
     whnf_cache: HashMap<Expr, Expr>,
     failure_cache: HashMap<ExprPair, bool>,
+    defeq_cache: HashMap<ExprPair, bool>,
     /// Metavariable assignments: ?m -> value
     mvar_assignments: HashMap<Name, Expr>,
     /// Universe level parameter substitutions: u -> level
     level_subst: HashMap<Name, Level>,
     /// Metavariable types for solve mode: ?m -> type
     mvar_types: HashMap<Name, Expr>,
+    /// Profiling counters for cache diagnostics.
+    pub infer_calls: u64,
+    pub infer_hits: u64,
+    pub whnf_calls: u64,
+    pub whnf_hits: u64,
+    pub defeq_calls: u64,
+    pub defeq_hits: u64,
 }
 
 impl TypeCheckerState {
@@ -43,9 +51,16 @@ impl TypeCheckerState {
             infer_cache: HashMap::new(),
             whnf_cache: HashMap::new(),
             failure_cache: HashMap::new(),
+            defeq_cache: HashMap::new(),
             mvar_assignments: HashMap::new(),
             level_subst: HashMap::new(),
             mvar_types: HashMap::new(),
+            infer_calls: 0,
+            infer_hits: 0,
+            whnf_calls: 0,
+            whnf_hits: 0,
+            defeq_calls: 0,
+            defeq_hits: 0,
         }
     }
 
@@ -63,8 +78,11 @@ impl TypeCheckerState {
             return false;
         }
         self.mvar_assignments.insert(name.clone(), val);
-        // Clear whnf cache since metavariable assignments can change reduction results
+        // Clear caches since metavariable assignments can change reduction,
+        // inference, and definitional equality results.
         self.whnf_cache.clear();
+        self.infer_cache.clear();
+        self.defeq_cache.clear();
         true
     }
 
@@ -277,6 +295,7 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn infer_type(&mut self, e: &Expr) -> Result<Expr, String> {
+        self.st.infer_calls += 1;
         // FVar and MVar types depend on local context / state which may change,
         // so we must not cache them.
         match e {
@@ -300,9 +319,14 @@ impl<'a> TypeChecker<'a> {
             _ => {}
         }
 
-        // Check cache
-        if let Some(ty) = self.st.infer_cache.get(e) {
-            return Ok(ty.clone());
+        // Check cache only for closed expressions; expressions with loose bound
+        // variables are context-dependent and cannot be safely shared across
+        // different local contexts.
+        if !e.has_loose_bvars() {
+            if let Some(ty) = self.st.infer_cache.get(e) {
+                self.st.infer_hits += 1;
+                return Ok(ty.clone());
+            }
         }
 
         let result = match e {
@@ -424,7 +448,11 @@ impl<'a> TypeChecker<'a> {
             }
         }?;
 
-        self.st.infer_cache.insert(e.clone(), result.clone());
+        // Cache the result only for closed expressions to avoid context-dependent
+        // hits across different local contexts.
+        if !e.has_loose_bvars() {
+            self.st.infer_cache.insert(e.clone(), result.clone());
+        }
         Ok(result)
     }
 
@@ -488,8 +516,10 @@ impl<'a> TypeChecker<'a> {
 
     /// Weak head normal form
     pub fn whnf(&mut self, e: &Expr) -> Expr {
+        self.st.whnf_calls += 1;
         // Check cache
         if let Some(result) = self.st.whnf_cache.get(e) {
+            self.st.whnf_hits += 1;
             return result.clone();
         }
 
@@ -523,8 +553,12 @@ impl<'a> TypeChecker<'a> {
                 e.clone()
             }
             Expr::FVar(name) => {
+                if let Some(cached) = self.lctx.get_let_whnf_cache(name) {
+                    return cached.clone();
+                }
                 if let Some(value) = self.lctx.get_value(&Expr::FVar(name.clone())).cloned() {
                     let result = self.whnf_core(&value);
+                    self.lctx.set_let_whnf_cache(name.clone(), result.clone());
                     if self.trace {
                         self.trace_step("fvar", e, &result);
                     }
@@ -964,13 +998,24 @@ impl<'a> TypeChecker<'a> {
 
     /// Check definitional equality
     pub fn is_def_eq(&mut self, t: &Expr, s: &Expr) -> bool {
+        self.st.defeq_calls += 1;
         // Quick checks
         if t == s {
+            self.st.defeq_hits += 1;
             return true;
         }
-        // Check failure cache
+        // Check caches only for closed pairs; bound variables depend on the
+        // current local context.
         let pair = ExprPair(t.clone(), s.clone());
+        let closed_pair = !t.has_loose_bvars() && !s.has_loose_bvars();
+        if closed_pair {
+            if let Some(&cached) = self.st.defeq_cache.get(&pair) {
+                self.st.defeq_hits += 1;
+                return cached;
+            }
+        }
         if self.st.failure_cache.contains_key(&pair) {
+            self.st.defeq_hits += 1;
             return false;
         }
 
@@ -992,6 +1037,9 @@ impl<'a> TypeChecker<'a> {
         // Try is_def_eq_core first
         let result = self.is_def_eq_core(&t_n, &s_n);
         if result {
+            if closed_pair {
+                self.st.defeq_cache.insert(pair, true);
+            }
             return true;
         }
 
@@ -1004,12 +1052,17 @@ impl<'a> TypeChecker<'a> {
         if ipt_t && ipt_s {
             if let (Ok(ty_t), Ok(ty_s)) = (self.infer(&t_n), self.infer(&s_n)) {
                 if ty_t == ty_s {
+                    if closed_pair {
+                        self.st.defeq_cache.insert(pair, true);
+                    }
                     return true;
                 }
             }
         }
 
-        self.st.failure_cache.insert(pair, false);
+        if closed_pair {
+            self.st.failure_cache.insert(pair, false);
+        }
         false
     }
 

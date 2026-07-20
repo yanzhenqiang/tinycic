@@ -2,6 +2,9 @@ import GeometryAxioms
 import GeometryCommon.Collinearity
 import GeometryCommon.Angle
 import GeometryCommon.SegmentOrder
+import GeometryCommon.PlaneSeparation
+import GeometryCommon.AngleOrder
+import GeometryCommon.RightAnglesEqual
 
 -- =====================================================================
 -- Midpoint construction helpers
@@ -280,24 +283,529 @@ theorem midpoint_of_isosceles : forall (A B P : Point),
 -- Construction of an isosceles apex (foundational geometric existence)
 -- ------------------------------------------------------------------
 -- midpoint_exists (below) is proved by bisecting the apex angle of an
--- isosceles triangle over AB.  The one geometric input it needs is a point
--- P off line AB with PA ≅ PB (the apex).  Producing such a P is *not*
--- derivable from incidence/order/congruence alone: every construction
--- (erect a perpendicular at the midpoint, intersect two equal-radius
--- circles, or draw two equal-base-angle rays until they meet) bottoms out
--- at the same missing plane-separation fact -- namely that at a point on a
--- line the perpendicular ray is unique (equivalently, two equal-base-angle
--- rays on the same side meet, a Pasch/side statement).
---
--- We therefore keep isosceles_apex_exists as a primitive-grade geometric-
--- existence axiom, on the same footing as perpendicular_exists and
--- circle_line_meet.  It is the one existence input feeding the proved
--- theorem midpoint_exists; adding a side predicate with perpendicular-ray
--- uniqueness would turn it into a theorem and remove it.
+-- isosceles triangle over AB.  The geometric input it needs is a point
+-- P off line AB with PA ≅ PB.  We construct such a P from Hilbert's
+-- full angle-transfer axiom III4 and the half-plane ray trichotomy.
 
-axiom isosceles_apex_exists : forall (A B : Point),
+-- The existence theorem is proved after the helper lemmas below.
+
+-- Angle congruence is preserved when the interior side point moves
+-- along the same ray from the vertex (including the equal-point case).
+theorem angle_congruent_on_ray_at_A : forall (A M Y B : Point),
+  on_ray A M Y -> angle_congruent B A M B A Y := by
+  intro A
+  intro M
+  intro Y
+  intro B
+  intro h
+  exact (or_elim (between A M Y) (Or (between A Y M) (Eq Point Y M))
+    (angle_congruent B A M B A Y) h
+    (fun h_AMY : between A M Y =>
+      let h1 : angle_congruent M A B Y A B :=
+        angle_congruent_same_ray A M Y B (Or.inl (between A M Y) (between A Y M) h_AMY) in
+      let h2 : angle_congruent M A B B A M := angle_vertex_swap A M B in
+      let h3 : angle_congruent Y A B B A Y := angle_vertex_swap A Y B in
+      angle_trans B A M M A B B A Y
+        (angle_sym M A B B A M h2)
+        (angle_trans M A B Y A B B A Y h1 h3))
+    (fun h_rest : Or (between A Y M) (Eq Point Y M) =>
+      or_elim (between A Y M) (Eq Point Y M) (angle_congruent B A M B A Y) h_rest
+        (fun h_AYM : between A Y M =>
+          let h1 : angle_congruent M A B Y A B :=
+            angle_congruent_same_ray A M Y B (Or.inr (between A M Y) (between A Y M) h_AYM) in
+          let h2 : angle_congruent M A B B A M := angle_vertex_swap A M B in
+          let h3 : angle_congruent Y A B B A Y := angle_vertex_swap A Y B in
+          angle_trans B A M M A B B A Y
+            (angle_sym M A B B A M h2)
+            (angle_trans M A B Y A B B A Y h1 h3))
+        (fun h_eq : Eq Point Y M =>
+          eq_subst Point M Y (fun Z : Point => angle_congruent B A M B A Z)
+            (eq_sym Point Y M h_eq) (angle_refl A B M))))
+
+-- If F and X are on the same side of line l through E, and E,X,F are
+-- collinear, then F lies on the closed ray from E through X.
+theorem same_side_collinear_on_ray : forall (E X F : Point) (l : Line),
+  on_line E l ->
+  Not (on_line X l) ->
+  Not (on_line F l) ->
+  same_side_line l F X ->
+  collinear E X F ->
+  Not (Eq Point E X) ->
+  on_ray E X F := by
+  intro E
+  intro X
+  intro F
+  intro l
+  intro h_E_l
+  intro h_X_off
+  intro h_F_off
+  intro h_same
+  intro h_col
+  intro h_ne_EX
+  have h_ne_EF : Not (Eq Point E F) :=
+    fun h_eq : Eq Point E F =>
+      h_F_off (eq_subst Point E F (fun Z : Point => on_line Z l) h_eq h_E_l)
+  have h_em : Or (Eq Point F X) (Not (Eq Point F X)) :=
+    excluded_middle (Eq Point F X)
+  exact (or_elim (Eq Point F X) (Not (Eq Point F X)) (on_ray E X F) h_em
+    (fun h_eq_FX : Eq Point F X =>
+      Or.inr (between E X F) (Or (between E F X) (Eq Point F X))
+        (Or.inr (between E F X) (Eq Point F X) h_eq_FX))
+    (fun h_ne_FX : Not (Eq Point F X) =>
+      let h_ne_XF : Not (Eq Point X F) :=
+        fun h_eq : Eq Point X F => h_ne_FX (eq_sym Point X F h_eq) in
+      let h_tri : Or (between E X F) (Or (between X F E) (between X E F)) :=
+        between_unique E X F h_ne_EX h_ne_XF h_ne_EF h_col in
+      or_elim (between E X F) (Or (between X F E) (between X E F)) (on_ray E X F) h_tri
+        (fun h_EXF : between E X F =>
+          Or.inl (between E X F) (Or (between E F X) (Eq Point F X)) h_EXF)
+        (fun h_rest : Or (between X F E) (between X E F) =>
+          or_elim (between X F E) (between X E F) (on_ray E X F) h_rest
+            (fun h_XFE : between X F E =>
+              Or.inr (between E X F) (Or (between E F X) (Eq Point F X))
+                (Or.inl (between E F X) (Eq Point F X) (between_sym X F E h_XFE)))
+            (fun h_XEF : between X E F =>
+              False_elim (on_ray E X F)
+                (same_side_line_not_opposite l F X h_same
+                  (between_opposite_at_point l F E X h_E_l
+                    (between_sym X E F h_XEF)))))))
+
+-- Helper: a point on the same side of a line as an off-line point is itself off the line.
+theorem same_side_line_off_line : forall (l : Line) (P Q : Point),
+  same_side_line l P Q -> Not (on_line Q l) -> Not (on_line P l) := by
+  intro l
+  intro P
+  intro Q
+  intro h_PQ
+  intro h_Qoff
+  exact (and_fst (Not (on_line P l))
+    (And (Not (on_line Q l)) (Not (opposite_side_line l P Q))) h_PQ)
+
+-- If the base angles at A and B are already equal, C is the isosceles apex.
+theorem apex_equal_angles : forall (A B C : Point),
+  Not (collinear A B C) -> angle_congruent B A C A B C ->
+  And (Not (collinear A B C)) (seg_congruent C A C B) := by
+  intro A
+  intro B
+  intro C
+  intro h_nc
+  intro h_eq
+  have h_perm : Not (collinear C A B) :=
+    fun h : collinear C A B => h_nc (collinear_perm3 C A B h)
+  have h1 : angle_congruent B A C C A B := angle_vertex_swap A B C
+  have h2 : angle_congruent A B C C B A := angle_vertex_swap B A C
+  have h3 : angle_congruent C A B B A C := angle_sym B A C C A B h1
+  have h4 : angle_congruent C A B A B C := angle_trans C A B B A C A B C h3 h_eq
+  have h5 : angle_congruent C A B C B A := angle_trans C A B A B C C B A h4 h2
+  exact (And.conj (Not (collinear A B C)) (seg_congruent C A C B) h_nc
+    (isosceles_converse_core C A B h_perm h5))
+
+-- Convert the open "same_ray" used by AngleOrder to the closed "on_ray"
+-- used by the angle axioms.  Since `same_ray` already excludes equality,
+-- the `Eq` disjunct of `on_ray` is never needed.
+def same_ray_to_on_ray (B C D : Point) (h : same_ray B C D) : on_ray B C D :=
+  or_elim (between B C D) (between B D C) (on_ray B C D) h
+    (fun h_BCD : between B C D =>
+      Or.inl (between B C D) (Or (between B D C) (Eq Point D C)) h_BCD)
+    (fun h_BDC : between B D C =>
+      Or.inr (between B C D) (Or (between B D C) (Eq Point D C))
+        (Or.inl (between B D C) (Eq Point D C) h_BDC))
+
+-- If copied point D lies on line BC (same side of AB as C), then C is the apex.
+theorem apex_collinear_BC : forall (A B C D : Point) (l : Line),
+  on_line A l -> on_line B l ->
+  Not (Eq Point A B) ->
+  Not (collinear A B C) ->
+  Not (on_line C l) ->
+  angle_congruent B A C A B D ->
+  Not (on_line D l) ->
+  same_side_line l D C ->
+  collinear B C D ->
+  Not (Eq Point C D) ->
+  exists (P : Point), And (Not (collinear A B P)) (seg_congruent P A P B) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro l
+  intro h_A_l
+  intro h_B_l
+  intro h_AB
+  intro h_nc_ABC
+  intro h_C_off
+  intro h_BAC_ABD
+  intro h_D_off
+  intro h_D_same
+  intro h_col_BCD
+  intro h_CD
+  have h_onray_BCD : on_ray B C D :=
+    same_ray_to_on_ray B C D
+      (same_side_collinear_same_ray B C D l h_B_l
+        (fun h_Cl : on_line C l => h_C_off h_Cl)
+        h_D_off
+        h_D_same
+        h_col_BCD
+        h_CD)
+  have h_ABC_ABD : angle_congruent A B C A B D :=
+    angle_congruent_on_ray_at_A B C D A h_onray_BCD
+  have h_BAC_ABC : angle_congruent B A C A B C :=
+    angle_trans B A C A B D A B C h_BAC_ABD (angle_sym A B C A B D h_ABC_ABD)
+  have h_nc_CAB : Not (collinear C A B) :=
+    fun h_col : collinear C A B =>
+      h_nc_ABC (collinear_perm A C B (collinear_perm2 C A B h_col))
+  have h1 : angle_congruent B A C C A B := angle_vertex_swap A B C
+  have h2 : angle_congruent A B C C B A := angle_vertex_swap B A C
+  have h3 : angle_congruent C A B B A C := angle_sym B A C C A B h1
+  have h4 : angle_congruent C A B A B C := angle_trans C A B B A C A B C h3 h_BAC_ABC
+  have h5 : angle_congruent C A B C B A := angle_trans C A B A B C C B A h4 h2
+  have h_iso : seg_congruent C A C B :=
+    isosceles_converse_core C A B h_nc_CAB h5
+  exact (Exists.intro Point (fun P : Point => And (Not (collinear A B P)) (seg_congruent P A P B)) C
+    (And.conj (Not (collinear A B C)) (seg_congruent C A C B) h_nc_ABC h_iso))
+
+-- If copied point D lies on line AC (same side of AB as C), then D is the apex.
+theorem apex_collinear_AC : forall (A B C D : Point) (l : Line),
+  on_line A l -> on_line B l ->
+  Not (Eq Point A B) ->
+  Not (collinear A B C) ->
+  Not (on_line C l) ->
+  angle_congruent B A C A B D ->
+  Not (on_line D l) ->
+  same_side_line l D C ->
+  collinear A C D ->
+  Not (Eq Point C D) ->
+  exists (P : Point), And (Not (collinear A B P)) (seg_congruent P A P B) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro l
+  intro h_A_l
+  intro h_B_l
+  intro h_AB
+  intro h_nc_ABC
+  intro h_C_off
+  intro h_BAC_ABD
+  intro h_D_off
+  intro h_D_same
+  intro h_col_ACD
+  intro h_CD
+  have h_onray_ACD : on_ray A C D :=
+    same_ray_to_on_ray A C D
+      (same_side_collinear_same_ray A C D l h_A_l
+        h_C_off
+        (fun h_Dl : on_line D l => h_D_off h_Dl)
+        h_D_same
+        h_col_ACD
+        h_CD)
+  have h_BAC_BAD : angle_congruent B A C B A D :=
+    angle_congruent_on_ray_at_A A C D B h_onray_ACD
+  have h_BAD_ABD : angle_congruent B A D A B D :=
+    angle_trans B A D B A C A B D
+      (angle_sym B A C B A D h_BAC_BAD)
+      h_BAC_ABD
+  have h_nc_BAD : Not (collinear B A D) :=
+    fun h_col : collinear B A D =>
+      h_D_off (collinear_point_on_line D A B l
+        (collinear_perm3 B A D h_col) h_A_l h_B_l h_AB)
+  have h_perm : Not (collinear D A B) :=
+    fun h : collinear D A B =>
+      h_nc_BAD (collinear_perm3 D A B h)
+  have h_swap1 : angle_congruent B A D D A B := angle_vertex_swap A B D
+  have h_swap2 : angle_congruent A B D D B A := angle_vertex_swap B A D
+  have h_goal : angle_congruent D B A D A B :=
+    angle_sym D A B D B A
+      (angle_trans D A B B A D D B A
+        (angle_sym B A D D A B h_swap1)
+        (angle_trans B A D A B D D B A h_BAD_ABD h_swap2))
+  have h_iso : seg_congruent D A D B :=
+    isosceles_converse_core D A B h_perm (angle_sym D B A D A B h_goal)
+  exact (Exists.intro Point (fun P : Point => And (Not (collinear A B P)) (seg_congruent P A P B)) D
+    (And.conj (Not (collinear A B D)) (seg_congruent D A D B)
+      (fun h : collinear A B D => h_nc_BAD (collinear_perm A B D h))
+      h_iso))
+
+-- A ray from B interior to angle ABC that already makes the same angle
+-- as ∠BAC meets side AC at the desired isosceles apex.
+theorem apex_from_ray_AC : forall (A B C D : Point) (l : Line),
+  on_line A l -> on_line B l ->
+  Not (Eq Point A B) ->
+  Not (collinear A B C) ->
+  Not (collinear A B D) ->
+  angle_congruent B A C A B D ->
+  ray_interior A B C D ->
+  exists (P : Point),
+    And (Not (collinear A B P)) (seg_congruent P A P B) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro l
+  intro h_A_l
+  intro h_B_l
+  intro h_AB
+  intro h_nc_ABC
+  intro h_nc_ABD
+  intro h_BAC_ABD
+  intro h_ri
+  have h_Y_ex : exists (Y : Point), And (between A Y C) (on_ray B D Y) := h_ri
+  have Y : Point := choice Point (fun Y : Point => And (between A Y C) (on_ray B D Y)) h_Y_ex
+  have h_Y_spec : And (between A Y C) (on_ray B D Y) :=
+    choice_spec Point (fun Y : Point => And (between A Y C) (on_ray B D Y)) h_Y_ex
+  have h_AYC : between A Y C := and_fst (between A Y C) (on_ray B D Y) h_Y_spec
+  have h_onray_BDY : on_ray B D Y := and_snd (between A Y C) (on_ray B D Y) h_Y_spec
+  have h_nc_ABY : Not (collinear A B Y) := not_collinear_between A B C Y h_nc_ABC h_AYC
+  have h_BAY_BAC : angle_congruent B A Y B A C :=
+    angle_congruent_on_ray_at_A A Y C B
+      (Or.inl (between A Y C) (Or (between A C Y) (Eq Point C Y)) h_AYC)
+  have h_BAY_ABD : angle_congruent B A Y A B D :=
+    angle_trans B A Y B A C A B D h_BAY_BAC h_BAC_ABD
+  have h_ABD_ABY : angle_congruent A B D A B Y :=
+    angle_congruent_on_ray_at_A B D Y A h_onray_BDY
+  have h_BAY_ABY : angle_congruent B A Y A B Y :=
+    angle_trans B A Y A B D A B Y h_BAY_ABD h_ABD_ABY
+  have h_YAB_BAY : angle_congruent Y A B B A Y :=
+    angle_sym B A Y Y A B (angle_vertex_swap A B Y)
+  have h_YAB_ABY : angle_congruent Y A B A B Y :=
+    angle_trans Y A B B A Y A B Y h_YAB_BAY h_BAY_ABY
+  have h_YAB_YBA : angle_congruent Y A B Y B A :=
+    angle_trans Y A B A B Y Y B A h_YAB_ABY (angle_vertex_swap B A Y)
+  have h_iso : seg_congruent Y A Y B :=
+    isosceles_converse_core Y A B h_nc_ABY h_YAB_YBA
+  exact (Exists.intro Point
+    (fun P : Point => And (Not (collinear A B P)) (seg_congruent P A P B)) Y
+    (And.conj (Not (collinear A B Y)) (seg_congruent Y A Y B) h_nc_ABY h_iso))
+
+-- If ∠ABC is smaller than ∠BAC, the carrying ray of the smaller angle
+-- meets side BC at the desired isosceles apex.
+theorem apex_from_angle_less : forall (A B C : Point) (l : Line),
+  on_line A l -> on_line B l ->
+  Not (Eq Point A B) ->
+  Not (collinear A B C) ->
+  angle_less A B C B A C ->
+  exists (P : Point),
+    And (Not (collinear A B P)) (seg_congruent P A P B) := by
+  intro A
+  intro B
+  intro C
+  intro l
+  intro h_A_l
+  intro h_B_l
+  intro h_AB
+  intro h_nc_ABC
+  intro h_lt
+  have h_D_ex : exists (D : Point),
+    And (ray_interior B A C D) (angle_congruent A B C B A D) := h_lt
+  have D : Point := choice Point (fun D : Point =>
+    And (ray_interior B A C D) (angle_congruent A B C B A D)) h_D_ex
+  have h_D_spec : And (ray_interior B A C D) (angle_congruent A B C B A D) :=
+    choice_spec Point (fun D : Point =>
+      And (ray_interior B A C D) (angle_congruent A B C B A D)) h_D_ex
+  have h_ri_BAC_D : ray_interior B A C D :=
+    and_fst (ray_interior B A C D) (angle_congruent A B C B A D) h_D_spec
+  have h_ABC_BAD : angle_congruent A B C B A D :=
+    and_snd (ray_interior B A C D) (angle_congruent A B C B A D) h_D_spec
+  have h_nc_BAC : Not (collinear B A C) :=
+    fun h : collinear B A C => h_nc_ABC (collinear_perm B A C h)
+  have h_nc_BAD : Not (collinear B A D) :=
+    ray_interior_not_collinear B A C D h_nc_BAC h_ri_BAC_D
+  have h_P_ex : exists (P : Point),
+    And (Not (collinear B A P)) (seg_congruent P B P A) :=
+    apex_from_ray_AC B A C D l h_B_l h_A_l
+      (fun h_eq : Eq Point B A => h_AB (eq_sym Point B A h_eq))
+      h_nc_BAC h_nc_BAD h_ABC_BAD h_ri_BAC_D
+  exact (exists_elim_prop Point
+    (fun P : Point => And (Not (collinear B A P)) (seg_congruent P B P A))
+    (exists (P : Point), And (Not (collinear A B P)) (seg_congruent P A P B))
+    (fun P : Point =>
+      fun h_P_spec : And (Not (collinear B A P)) (seg_congruent P B P A) =>
+        Exists.intro Point
+          (fun P' : Point => And (Not (collinear A B P')) (seg_congruent P' A P' B)) P
+          (And.conj (Not (collinear A B P)) (seg_congruent P A P B)
+            (fun h : collinear A B P =>
+              and_fst (Not (collinear B A P)) (seg_congruent P B P A) h_P_spec
+                (collinear_perm A B P h))
+            (congruent_sym P B P A
+              (and_snd (Not (collinear B A P)) (seg_congruent P B P A) h_P_spec))))
+    h_P_ex)
+
+-- Given a copied angle at B matching ∠BAC and lying on C's side of AB,
+-- produce an isosceles apex over AB.
+theorem apex_from_copied_angle : forall (A B C D : Point) (l : Line),
+  on_line A l -> on_line B l ->
+  Not (Eq Point A B) ->
+  Not (collinear A B C) ->
+  Not (on_line C l) ->
+  angle_congruent B A C A B D ->
+  same_side_line l D C ->
+  exists (P : Point), And (Not (collinear A B P)) (seg_congruent P A P B) := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro l
+  intro h_A_l
+  intro h_B_l
+  intro h_AB
+  intro h_nc_ABC
+  intro h_C_off
+  intro h_BAC_ABD
+  intro h_D_same
+  have h_D_off : Not (on_line D l) := same_side_line_off_line l D C h_D_same h_C_off
+  have h_em_eqCD : Or (Eq Point C D) (Not (Eq Point C D)) :=
+    excluded_middle (Eq Point C D)
+  exact (or_elim (Eq Point C D) (Not (Eq Point C D))
+    (exists (P : Point), And (Not (collinear A B P)) (seg_congruent P A P B)) h_em_eqCD
+    (fun h_eq_CD : Eq Point C D =>
+      let h_eq_ang : angle_congruent B A C A B C :=
+        eq_subst Point D C (fun Z : Point => angle_congruent B A C A B Z)
+          (eq_sym Point C D h_eq_CD) h_BAC_ABD in
+      let h_apex : And (Not (collinear A B C)) (seg_congruent C A C B) :=
+        apex_equal_angles A B C h_nc_ABC h_eq_ang in
+      Exists.intro Point
+        (fun P : Point => And (Not (collinear A B P)) (seg_congruent P A P B)) C h_apex)
+    (fun h_ne_CD : Not (Eq Point C D) =>
+      let h_em_BCD : Or (collinear B C D) (Not (collinear B C D)) :=
+        excluded_middle (collinear B C D) in
+      or_elim (collinear B C D) (Not (collinear B C D))
+        (exists (P : Point), And (Not (collinear A B P)) (seg_congruent P A P B)) h_em_BCD
+        (fun h_col_BCD : collinear B C D =>
+          apex_collinear_BC A B C D l h_A_l h_B_l h_AB h_nc_ABC h_C_off
+            h_BAC_ABD h_D_off h_D_same h_col_BCD h_ne_CD)
+        (fun h_nc_BCD : Not (collinear B C D) =>
+          let h_em_ACD : Or (collinear A C D) (Not (collinear A C D)) :=
+            excluded_middle (collinear A C D) in
+          or_elim (collinear A C D) (Not (collinear A C D))
+            (exists (P : Point), And (Not (collinear A B P)) (seg_congruent P A P B)) h_em_ACD
+            (fun h_col_ACD : collinear A C D =>
+              apex_collinear_AC A B C D l h_A_l h_B_l h_AB h_nc_ABC h_C_off
+                h_BAC_ABD h_D_off h_D_same h_col_ACD h_ne_CD)
+            (fun h_nc_ACD : Not (collinear A C D) =>
+              let h_nc_ABD : Not (collinear A B D) :=
+                fun h : collinear A B D =>
+                  h_D_off (collinear_point_on_line D A B l
+                    (collinear_perm3 B A D h) h_A_l h_B_l h_AB) in
+              let h_nc_ADC : Not (collinear A D C) :=
+                fun h : collinear A D C =>
+                  h_nc_ACD (collinear_perm2 A D C h) in
+              let h_same_CD : same_side_line l C D :=
+                same_side_line_sym l D C h_D_same in
+              let h_rt : Or (ray_interior A B C D) (ray_interior A B D C) :=
+                ray_trichotomy B A C D l h_B_l h_A_l
+                  (fun h_eq : Eq Point B A => h_AB (eq_sym Point B A h_eq))
+                  h_C_off h_D_off h_same_CD
+                  h_nc_BCD h_nc_ABC h_nc_ABD h_nc_ADC in
+              or_elim (ray_interior A B C D) (ray_interior A B D C)
+                (exists (P : Point), And (Not (collinear A B P)) (seg_congruent P A P B)) h_rt
+                (fun h_ri_ACD : ray_interior A B C D =>
+                  apex_from_ray_AC A B C D l h_A_l h_B_l h_AB h_nc_ABC h_nc_ABD
+                    h_BAC_ABD h_ri_ACD)
+                (fun h_ri_ADC : ray_interior A B D C =>
+                  let h_lt_ABC_ABD : angle_less A B C A B D :=
+                    interior_angle_less A B D C h_ri_ADC in
+                  let h_ABD_BAC : angle_congruent A B D B A C :=
+                    angle_sym B A C A B D h_BAC_ABD in
+                  let h_nc_BAC : Not (collinear B A C) :=
+                    fun h : collinear B A C =>
+                      h_nc_ABC (collinear_perm B A C h) in
+                  let h_lt_ABC_BAC : angle_less A B C B A C :=
+                    angle_less_congr_right A B C A B D B A C
+                      h_nc_ABD h_nc_BAC h_ABD_BAC h_lt_ABC_ABD in
+                  apex_from_angle_less A B C l h_A_l h_B_l h_AB h_nc_ABC h_lt_ABC_BAC)))))
+
+-- Construct an isosceles apex over any segment.
+theorem isosceles_apex_exists : forall (A B : Point),
   Not (Eq Point A B) -> exists (P : Point),
-    And (Not (collinear A B P)) (seg_congruent P A P B)
+    And (Not (collinear A B P)) (seg_congruent P A P B) := by
+  intro A
+  intro B
+  intro h_AB
+  have h_C_ex : exists (C : Point), Not (collinear A B C) :=
+    exists_non_collinear_point A B h_AB
+  have C : Point := choice Point (fun C : Point => Not (collinear A B C)) h_C_ex
+  have h_nc_ABC : Not (collinear A B C) :=
+    choice_spec Point (fun C : Point => Not (collinear A B C)) h_C_ex
+  have h_l_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_l_ex
+  have h_l : And (on_line A l) (on_line B l) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_l_ex
+  have h_A_l : on_line A l := and_fst (on_line A l) (on_line B l) h_l
+  have h_B_l : on_line B l := and_snd (on_line A l) (on_line B l) h_l
+  have h_C_off : Not (on_line C l) :=
+    fun h_Cl : on_line C l =>
+      h_nc_ABC (Exists.intro Line
+        (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l
+        (And.conj (on_line A l) (And (on_line B l) (on_line C l)) h_A_l
+          (And.conj (on_line B l) (on_line C l) h_B_l h_Cl)))
+  have h_ne_AC : Not (Eq Point A C) :=
+    and_snd (Not (Eq Point B C)) (Not (Eq Point A C))
+      (and_snd (Not (Eq Point A B))
+        (And (Not (Eq Point B C)) (Not (Eq Point A C)))
+        (triangle_nondegenerate A B C h_nc_ABC))
+  have h_ne_BA : Not (Eq Point B A) :=
+    fun h_eq : Eq Point B A => h_AB (eq_sym Point B A h_eq)
+  have h_D_ex : exists (D : Point),
+    And (angle_congruent B A C A B D)
+      (And (same_side_line l D C)
+        (forall (D' : Point),
+          angle_congruent B A C A B D' ->
+          same_side_line l D' C ->
+          collinear B D D')) :=
+    angle_transfer_III4 A B C B A l C h_AB h_ne_AC h_ne_BA h_B_l h_A_l h_C_off
+  have D : Point := choice Point (fun D : Point =>
+    And (angle_congruent B A C A B D)
+      (And (same_side_line l D C)
+        (forall (D' : Point),
+          angle_congruent B A C A B D' ->
+          same_side_line l D' C ->
+          collinear B D D'))) h_D_ex
+  have h_D_spec : And (angle_congruent B A C A B D)
+    (And (same_side_line l D C)
+      (forall (D' : Point),
+        angle_congruent B A C A B D' ->
+        same_side_line l D' C ->
+        collinear B D D')) :=
+    choice_spec Point (fun D : Point =>
+      And (angle_congruent B A C A B D)
+        (And (same_side_line l D C)
+          (forall (D' : Point),
+            angle_congruent B A C A B D' ->
+            same_side_line l D' C ->
+            collinear B D D'))) h_D_ex
+  have h_BAC_ABD : angle_congruent B A C A B D :=
+    and_fst (angle_congruent B A C A B D)
+      (And (same_side_line l D C)
+        (forall (D' : Point),
+          angle_congruent B A C A B D' ->
+          same_side_line l D' C ->
+          collinear B D D')) h_D_spec
+  have h_rest : And (same_side_line l D C)
+    (forall (D' : Point),
+          angle_congruent B A C A B D' ->
+          same_side_line l D' C ->
+          collinear B D D') :=
+    and_snd (angle_congruent B A C A B D)
+      (And (same_side_line l D C)
+        (forall (D' : Point),
+          angle_congruent B A C A B D' ->
+          same_side_line l D' C ->
+          collinear B D D')) h_D_spec
+  have h_D_same : same_side_line l D C :=
+    and_fst (same_side_line l D C) (forall (D' : Point),
+          angle_congruent B A C A B D' ->
+          same_side_line l D' C ->
+          collinear B D D') h_rest
+  exact (apex_from_copied_angle A B C D l h_A_l h_B_l h_AB h_nc_ABC h_C_off
+    h_BAC_ABD h_D_same)
+
+-- Construction of an isosceles apex over any segment.
+theorem isosceles_apex_construct : forall (A B : Point),
+  Not (Eq Point A B) -> exists (P : Point),
+    And (Not (collinear A B P)) (seg_congruent P A P B) := by
+  intro A
+  intro B
+  intro h_AB
+  exact (isosceles_apex_exists A B h_AB)
 
 -- Every segment has a midpoint.
 theorem midpoint_exists : forall (A B : Point),
@@ -307,7 +815,7 @@ theorem midpoint_exists : forall (A B : Point),
   intro h_AB
   have h_P_ex : exists (P : Point),
     And (Not (collinear A B P)) (seg_congruent P A P B) :=
-    isosceles_apex_exists A B h_AB
+    isosceles_apex_construct A B h_AB
   exact (exists_elim_prop Point
     (fun P : Point => And (Not (collinear A B P)) (seg_congruent P A P B))
     (exists (M : Point), midpoint M A B)

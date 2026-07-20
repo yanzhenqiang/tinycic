@@ -1,6 +1,7 @@
 import GeometryAxioms
 import GeometryCommon.Collinearity
 import GeometryCommon.Angle
+import GeometryCommon.RightAnglesEqual
 
 -- Canonical line through two points.
 def line : Point -> Point -> Line :=

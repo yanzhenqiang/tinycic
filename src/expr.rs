@@ -621,6 +621,24 @@ impl Expr {
         }
     }
 
+    /// Check whether the expression contains any loose bound variables.
+    /// Such expressions are context-dependent and must not be cached across
+    /// different local contexts.
+    pub fn has_loose_bvars(&self) -> bool {
+        match self {
+            Expr::BVar(_) => true,
+            Expr::App(f, a) => f.has_loose_bvars() || a.has_loose_bvars(),
+            Expr::Lambda(_, _, ty, body) => ty.has_loose_bvars() || body.has_loose_bvars(),
+            Expr::Pi(_, _, ty, body) => ty.has_loose_bvars() || body.has_loose_bvars(),
+            Expr::Let(_, ty, value, body, _) => {
+                ty.has_loose_bvars() || value.has_loose_bvars() || body.has_loose_bvars()
+            }
+            Expr::MData(_, e) => e.has_loose_bvars(),
+            Expr::Proj(_, _, e) => e.has_loose_bvars(),
+            _ => false,
+        }
+    }
+
     /// Check if expression contains any metavariables
     pub fn has_expr_mvar(&self) -> bool {
         match self {

@@ -1,6 +1,7 @@
 import GeometryAxioms
 import GeometryCommon.Collinearity
 import GeometryCommon.Angle
+import GeometryCommon.RightAnglesEqual
 import GeometryCommon.Midpoint
 
 -- Canonical line through two points.
@@ -866,28 +867,6 @@ theorem perpendicular_bisector_exists : forall (A B : Point),
                 (line_through_Q A B)
                 h_perp_l_AB)))))))
 
-theorem perpendicular_bisector_unique : forall (A B : Point) (l m : Line),
-  Not (Eq Point A B) -> perpendicular_bisector A B l ->
-  perpendicular_bisector A B m -> Eq Line l m := by
-  intro A
-  intro B
-  intro l
-  intro m
-  intro h_AB
-  intro h_l
-  intro h_m
-  have h_M_l : on_line (midpoint_of A B h_AB) l :=
-    perpendicular_bisector_midpoint_on A B h_AB l h_l
-  have h_M_m : on_line (midpoint_of A B h_AB) m :=
-    perpendicular_bisector_midpoint_on A B h_AB m h_m
-  have h_l_perp : perpendicular l (line A B) :=
-    perpendicular_bisector_base_perp A B l h_AB h_l
-  have h_m_perp : perpendicular m (line A B) :=
-    perpendicular_bisector_base_perp A B m h_AB h_m
-  have h_AB_l : perpendicular (line A B) l := perpendicular_sym l (line A B) h_l_perp
-  have h_AB_m : perpendicular (line A B) m := perpendicular_sym m (line A B) h_m_perp
-  exact (perpendicular_unique (line A B) (midpoint_of A B h_AB) l m
-    (midpoint_on_base_line A B h_AB) h_M_l h_M_m h_AB_l h_AB_m)
 -- Perpendicular lines are distinct: a line cannot be perpendicular to itself.
 theorem perpendicular_neq : forall (l m : Line),
   perpendicular l m -> Not (Eq Line l m) := by
@@ -931,6 +910,209 @@ theorem perpendicular_intersection_unique : forall (l m : Line) (P Q : Point),
     (fun h_eq : Eq Point P Q => h_eq)
     (fun h_neq_PQ : Not (Eq Point P Q) =>
       False_elim (Eq Point P Q) (h_neq (line_unique P Q l m h_neq_PQ h_Pl h_Ql h_Pm h_Qm))))
+
+-- Given a line m perpendicular to l at P and a chosen side of l (represented
+-- by an off-line point B1), return a point B on m (B ≠ P) on that side such
+-- that ∠APB is right for the given A on l, A ≠ P.
+theorem perpendicular_point_on_side : forall (l m : Line) (P A B1 : Point),
+  on_line P l -> on_line A l -> Not (Eq Point P A) ->
+  on_line P m -> perpendicular l m -> Not (on_line B1 l) ->
+  exists (B : Point), And (on_line B m) (And (Not (Eq Point P B))
+    (And (same_side_line l B B1) (right_angle A P B))) := by
+  intro l
+  intro m
+  intro P
+  intro A
+  intro B1
+  intro h_Pl
+  intro h_A_l
+  intro h_ne_PA
+  intro h_Pm
+  intro h_perp
+  intro h_B1_off
+  have X : Point := perpendicular_point l m h_perp
+  have A2 : Point := perpendicular_witness_A l m h_perp
+  have B2 : Point := perpendicular_witness_B l m h_perp
+  have h_X_l : on_line X l := perpendicular_point_on_l l m h_perp
+  have h_X_m : on_line X m := perpendicular_point_on_m l m h_perp
+  have h_A2_l : on_line A2 l := perpendicular_witness_A_on_l l m h_perp
+  have h_B2_m : on_line B2 m := perpendicular_witness_B_on_m l m h_perp
+  have h_ne_XA2 : Not (Eq Point X A2) := perpendicular_point_neq_A l m h_perp
+  have h_ne_XB2 : Not (Eq Point X B2) := perpendicular_point_neq_B l m h_perp
+  have h_ne_B2X : Not (Eq Point B2 X) :=
+    fun h_B2X : Eq Point B2 X => h_ne_XB2 (eq_sym Point B2 X h_B2X)
+  have h_ra : right_angle A2 X B2 := perpendicular_right_angle l m h_perp
+  have h_eq_XP : Eq Point X P := perpendicular_intersection_unique l m X P h_perp h_X_l h_X_m h_Pl h_Pm
+  have h_ra_P : right_angle A2 P B2 :=
+    eq_subst Point X P (fun Z : Point => right_angle A2 Z B2) h_eq_XP h_ra
+  have h_col_A2PA : collinear A2 P A :=
+    Exists.intro Line (fun n : Line => And (on_line A2 n) (And (on_line P n) (on_line A n))) l
+      (And.conj (on_line A2 l) (And (on_line P l) (on_line A l)) h_A2_l
+        (And.conj (on_line P l) (on_line A l) h_Pl h_A_l))
+  have h_ra_AP_B2 : right_angle A P B2 :=
+    right_angle_collinear_transfer A2 P B2 A h_ra_P h_col_A2PA h_ne_PA
+  have h_B2_off_l : Not (on_line B2 l) :=
+    fun h_B2_l : on_line B2 l =>
+      right_angle_non_collinear A2 P B2 h_ra_P
+        (Exists.intro Line (fun n : Line => And (on_line A2 n) (And (on_line P n) (on_line B2 n))) l
+          (And.conj (on_line A2 l) (And (on_line P l) (on_line B2 l)) h_A2_l
+            (And.conj (on_line P l) (on_line B2 l) h_Pl h_B2_l)))
+  have h_em : Or (same_side_line l B2 B1) (Not (same_side_line l B2 B1)) :=
+    excluded_middle (same_side_line l B2 B1)
+  exact (or_elim (same_side_line l B2 B1) (Not (same_side_line l B2 B1))
+    (exists (B : Point), And (on_line B m) (And (Not (Eq Point P B))
+      (And (same_side_line l B B1) (right_angle A P B)))) h_em
+    (fun h_same : same_side_line l B2 B1 =>
+      Exists.intro Point (fun B : Point => And (on_line B m) (And (Not (Eq Point P B))
+        (And (same_side_line l B B1) (right_angle A P B)))) B2
+        (And.conj (on_line B2 m) (And (Not (Eq Point P B2))
+          (And (same_side_line l B2 B1) (right_angle A P B2))) h_B2_m
+          (And.conj (Not (Eq Point P B2)) (And (same_side_line l B2 B1) (right_angle A P B2))
+            (fun h_PB2 : Eq Point P B2 =>
+              h_ne_XB2 (eq_trans Point X P B2 h_eq_XP h_PB2))
+            (And.conj (same_side_line l B2 B1) (right_angle A P B2) h_same h_ra_AP_B2))))
+    (fun h_not_same : Not (same_side_line l B2 B1) =>
+      let h_opp_B2B1 : opposite_side_line l B2 B1 :=
+        not_same_side_to_opposite l B2 B1 h_B2_off_l h_B1_off h_not_same in
+      let h_B_ex : exists (B : Point), between B2 X B := between_extension B2 X h_ne_B2X in
+      let B : Point := choice Point (fun Y : Point => between B2 X Y) h_B_ex in
+      let h_B_spec : between B2 X B := choice_spec Point (fun Y : Point => between B2 X Y) h_B_ex in
+      let h_B_m : on_line B m :=
+        collinear_point_on_line B X B2 m
+          (collinear_perm3 B2 X B (between_implies_collinear B2 X B h_B_spec))
+          h_X_m h_B2_m h_ne_XB2 in
+      let h_ne_PB : Not (Eq Point P B) :=
+        fun h_PB : Eq Point P B =>
+          let h_XB : Eq Point X B := eq_trans Point X P B h_eq_XP h_PB in
+          let h_ne_XB : Not (Eq Point X B) := between_distinct_ends B2 X B h_B_spec in
+          h_ne_XB h_XB in
+      let h_opp_B2B : opposite_side_line l B2 B :=
+        Exists.intro Point (fun Z : Point => And (on_line Z l) (between B2 Z B)) X
+          (And.conj (on_line X l) (between B2 X B) h_X_l h_B_spec) in
+      let h_same_BB1 : same_side_line l B B1 :=
+        opposite_opposite_to_same l B2 B B1 h_B2_off_l h_opp_B2B h_opp_B2B1 in
+      let h_col_PB2B : collinear P B2 B :=
+        Exists.intro Line (fun n : Line => And (on_line P n) (And (on_line B2 n) (on_line B n))) m
+          (And.conj (on_line P m) (And (on_line B2 m) (on_line B m)) h_Pm
+            (And.conj (on_line B2 m) (on_line B m) h_B2_m h_B_m)) in
+      let h_ra_AP_B : right_angle A P B :=
+        right_angle_collinear_transfer_snd A P B2 B h_ra_AP_B2 h_col_PB2B h_ne_PB in
+      Exists.intro Point (fun Y : Point => And (on_line Y m) (And (Not (Eq Point P Y))
+        (And (same_side_line l Y B1) (right_angle A P Y)))) B
+        (And.conj (on_line B m) (And (Not (Eq Point P B))
+          (And (same_side_line l B B1) (right_angle A P B))) h_B_m
+          (And.conj (Not (Eq Point P B)) (And (same_side_line l B B1) (right_angle A P B))
+            h_ne_PB (And.conj (same_side_line l B B1) (right_angle A P B) h_same_BB1 h_ra_AP_B)))))
+
+-- At a point P on a line l, the perpendicular to l is unique.
+-- Proof: take right angles A1 P B1 (on m1) and A P B (on m2, same side of l as B1);
+-- right_angles_equal makes them congruent, and III4 uniqueness forces P, B1, B
+-- collinear; hence m1 and m2 coincide.
+theorem perpendicular_unique : forall (l : Line) (P : Point) (m1 m2 : Line),
+  on_line P l -> on_line P m1 -> on_line P m2 ->
+  perpendicular l m1 -> perpendicular l m2 -> Eq Line m1 m2 := by
+  intro l
+  intro P
+  intro m1
+  intro m2
+  intro h_Pl
+  intro h_Pm1
+  intro h_Pm2
+  intro h_perp1
+  intro h_perp2
+  have X1 : Point := perpendicular_point l m1 h_perp1
+  have A1 : Point := perpendicular_witness_A l m1 h_perp1
+  have B1 : Point := perpendicular_witness_B l m1 h_perp1
+  have h_X1_l : on_line X1 l := perpendicular_point_on_l l m1 h_perp1
+  have h_X1_m1 : on_line X1 m1 := perpendicular_point_on_m l m1 h_perp1
+  have h_A1_l : on_line A1 l := perpendicular_witness_A_on_l l m1 h_perp1
+  have h_B1_m1 : on_line B1 m1 := perpendicular_witness_B_on_m l m1 h_perp1
+  have h_ne_X1A1 : Not (Eq Point X1 A1) := perpendicular_point_neq_A l m1 h_perp1
+  have h_ne_X1B1 : Not (Eq Point X1 B1) := perpendicular_point_neq_B l m1 h_perp1
+  have h_ra1 : right_angle A1 X1 B1 := perpendicular_right_angle l m1 h_perp1
+  have h_eq_X1P : Eq Point X1 P := perpendicular_intersection_unique l m1 X1 P h_perp1 h_X1_l h_X1_m1 h_Pl h_Pm1
+  have h_ne_PA1 : Not (Eq Point P A1) :=
+    fun h_PA1 : Eq Point P A1 => h_ne_X1A1 (eq_trans Point X1 P A1 h_eq_X1P h_PA1)
+  have h_ne_A1P : Not (Eq Point A1 P) :=
+    fun h_A1P : Eq Point A1 P => h_ne_PA1 (eq_sym Point A1 P h_A1P)
+  have h_ne_PB1 : Not (Eq Point P B1) :=
+    fun h_PB1 : Eq Point P B1 => h_ne_X1B1 (eq_trans Point X1 P B1 h_eq_X1P h_PB1)
+  have h_ra1_P : right_angle A1 P B1 :=
+    eq_subst Point X1 P (fun Z : Point => right_angle A1 Z B1) h_eq_X1P h_ra1
+  have h_B1_off_l : Not (on_line B1 l) :=
+    fun h_B1_l : on_line B1 l =>
+      right_angle_non_collinear A1 P B1 h_ra1_P
+        (Exists.intro Line (fun n : Line => And (on_line A1 n) (And (on_line P n) (on_line B1 n))) l
+          (And.conj (on_line A1 l) (And (on_line P l) (on_line B1 l)) h_A1_l
+            (And.conj (on_line P l) (on_line B1 l) h_Pl h_B1_l)))
+  have h_B_ex : exists (B : Point), And (on_line B m2) (And (Not (Eq Point P B))
+    (And (same_side_line l B B1) (right_angle A1 P B))) :=
+    perpendicular_point_on_side l m2 P A1 B1 h_Pl h_A1_l h_ne_PA1 h_Pm2 h_perp2 h_B1_off_l
+  have B : Point := choice Point (fun Y : Point => And (on_line Y m2) (And (Not (Eq Point P Y))
+    (And (same_side_line l Y B1) (right_angle A1 P Y)))) h_B_ex
+  have h_B_spec : And (on_line B m2) (And (Not (Eq Point P B))
+    (And (same_side_line l B B1) (right_angle A1 P B))) :=
+    choice_spec Point (fun Y : Point => And (on_line Y m2) (And (Not (Eq Point P Y))
+      (And (same_side_line l Y B1) (right_angle A1 P Y)))) h_B_ex
+  have h_B_m2 : on_line B m2 :=
+    and_fst (on_line B m2) (And (Not (Eq Point P B))
+      (And (same_side_line l B B1) (right_angle A1 P B))) h_B_spec
+  have h_ne_PB : Not (Eq Point P B) :=
+    and_fst (Not (Eq Point P B)) (And (same_side_line l B B1) (right_angle A1 P B))
+      (and_snd (on_line B m2) (And (Not (Eq Point P B))
+        (And (same_side_line l B B1) (right_angle A1 P B))) h_B_spec)
+  have h_same_BB1 : same_side_line l B B1 :=
+    and_fst (same_side_line l B B1) (right_angle A1 P B)
+      (and_snd (Not (Eq Point P B)) (And (same_side_line l B B1) (right_angle A1 P B))
+        (and_snd (on_line B m2) (And (Not (Eq Point P B))
+          (And (same_side_line l B B1) (right_angle A1 P B))) h_B_spec))
+  have h_ra_A1PB : right_angle A1 P B :=
+    and_snd (same_side_line l B B1) (right_angle A1 P B)
+      (and_snd (Not (Eq Point P B)) (And (same_side_line l B B1) (right_angle A1 P B))
+        (and_snd (on_line B m2) (And (Not (Eq Point P B))
+          (And (same_side_line l B B1) (right_angle A1 P B))) h_B_spec))
+  have h_congr : angle_congruent A1 P B A1 P B1 :=
+    angle_sym A1 P B1 A1 P B (right_angles_equal A1 P B1 A1 P B h_ra1_P h_ra_A1PB)
+  have h_col_PB1B : collinear P B1 B :=
+    angle_congruent_same_side_collinear A1 P B1 B l h_Pl h_A1_l h_ne_A1P h_B1_off_l h_same_BB1 h_congr
+  have h_col_ex : exists (n : Line), And (on_line P n) (And (on_line B1 n) (on_line B n)) := h_col_PB1B
+  have n : Line := choice Line (fun k : Line => And (on_line P k) (And (on_line B1 k) (on_line B k))) h_col_ex
+  have h_n_spec : And (on_line P n) (And (on_line B1 n) (on_line B n)) :=
+    choice_spec Line (fun k : Line => And (on_line P k) (And (on_line B1 k) (on_line B k))) h_col_ex
+  have h_P_n : on_line P n := and_fst (on_line P n) (And (on_line B1 n) (on_line B n)) h_n_spec
+  have h_B1_n : on_line B1 n :=
+    and_fst (on_line B1 n) (on_line B n)
+      (and_snd (on_line P n) (And (on_line B1 n) (on_line B n)) h_n_spec)
+  have h_B_n : on_line B n :=
+    and_snd (on_line B1 n) (on_line B n)
+      (and_snd (on_line P n) (And (on_line B1 n) (on_line B n)) h_n_spec)
+  have h_eq_m1_n : Eq Line m1 n := line_unique P B1 m1 n h_ne_PB1 h_Pm1 h_B1_m1 h_P_n h_B1_n
+  have h_eq_m2_n : Eq Line m2 n := line_unique P B m2 n h_ne_PB h_Pm2 h_B_m2 h_P_n h_B_n
+  exact (eq_trans Line m1 n m2 h_eq_m1_n (eq_sym Line m2 n h_eq_m2_n))
+
+-- Two perpendicular bisectors of the same segment coincide.
+theorem perpendicular_bisector_unique : forall (A B : Point) (l m : Line),
+  Not (Eq Point A B) -> perpendicular_bisector A B l ->
+  perpendicular_bisector A B m -> Eq Line l m := by
+  intro A
+  intro B
+  intro l
+  intro m
+  intro h_AB
+  intro h_l
+  intro h_m
+  have h_M_l : on_line (midpoint_of A B h_AB) l :=
+    perpendicular_bisector_midpoint_on A B h_AB l h_l
+  have h_M_m : on_line (midpoint_of A B h_AB) m :=
+    perpendicular_bisector_midpoint_on A B h_AB m h_m
+  have h_l_perp : perpendicular l (line A B) :=
+    perpendicular_bisector_base_perp A B l h_AB h_l
+  have h_m_perp : perpendicular m (line A B) :=
+    perpendicular_bisector_base_perp A B m h_AB h_m
+  have h_AB_l : perpendicular (line A B) l := perpendicular_sym l (line A B) h_l_perp
+  have h_AB_m : perpendicular (line A B) m := perpendicular_sym m (line A B) h_m_perp
+  exact (perpendicular_unique (line A B) (midpoint_of A B h_AB) l m
+    (midpoint_on_base_line A B h_AB) h_M_l h_M_m h_AB_l h_AB_m)
 
 -- Perpendicular lines are distinct: a line cannot be perpendicular to itself.
 theorem perpendicular_lines_distinct : forall (l m : Line),

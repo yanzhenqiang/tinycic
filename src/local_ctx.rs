@@ -1,4 +1,5 @@
 use super::expr::*;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Local declaration in the context
@@ -77,6 +78,10 @@ pub struct LocalCtx {
     /// Stack of binder types for BVar lookup (index 0 = outermost)
     /// Types are stored as FVar-based expressions
     bvar_types: Vec<Expr>,
+    /// Cache for WHNF of let-bound FVars.  Each let-binding value is
+    /// normalized at most once in a given local context, avoiding
+    /// exponential re-expansion of large `have`/`let` witnesses.
+    let_whnf_cache: HashMap<Name, Expr>,
 }
 
 impl LocalCtx {
@@ -86,6 +91,7 @@ impl LocalCtx {
             next_index: 0,
             bvar_names: Vec::new(),
             bvar_types: Vec::new(),
+            let_whnf_cache: HashMap::new(),
         }
     }
 
@@ -237,6 +243,16 @@ impl LocalCtx {
         } else {
             None
         }
+    }
+
+    /// Get the cached WHNF of a let-bound FVar, if available.
+    pub fn get_let_whnf_cache(&self, name: &Name) -> Option<&Expr> {
+        self.let_whnf_cache.get(name)
+    }
+
+    /// Cache the WHNF of a let-bound FVar.
+    pub fn set_let_whnf_cache(&mut self, name: Name, value: Expr) {
+        self.let_whnf_cache.insert(name, value);
     }
 
     /// Check if FVar is a let-binding

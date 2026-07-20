@@ -238,14 +238,10 @@ axiom dedekind : forall (l : Line) (P Q : Point),
 -- isosceles_apex_exists in GeometryCommon.Midpoint.
 
 -- Through any point there exists a perpendicular to a given line.
+-- (Theorem: perpendicular_exists remains an axiom until isosceles_apex_exists
+-- is de-axiomatized.)
 axiom perpendicular_exists : forall (l : Line), forall (P : Point),
   exists (m : Line), And (on_line P m) (perpendicular l m)
-
--- Two distinct lines perpendicular to the same line are parallel
--- (or coincide).  We phrase it as uniqueness at a point.
-axiom perpendicular_unique : forall (l : Line), forall (P : Point), forall (m1 m2 : Line),
-  on_line P l -> on_line P m1 -> on_line P m2 ->
-  perpendicular l m1 -> perpendicular l m2 -> Eq Line m1 m2
 
 -- Classical logical equivalence: ¬∀x ¬P(x) implies ∃x P(x).
 theorem not_forall_not_to_exists : forall (A : Type) (P : A -> Prop),

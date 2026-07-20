@@ -6,6 +6,7 @@ import GeometryCommon.Crossbar
 import GeometryCommon.Angle
 import GeometryCommon.AngleAddition
 import GeometryCommon.AngleOrder
+import GeometryCommon.RightAnglesEqual
 import GeometryCommon.SegmentOrder
 import GeometryCommon.Midpoint
 import GeometryCommon.Parallelogram

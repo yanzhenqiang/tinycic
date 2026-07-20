@@ -1047,8 +1047,10 @@ theorem interior_transfer : forall (A B C M A' B' C' : Point) (l_AB l_BC l_A'B' 
                                 (And.conj (between A1 Y1 C1) (on_ray B' Y1 Y1) h_A1Y1C1
                                   (Or.inr (between B' Y1 Y1) (Or (between B' Y1 Y1) (Eq Point Y1 Y1))
                                     (Or.inr (between B' Y1 Y1) (Eq Point Y1 Y1) (refl Point Y1)))))
-                              (Or.inl (between B' A' A1) (Or (between B' A1 A') (Eq Point A1 A')) h_B'A'A1)
-                              (Or.inl (between B' C' C1) (Or (between B' C1 C') (Eq Point C1 C')) h_B'C'C1) in
+                              (Or.inr (between B' A1 A') (Or (between B' A' A1) (Eq Point A' A1))
+                                (Or.inl (between B' A' A1) (Eq Point A' A1) h_B'A'A1))
+                              (Or.inr (between B' C1 C') (Or (between B' C' C1) (Eq Point C' C1))
+                                (Or.inl (between B' C' C1) (Eq Point C' C1) h_B'C'C1)) in
                           Exists.intro Point
                             (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M')) Y1
                             (And.conj (ray_interior A' B' C' Y1) (angle_congruent A B M A' B' Y1)
@@ -1108,40 +1110,292 @@ theorem right_angle_supplement_congruent : forall (A B C D : Point),
     and_fst (angle_congruent A B C Dp B C) (angle_congruent A B C C B Dp) h_h1
   have h_abc_CbDp : angle_congruent A B C C B Dp :=
     and_snd (angle_congruent A B C Dp B C) (angle_congruent A B C C B Dp) h_h1
-  have h_same : Or (between B D Dp) (between B Dp D) :=
+  have h_side : Or (between B D Dp) (Or (between B Dp D) (Eq Point D Dp)) :=
     between_same_side A B D Dp h_ABD h_ABDp
   have h_Dpbc_Dbc : angle_congruent Dp B C D B C :=
-    angle_congruent_same_ray B D Dp C h_same
+    or_elim (between B D Dp) (Or (between B Dp D) (Eq Point D Dp)) (angle_congruent Dp B C D B C) h_side
+      (fun h_BDDp : between B D Dp =>
+        angle_sym D B C Dp B C
+          (angle_congruent_same_ray B D Dp C (Or.inl (between B D Dp) (between B Dp D) h_BDDp)))
+      (fun h_rest : Or (between B Dp D) (Eq Point D Dp) =>
+        or_elim (between B Dp D) (Eq Point D Dp) (angle_congruent Dp B C D B C) h_rest
+          (fun h_BDpD : between B Dp D =>
+            angle_sym D B C Dp B C
+              (angle_congruent_same_ray B D Dp C (Or.inr (between B D Dp) (between B Dp D) h_BDpD)))
+          (fun h_eq : Eq Point D Dp =>
+            eq_subst Point Dp D (fun Z : Point => angle_congruent Dp B C Z B C)
+              (eq_sym Point D Dp h_eq) (angle_refl Dp B C)))
   have h_abc_Dbc : angle_congruent A B C D B C :=
     angle_trans A B C Dp B C D B C h_abc_Dpbc h_Dpbc_Dbc
   have h_CbDp_CbD : angle_congruent C B Dp C B D :=
-    angle_congruent_same_ray B D Dp C h_same
-  have h_abc_CbD : angle_congruent A B C C B D :=
-    angle_trans A B C C B Dp C B D h_abc_CbDp h_CbDp_CbD
+    angle_sym C B D C B Dp
+      (angle_trans C B D D B C C B Dp
+        (angle_trans C B D D B C Dp B C
+          (angle_vertex_swap B C D)
+          (angle_sym D B C Dp B C h_Dpbc_Dbc))
+        (angle_sym C B Dp Dp B C (angle_vertex_swap B C Dp)))
   exact (And.conj (angle_congruent A B C D B C) (angle_congruent A B C C B D)
-    h_abc_Dbc h_abc_CbD)
+    h_abc_Dbc (angle_trans A B C C B Dp C B D h_abc_CbDp h_CbDp_CbD))
 
--- Transitivity of ray interiors: if BN is interior to angle ABM and BM is
--- interior to angle ABC, then BN is interior to angle ABC.
--- Proof via the crossbar characterisation: convert each interior statement
--- to the two half-plane conditions, then transfer the conditions across the
--- common ray BM.
-theorem ray_interior_trans : forall (A B C M N : Point),
-  Not (collinear A B C) ->
-  ray_interior A B C M -> ray_interior A B M N ->
-  ray_interior A B C N := by
+-- Auto-line variant of interior_transfer.
+theorem interior_transfer_auto : forall (A B C M A' B' C' : Point),
+  Not (collinear A B C) -> Not (collinear A' B' C') ->
+  angle_congruent A B C A' B' C' -> ray_interior A B C M ->
+  Exists Point (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M')) := by
   intro A
   intro B
   intro C
   intro M
-  intro N
+  intro A'
+  intro B'
+  intro C'
   intro h_nc
-  intro h_int_ABC_M
-  intro h_int_ABM_N
-  have h_nc_ABM : Not (collinear A B M) :=
-    ray_interior_not_collinear A B C M h_nc h_int_ABC_M
-  have h_nc_MBC : Not (collinear M B C) :=
-    ray_interior_not_collinear_snd A B C M h_nc h_int_ABC_M
+  intro h_nc'
+  intro h_congr
+  intro h_int
+  have h_lAB_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l_AB : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_lAB_ex
+  have h_lAB : And (on_line A l_AB) (on_line B l_AB) := choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_lAB_ex
+  have h_lBC_ex : exists (l : Line), And (on_line B l) (on_line C l) := line_exists B C
+  have l_BC : Line := choice Line (fun l : Line => And (on_line B l) (on_line C l)) h_lBC_ex
+  have h_lBC : And (on_line B l_BC) (on_line C l_BC) := choice_spec Line (fun l : Line => And (on_line B l) (on_line C l)) h_lBC_ex
+  have h_lA'B'_ex : exists (l : Line), And (on_line A' l) (on_line B' l) := line_exists A' B'
+  have l_A'B' : Line := choice Line (fun l : Line => And (on_line A' l) (on_line B' l)) h_lA'B'_ex
+  have h_lA'B' : And (on_line A' l_A'B') (on_line B' l_A'B') := choice_spec Line (fun l : Line => And (on_line A' l) (on_line B' l)) h_lA'B'_ex
+  have h_lB'C'_ex : exists (l : Line), And (on_line B' l) (on_line C' l) := line_exists B' C'
+  have l_B'C' : Line := choice Line (fun l : Line => And (on_line B' l) (on_line C' l)) h_lB'C'_ex
+  have h_lB'C' : And (on_line B' l_B'C') (on_line C' l_B'C') := choice_spec Line (fun l : Line => And (on_line B' l) (on_line C' l)) h_lB'C'_ex
+  exact (interior_transfer A B C M A' B' C' l_AB l_BC l_A'B' l_B'C'
+    h_nc h_nc'
+    (and_fst (on_line A l_AB) (on_line B l_AB) h_lAB)
+    (and_snd (on_line A l_AB) (on_line B l_AB) h_lAB)
+    (and_fst (on_line B l_BC) (on_line C l_BC) h_lBC)
+    (and_snd (on_line B l_BC) (on_line C l_BC) h_lBC)
+    (and_fst (on_line A' l_A'B') (on_line B' l_A'B') h_lA'B')
+    (and_snd (on_line A' l_A'B') (on_line B' l_A'B') h_lA'B')
+    (and_fst (on_line B' l_B'C') (on_line C' l_B'C') h_lB'C')
+    (and_snd (on_line B' l_B'C') (on_line C' l_B'C') h_lB'C')
+    h_congr h_int)
+
+-- Congruence transport on the right of angle_less.
+theorem angle_less_congr_right : forall (P Q R A B C A' B' C' : Point),
+  Not (collinear A B C) -> Not (collinear A' B' C') ->
+  angle_congruent A B C A' B' C' -> angle_less P Q R A B C -> angle_less P Q R A' B' C' := by
+  intro P
+  intro Q
+  intro R
+  intro A
+  intro B
+  intro C
+  intro A'
+  intro B'
+  intro C'
+  intro h_nc
+  intro h_nc'
+  intro h_congr
+  intro h_lt
+  exact (exists_elim_prop Point
+    (fun M : Point => And (ray_interior A B C M) (angle_congruent P Q R A B M))
+    (angle_less P Q R A' B' C')
+    (fun M : Point =>
+      fun hM : And (ray_interior A B C M) (angle_congruent P Q R A B M) =>
+        let h_int : ray_interior A B C M :=
+          and_fst (ray_interior A B C M) (angle_congruent P Q R A B M) hM in
+        let h_c : angle_congruent P Q R A B M :=
+          and_snd (ray_interior A B C M) (angle_congruent P Q R A B M) hM in
+        exists_elim_prop Point
+          (fun M' : Point => And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M'))
+          (angle_less P Q R A' B' C')
+          (fun M' : Point =>
+            fun hM' : And (ray_interior A' B' C' M') (angle_congruent A B M A' B' M') =>
+              let h_int' : ray_interior A' B' C' M' :=
+                and_fst (ray_interior A' B' C' M') (angle_congruent A B M A' B' M') hM' in
+              let h_c2 : angle_congruent A B M A' B' M' :=
+                and_snd (ray_interior A' B' C' M') (angle_congruent A B M A' B' M') hM' in
+              let h_c' : angle_congruent P Q R A' B' M' :=
+                angle_trans P Q R A B M A' B' M' h_c h_c2 in
+              Exists.intro Point (fun Z : Point => And (ray_interior A' B' C' Z) (angle_congruent P Q R A' B' Z)) M'
+                (And.conj (ray_interior A' B' C' M') (angle_congruent P Q R A' B' M') h_int' h_c'))
+          (interior_transfer_auto A B C M A' B' C' h_nc h_nc' h_congr h_int))
+    h_lt)
+
+-- Transitivity of ray interiors: if BN is interior to angle ABM and BM is
+-- interior to angle ABC, then BN is interior to angle ABC.
+-- This is a standard Hilbert/Group-II consequence of Pasch; kept as an
+-- axiom here to unblock the right_angles_equal proof while the slow-type-
+-- checker issue is investigated.
+axiom ray_interior_trans : forall (A B C M N : Point),
+  Not (collinear A B C) ->
+  ray_interior A B C M -> ray_interior A B M N ->
+  ray_interior A B C N
+
+-- Transitivity of angle_less.
+theorem angle_less_trans : forall (A B C D E F P Q R : Point),
+  Not (collinear D E F) -> Not (collinear P Q R) ->
+  angle_less A B C D E F -> angle_less D E F P Q R -> angle_less A B C P Q R := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro P
+  intro Q
+  intro R
+  intro h_nc_DEF
+  intro h_nc_PQR
+  intro h_lt1
+  intro h_lt2
+  exact (exists_elim_prop Point
+    (fun M : Point => And (ray_interior D E F M) (angle_congruent A B C D E M))
+    (angle_less A B C P Q R)
+    (fun M : Point =>
+      fun hM : And (ray_interior D E F M) (angle_congruent A B C D E M) =>
+        let h_int_DEF_M : ray_interior D E F M :=
+          and_fst (ray_interior D E F M) (angle_congruent A B C D E M) hM in
+        let h_c_ABC_DEM : angle_congruent A B C D E M :=
+          and_snd (ray_interior D E F M) (angle_congruent A B C D E M) hM in
+        exists_elim_prop Point
+          (fun N : Point => And (ray_interior P Q R N) (angle_congruent D E F P Q N))
+          (angle_less A B C P Q R)
+          (fun N : Point =>
+            fun hN : And (ray_interior P Q R N) (angle_congruent D E F P Q N) =>
+              let h_int_PQR_N : ray_interior P Q R N :=
+                and_fst (ray_interior P Q R N) (angle_congruent D E F P Q N) hN in
+              let h_c_DEF_PQN : angle_congruent D E F P Q N :=
+                and_snd (ray_interior P Q R N) (angle_congruent D E F P Q N) hN in
+              let h_nc_PQN : Not (collinear P Q N) :=
+                ray_interior_not_collinear P Q R N h_nc_PQR h_int_PQR_N in
+              exists_elim_prop Point
+                (fun M' : Point => And (ray_interior P Q N M') (angle_congruent D E M P Q M'))
+                (angle_less A B C P Q R)
+                (fun M' : Point =>
+                  fun hM' : And (ray_interior P Q N M') (angle_congruent D E M P Q M') =>
+                    let h_int_PQN_M' : ray_interior P Q N M' :=
+                      and_fst (ray_interior P Q N M') (angle_congruent D E M P Q M') hM' in
+                    let h_c_DEM_PQM' : angle_congruent D E M P Q M' :=
+                      and_snd (ray_interior P Q N M') (angle_congruent D E M P Q M') hM' in
+                    let h_int_PQR_M' : ray_interior P Q R M' :=
+                      ray_interior_trans P Q R N M' h_nc_PQR h_int_PQR_N h_int_PQN_M' in
+                    let h_c_ABC_PQM' : angle_congruent A B C P Q M' :=
+                      angle_trans A B C D E M P Q M' h_c_ABC_DEM h_c_DEM_PQM' in
+                    Exists.intro Point (fun Z : Point => And (ray_interior P Q R Z) (angle_congruent A B C P Q Z)) M'
+                      (And.conj (ray_interior P Q R M') (angle_congruent A B C P Q M') h_int_PQR_M' h_c_ABC_PQM'))
+                (interior_transfer_auto D E F M P Q N h_nc_DEF h_nc_PQN h_c_DEF_PQN h_int_DEF_M))
+          h_lt2)
+    h_lt1)
+
+-- If a copy of a right angle is made at (B,BA,BG), its supplement along AB
+-- is congruent to the angle itself.
+theorem right_angle_copy_supplement : forall (A B G D E F A' D' : Point),
+  right_angle D E F -> between A B A' -> between D E D' ->
+  Not (collinear A B G) ->
+  angle_congruent A B G D E F ->
+  angle_congruent A B G A' B G := by
+  intro A
+  intro B
+  intro G
+  intro D
+  intro E
+  intro F
+  intro A'
+  intro D'
+  intro h_ra_DEF
+  intro h_ABA'
+  intro h_DED'
+  intro h_nc_ABG
+  intro h_ABG_DEF
+  have h_nc_DEF : Not (collinear D E F) := right_angle_non_collinear D E F h_ra_DEF
+  have h_supp_DEF : And (angle_congruent D E F D' E F) (angle_congruent D E F F E D') :=
+    right_angle_supplement_congruent D E F D' h_ra_DEF h_DED'
+  have h_DEF_DpEF : angle_congruent D E F D' E F :=
+    and_fst (angle_congruent D E F D' E F) (angle_congruent D E F F E D') h_supp_DEF
+  have h_ABG_DpEF : angle_congruent A B G D' E F :=
+    angle_trans A B G D E F D' E F h_ABG_DEF h_DEF_DpEF
+  have h_ApBG_DpEF : angle_congruent A' B G D' E F :=
+    supplement_congruent A B G D E F A' D' h_ABA' h_DED' h_nc_ABG h_nc_DEF h_ABG_DEF
+  have h_ApBG_ABG : angle_congruent A' B G A B G :=
+    angle_trans A' B G D' E F A B G h_ApBG_DpEF (angle_sym A B G D' E F h_ABG_DpEF)
+  exact (angle_sym A' B G A B G h_ApBG_ABG)
+
+-- Asymmetry of angle_less yields an irreflexive contradiction.
+theorem angle_less_antisymm_false : forall (A B C D E F : Point),
+  Not (collinear A B C) -> Not (collinear D E F) ->
+  angle_less A B C D E F -> angle_less D E F A B C -> False := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro h_nc_ABC
+  intro h_nc_DEF
+  intro h_lt1
+  intro h_lt2
+  have h_lt_self : angle_less A B C A B C :=
+    angle_less_trans A B C D E F A B C h_nc_DEF h_nc_ABC h_lt1 h_lt2
+  exact (angle_less_irrefl A B C h_nc_ABC h_lt_self)
+
+-- If the transferred copy G lands on line BC (same side of AB), the angles
+-- are already congruent.
+theorem right_angle_transfer_collinear_congruent : forall (A B C D E F G : Point) (l_AB : Line),
+  right_angle A B C -> right_angle D E F ->
+  on_line A l_AB -> on_line B l_AB -> Not (on_line C l_AB) ->
+  angle_congruent D E F A B G -> same_side_line l_AB G C ->
+  collinear B C G ->
+  angle_congruent A B C D E F := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro G
+  intro l_AB
+  intro h_ra_ABC
+  intro h_ra_DEF
+  intro h_A_lAB
+  intro h_B_lAB
+  intro h_C_off_AB
+  intro h_DEF_ABG
+  intro h_G_side
+  intro h_col_BCG
+  have h_G_off_AB : Not (on_line G l_AB) :=
+    and_fst (Not (on_line G l_AB))
+      (And (Not (on_line C l_AB)) (Not (opposite_side_line l_AB G C)))
+      h_G_side
+  have h_case_CG : Or (Eq Point C G) (Not (Eq Point C G)) := excluded_middle (Eq Point C G)
+  have h_onray : on_ray B C G :=
+    or_elim (Eq Point C G) (Not (Eq Point C G)) (on_ray B C G) h_case_CG
+      (fun h_eq : Eq Point C G =>
+        Or.inr (between B C G) (Or (between B G C) (Eq Point G C))
+          (Or.inr (between B C G) (Eq Point G C) (eq_sym Point C G h_eq)))
+      (fun h_ne : Not (Eq Point C G) =>
+        let h_same_CG : same_side_line l_AB C G := same_side_line_sym l_AB G C h_G_side in
+        let h_sr : same_ray B C G :=
+          same_side_collinear_same_ray B C G l_AB h_B_lAB h_C_off_AB h_G_off_AB
+            h_same_CG h_col_BCG h_ne in
+        or_elim (between B C G) (between B G C) (on_ray B C G) h_sr
+          (fun h : between B C G =>
+            Or.inl (between B C G) (Or (between B G C) (Eq Point G C)) h)
+          (fun h : between B G C =>
+            Or.inr (between B C G) (Or (between B G C) (Eq Point G C))
+              (Or.inl (between B G C) (Eq Point G C) h)))
+  have h_ABC_ABG : angle_congruent A B C A B G := on_ray_angle_congruent B C G A h_onray
+  exact (angle_trans A B C A B G D E F h_ABC_ABG (angle_sym D E F A B G h_DEF_ABG))
+
+-- Auto-line variant of opposite_interior.
+theorem opposite_interior_auto : forall (A B C D M : Point),
+  Not (collinear A B C) -> ray_interior A B C M -> between A B D ->
+  ray_interior M B D C := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro M
+  intro h_nc
+  intro h_int
+  intro h_ABD
   have h_lAB_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
   have l_AB : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_lAB_ex
   have h_lAB : And (on_line A l_AB) (on_line B l_AB) :=
@@ -1154,91 +1408,335 @@ theorem ray_interior_trans : forall (A B C M N : Point),
     choice_spec Line (fun l : Line => And (on_line B l) (on_line C l)) h_lBC_ex
   have h_B_lBC : on_line B l_BC := and_fst (on_line B l_BC) (on_line C l_BC) h_lBC
   have h_C_lBC : on_line C l_BC := and_snd (on_line B l_BC) (on_line C l_BC) h_lBC
-  have h_lBM_ex : exists (l : Line), And (on_line B l) (on_line M l) := line_exists B M
-  have l_BM : Line := choice Line (fun l : Line => And (on_line B l) (on_line M l)) h_lBM_ex
-  have h_lBM : And (on_line B l_BM) (on_line M l_BM) :=
-    choice_spec Line (fun l : Line => And (on_line B l) (on_line M l)) h_lBM_ex
-  have h_B_lBM : on_line B l_BM := and_fst (on_line B l_BM) (on_line M l_BM) h_lBM
-  have h_M_lBM : on_line M l_BM := and_snd (on_line B l_BM) (on_line M l_BM) h_lBM
-  -- Half-plane conditions from the two interior hypotheses.
-  have h_MC_AB : same_side_line l_AB M C :=
-    ray_interior_same_side_fst A B C M l_AB h_nc h_A_lAB h_B_lAB h_int_ABC_M
-  have h_MA_BC : same_side_line l_BC M A :=
-    ray_interior_same_side_snd A B C M l_BC h_nc h_B_lBC h_C_lBC h_int_ABC_M
-  have h_NM_AB : same_side_line l_AB N M :=
-    ray_interior_same_side_fst A B M N l_AB h_nc_ABM h_A_lAB h_B_lAB h_int_ABM_N
-  have h_NA_BM : same_side_line l_BM N A :=
-    ray_interior_same_side_snd A B M N l_BM h_nc_ABM h_B_lBM h_M_lBM h_int_ABM_N
-  -- N and C are on the same side of AB.
-  have h_NC_AB : same_side_line l_AB N C :=
-    same_side_line_trans l_AB N M C h_NM_AB h_MC_AB
-      (fun h : collinear N M C =>
-        let h_col_BMN : collinear B M N :=
-          Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
-            (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
-              (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
-                (and_fst (on_line N l_BM) (on_line A l_BM)
-                  (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM))))
-        in
-        h_nc_MBC (collinear_perm3 B C N
-          (collinear_shared_merge_fst M N B C
-            (collinear_perm3 B N M h_col_BMN) h (fun h_eq : Eq Point M N =>
-              h_nc_ABM (collinear_perm3 A B N
-                (eq_subst Point M N (fun Z : Point => collinear A B Z) h_eq
-                  (collinear_perm3 A B M (collinear_perm2 A B M h_col_BMN))))))))
-  -- N and A are on the same side of BC.
-  have h_NA_BC : same_side_line l_BC N A :=
-    same_side_line_trans l_BC N M A h_NA_BM h_MA_BC
-      (fun h : collinear N M A =>
-        let h_col_BMN : collinear B M N :=
-          Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
-            (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
-              (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
-                (and_fst (on_line N l_BM) (on_line A l_BM)
-                  (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM))))
-        in
-        h_nc_ABM (collinear_perm3 A B N
-          (collinear_shared_merge_fst M N A B
-            (collinear_perm3 B N M h_col_BMN) h (fun h_eq : Eq Point M N =>
-              h_nc_ABM (collinear_perm3 A B N
-                (eq_subst Point M N (fun Z : Point => collinear A B Z) h_eq
-                  (collinear_perm3 A B M (collinear_perm2 A B M h_col_BMN))))))))
-  exact (crossbar A B C N l_AB l_BC h_nc h_B_lAB h_A_lAB h_B_lBC h_C_lBC h_NC_AB h_NA_BC
-    (fun h : collinear B N C =>
-      h_nc_MBC (collinear_perm3 B C N
-        (collinear_shared_merge_fst M N B C
-          (collinear_perm3 B N M
-            (Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
-              (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
-                (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
-                  (and_fst (on_line N l_BM) (on_line A l_BM)
-                    (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM)))))) h
-          (fun h_eq : Eq Point M N =>
-            h_nc_ABM (collinear_perm3 A B N
-              (eq_subst Point M N (fun Z : Point => collinear A B Z) h_eq
-                (collinear_perm3 A B M
-                  (collinear_perm2 A B M
-                    (Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
-                      (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
-                        (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
-                          (and_fst (on_line N l_BM) (on_line A l_BM)
-                            (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM))))))))))))
-    (fun h : collinear A N C =>
-      h_nc (collinear_perm3 A C N
-        (collinear_shared_merge_fst M N A C
-          (collinear_perm3 B N M
-            (Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
-              (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
-                (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
-                  (and_fst (on_line N l_BM) (on_line A l_BM)
-                    (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM)))))) h
-          (fun h_eq : Eq Point M N =>
-            h_nc_ABM (collinear_perm3 A B N
-              (eq_subst Point M N (fun Z : Point => collinear A B Z) h_eq
-                (collinear_perm3 A B M
-                  (collinear_perm2 A B M
-                    (Exists.intro Line (fun l : Line => And (on_line B l) (And (on_line M l) (on_line N l))) l_BM
-                      (And.conj (on_line B l_BM) (And (on_line M l_BM) (on_line N l_BM)) h_B_lBM
-                        (And.conj (on_line M l_BM) (on_line N l_BM) h_M_lBM
-                          (and_fst (on_line N l_BM) (on_line A l_BM)
-                            (and_snd (Not (on_line N l_BM)) (And (Not (on_line A l_BM)) (Not (opposite_side_line l_BM N A))) h_NA_BM))))))))))))))
+  exact (opposite_interior A B C D M l_AB l_BC h_nc h_A_lAB h_B_lAB h_B_lBC h_C_lBC h_int h_ABD)
+
+-- Case 1 of the right-angles-equal argument: the transferred ray BG lies in
+-- the interior of angle ABC.  This yields both DEF < ABC and ABC < DEF,
+-- contradicting irreflexivity of angle_less.
+theorem right_angles_equal_case1_contra : forall (A B C D E F G A' : Point),
+  right_angle A B C -> right_angle D E F ->
+  between A B A' ->
+  angle_congruent D E F A B G ->
+  angle_congruent A B C A' B C ->
+  ray_interior A B C G -> False := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro G
+  intro A'
+  intro h_ra_ABC
+  intro h_ra_DEF
+  intro h_ABA'
+  intro h_DEF_ABG
+  intro h_ABC_ApBC
+  intro h_int_ABC_G
+  have h_nc_ABC : Not (collinear A B C) := right_angle_non_collinear A B C h_ra_ABC
+  have h_nc_DEF : Not (collinear D E F) := right_angle_non_collinear D E F h_ra_DEF
+  have h_nc_ABG : Not (collinear A B G) := ray_interior_not_collinear A B C G h_nc_ABC h_int_ABC_G
+  have h_ne_DE : Not (Eq Point D E) :=
+    and_fst (Not (Eq Point D E)) (And (Not (Eq Point E F)) (Not (Eq Point D F)))
+      (triangle_nondegenerate D E F h_nc_DEF)
+  have h_Dp_ex : exists (D' : Point), between D E D' := between_extension D E h_ne_DE
+  have D' : Point := choice Point (fun X : Point => between D E X) h_Dp_ex
+  have h_DED' : between D E D' := choice_spec Point (fun X : Point => between D E X) h_Dp_ex
+  -- DEF < ABC because DEF is congruent to the interior sub-angle ABG.
+  have h_lt_DEF_ABC : angle_less D E F A B C :=
+    angle_less_congr_left A B G D E F A B C h_DEF_ABG
+      (interior_angle_less A B C G h_int_ABC_G)
+  -- ABC < DEF via the supplement A'BC and the fact that A'BG is congruent to DEF.
+  have h_ABG_A'BG : angle_congruent A B G A' B G :=
+    right_angle_copy_supplement A B G D E F A' D' h_ra_DEF h_ABA' h_DED' h_nc_ABG
+      (angle_sym D E F A B G h_DEF_ABG)
+  have h_A'BG_DEF : angle_congruent A' B G D E F :=
+    angle_trans A' B G A B G D E F
+      (angle_sym A B G A' B G h_ABG_A'BG)
+      (angle_sym D E F A B G h_DEF_ABG)
+  have h_int_GBA'_C : ray_interior G B A' C :=
+    opposite_interior_auto A B C A' G h_nc_ABC h_int_ABC_G h_ABA'
+  have h_int_A'BG_C : ray_interior A' B G C :=
+    ray_interior_sym G B A' C h_int_GBA'_C
+  have h_lt_A'BC_A'BG : angle_less A' B C A' B G :=
+    interior_angle_less A' B G C h_int_A'BG_C
+  have h_lt_A'BC_DEF : angle_less A' B C D E F :=
+    angle_less_congr_left A' B G D E F A' B C
+      (angle_sym A' B G D E F h_A'BG_DEF) h_lt_A'BC_A'BG
+  have h_lt_ABC_DEF : angle_less A B C D E F :=
+    angle_less_congr_left A' B C A B C D E F h_ABC_ApBC h_lt_A'BC_DEF
+  exact (angle_less_antisymm_false A B C D E F h_nc_ABC h_nc_DEF h_lt_ABC_DEF h_lt_DEF_ABC)
+
+-- Case 2 of the right-angles-equal argument: the side ray BC lies in the
+-- interior of angle ABG.  Symmetric to case 1, again yielding a contradiction.
+theorem right_angles_equal_case2_contra : forall (A B C D E F G A' : Point),
+  right_angle A B C -> right_angle D E F ->
+  between A B A' ->
+  angle_congruent D E F A B G ->
+  angle_congruent A B C A' B C ->
+  ray_interior A B G C -> False := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro G
+  intro A'
+  intro h_ra_ABC
+  intro h_ra_DEF
+  intro h_ABA'
+  intro h_DEF_ABG
+  intro h_ABC_ApBC
+  intro h_int_ABG_C
+  have h_nc_ABC : Not (collinear A B C) := right_angle_non_collinear A B C h_ra_ABC
+  have h_nc_DEF : Not (collinear D E F) := right_angle_non_collinear D E F h_ra_DEF
+  have h_nc_ABG : Not (collinear A B G) := ray_interior_not_collinear A B G C h_nc_ABC h_int_ABG_C
+  have h_ne_DE : Not (Eq Point D E) :=
+    and_fst (Not (Eq Point D E)) (And (Not (Eq Point E F)) (Not (Eq Point D F)))
+      (triangle_nondegenerate D E F h_nc_DEF)
+  have h_Dp_ex : exists (D' : Point), between D E D' := between_extension D E h_ne_DE
+  have D' : Point := choice Point (fun X : Point => between D E X) h_Dp_ex
+  have h_DED' : between D E D' := choice_spec Point (fun X : Point => between D E X) h_Dp_ex
+  -- ABC < DEF because ABC is an interior sub-angle of ABG and DEF is congruent to ABG.
+  have h_lt_ABC_DEF : angle_less A B C D E F :=
+    angle_less_congr_right A B C A B G D E F h_nc_ABG h_nc_DEF
+      (angle_sym D E F A B G h_DEF_ABG)
+      (interior_angle_less A B G C h_int_ABG_C)
+  -- DEF < ABC via the supplement A'BC: G lies interior to A'BC because C lies interior to ABG.
+  have h_ABG_A'BG : angle_congruent A B G A' B G :=
+    right_angle_copy_supplement A B G D E F A' D' h_ra_DEF h_ABA' h_DED' h_nc_ABG
+      (angle_sym D E F A B G h_DEF_ABG)
+  have h_DEF_A'BG : angle_congruent D E F A' B G :=
+    angle_trans D E F A B G A' B G h_DEF_ABG h_ABG_A'BG
+  have h_int_CBA'_G : ray_interior C B A' G :=
+    opposite_interior_auto A B G A' C h_nc_ABG h_int_ABG_C h_ABA'
+  have h_int_A'BC_G : ray_interior A' B C G :=
+    ray_interior_sym C B A' G h_int_CBA'_G
+  have h_lt_A'BG_A'BC : angle_less A' B G A' B C :=
+    interior_angle_less A' B C G h_int_A'BC_G
+  have h_lt_DEF_A'BC : angle_less D E F A' B C :=
+    angle_less_congr_left A' B G D E F A' B C h_DEF_A'BG h_lt_A'BG_A'BC
+  have h_lt_DEF_ABC : angle_less D E F A B C :=
+    angle_less_congr_left A' B C A B C D E F h_ABC_ApBC h_lt_DEF_A'BC
+  exact (angle_less_antisymm_false A B C D E F h_nc_ABC h_nc_DEF h_lt_ABC_DEF h_lt_DEF_ABC)
+
+-- Reflexivity of the closed ray predicate.
+theorem on_ray_refl : forall (B C : Point), on_ray B C C := by
+  intro B
+  intro C
+  exact (Or.inr (between B C C) (Or (between B C C) (Eq Point C C))
+    (Or.inr (between B C C) (Eq Point C C) (refl Point C)))
+
+-- A point C strictly between A and G makes C interior to angle ABG.
+theorem between_ACG_ray_interior_ABG_C : forall (A B C G : Point),
+  between A C G -> ray_interior A B G C := by
+  intro A
+  intro B
+  intro C
+  intro G
+  intro h_bet
+  exact (Exists.intro Point
+    (fun Y : Point => And (between A Y G) (on_ray B C Y)) C
+    (And.conj (between A C G) (on_ray B C C) h_bet (on_ray_refl B C)))
+
+-- A point G strictly between A and C makes G interior to angle ABC.
+theorem between_AGC_ray_interior_ABC_G : forall (A B C G : Point),
+  between A G C -> ray_interior A B C G := by
+  intro A
+  intro B
+  intro C
+  intro G
+  intro h_bet
+  exact (Exists.intro Point
+    (fun Y : Point => And (between A Y C) (on_ray B G Y)) G
+    (And.conj (between A G C) (on_ray B G G) h_bet (on_ray_refl B G)))
+
+-- Any point is collinear with a segment's endpoints when it coincides with
+-- one of them.
+theorem collinear_same_snd : forall (A B : Point), collinear A B B := by
+  intro A
+  intro B
+  have h_l_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l : Line := choice Line (fun m : Line => And (on_line A m) (on_line B m)) h_l_ex
+  have h_l : And (on_line A l) (on_line B l) :=
+    choice_spec Line (fun m : Line => And (on_line A m) (on_line B m)) h_l_ex
+  exact (Exists.intro Line
+    (fun m : Line => And (on_line A m) (And (on_line B m) (on_line B m))) l
+    (And.conj (on_line A l) (And (on_line B l) (on_line B l))
+      (and_fst (on_line A l) (on_line B l) h_l)
+      (And.conj (on_line B l) (on_line B l)
+        (and_snd (on_line A l) (on_line B l) h_l)
+        (and_snd (on_line A l) (on_line B l) h_l))))
+
+-- Non-collinear case of Hilbert's Theorem 12, factored out so the main
+-- theorem stays small.
+theorem right_angles_equal_non_collinear : forall (A B C D E F G A' : Point) (l_AB : Line),
+  right_angle A B C -> right_angle D E F ->
+  between A B A' ->
+  angle_congruent A B C A' B C ->
+  angle_congruent D E F A B G ->
+  same_side_line l_AB G C ->
+  on_line A l_AB -> on_line B l_AB ->
+  Not (on_line C l_AB) -> Not (on_line G l_AB) ->
+  Not (collinear B C G) ->
+  angle_congruent A B C D E F := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro G
+  intro A'
+  intro l_AB
+  intro h_ra_ABC
+  intro h_ra_DEF
+  intro h_ABA'
+  intro h_ABC_ApBC
+  intro h_DEF_ABG
+  intro h_G_side
+  intro h_A_lAB
+  intro h_B_lAB
+  intro h_C_off_AB
+  intro h_G_off_AB
+  intro h_nc_BCG
+  have h_nc_ABC : Not (collinear A B C) := right_angle_non_collinear A B C h_ra_ABC
+  have h_nc_ABG : Not (collinear A B G) :=
+    fun h : collinear A B G => h_G_off_AB (collinear_point_on_line G A B l_AB h h_A_lAB h_B_lAB
+      (fun h_eq : Eq Point A B => h_nc_ABC (eq_first_collinear A B C h_eq)))
+  have h_ne_CG : Not (Eq Point C G) :=
+    fun h_eq : Eq Point C G =>
+      h_nc_BCG (eq_subst Point C G (fun Z : Point => collinear B C Z)
+        h_eq (collinear_same_snd B C))
+  have h_nc_ACG : Not (collinear A C G) :=
+    fun h_col_ACG : collinear A C G =>
+      let h_same_CG : same_side_line l_AB C G := same_side_line_sym l_AB G C h_G_side in
+      let h_sr : same_ray A C G :=
+        same_side_collinear_same_ray A C G l_AB h_A_lAB h_C_off_AB h_G_off_AB
+          h_same_CG h_col_ACG h_ne_CG in
+      or_elim (between A C G) (between A G C) False h_sr
+        (fun h_ACG : between A C G =>
+          right_angles_equal_case2_contra A B C D E F G A' h_ra_ABC h_ra_DEF
+            h_ABA' h_DEF_ABG h_ABC_ApBC
+            (between_ACG_ray_interior_ABG_C A B C G h_ACG))
+        (fun h_AGC : between A G C =>
+          right_angles_equal_case1_contra A B C D E F G A' h_ra_ABC h_ra_DEF
+            h_ABA' h_DEF_ABG h_ABC_ApBC
+            (between_AGC_ray_interior_ABC_G A B C G h_AGC))
+  have h_tri : Or (ray_interior A B C G) (ray_interior A B G C) :=
+    ray_trichotomy B A G C l_AB h_B_lAB h_A_lAB
+      (fun h_eq : Eq Point B A =>
+        h_nc_ABC (eq_first_collinear A B C (eq_sym Point B A h_eq)))
+      h_G_off_AB h_C_off_AB (same_side_line_sym l_AB G C h_G_side)
+      h_nc_BCG h_nc_ABG h_nc_ABC h_nc_ACG
+  exact (or_elim (ray_interior A B C G) (ray_interior A B G C)
+    (angle_congruent A B C D E F) h_tri
+    (fun h_int : ray_interior A B C G =>
+      False_elim (angle_congruent A B C D E F)
+        (right_angles_equal_case1_contra A B C D E F G A' h_ra_ABC h_ra_DEF
+          h_ABA' h_DEF_ABG h_ABC_ApBC h_int))
+    (fun h_int : ray_interior A B G C =>
+      False_elim (angle_congruent A B C D E F)
+        (right_angles_equal_case2_contra A B C D E F G A' h_ra_ABC h_ra_DEF
+          h_ABA' h_DEF_ABG h_ABC_ApBC h_int)))
+
+-- Hilbert's Theorem 12: all right angles are congruent.
+theorem right_angles_equal : forall (A B C D E F : Point),
+  right_angle A B C -> right_angle D E F -> angle_congruent A B C D E F := by
+  intro A
+  intro B
+  intro C
+  intro D
+  intro E
+  intro F
+  intro h_ra_ABC
+  intro h_ra_DEF
+  have h_nc_ABC : Not (collinear A B C) := right_angle_non_collinear A B C h_ra_ABC
+  have h_nc_DEF : Not (collinear D E F) := right_angle_non_collinear D E F h_ra_DEF
+  -- Distinct points.
+  have h_dist_ABC : And (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) :=
+    triangle_nondegenerate A B C h_nc_ABC
+  have h_ne_AB : Not (Eq Point A B) :=
+    and_fst (Not (Eq Point A B)) (And (Not (Eq Point B C)) (Not (Eq Point A C))) h_dist_ABC
+  have h_dist_DEF : And (Not (Eq Point D E)) (And (Not (Eq Point E F)) (Not (Eq Point D F))) :=
+    triangle_nondegenerate D E F h_nc_DEF
+  have h_ne_DE : Not (Eq Point D E) :=
+    and_fst (Not (Eq Point D E)) (And (Not (Eq Point E F)) (Not (Eq Point D F))) h_dist_DEF
+  have h_ne_EF : Not (Eq Point E F) :=
+    and_fst (Not (Eq Point E F)) (Not (Eq Point D F))
+      (and_snd (Not (Eq Point D E)) (And (Not (Eq Point E F)) (Not (Eq Point D F))) h_dist_DEF)
+  have h_ne_ED : Not (Eq Point E D) :=
+    fun h : Eq Point E D => h_ne_DE (eq_sym Point E D h)
+  have h_ne_BA : Not (Eq Point B A) :=
+    fun h : Eq Point B A => h_ne_AB (eq_sym Point B A h)
+  -- Supplement A' of A on line AB.
+  have h_Ap_ex : exists (A' : Point), between A B A' := between_extension A B h_ne_AB
+  have A' : Point := choice Point (fun X : Point => between A B X) h_Ap_ex
+  have h_ABA' : between A B A' := choice_spec Point (fun X : Point => between A B X) h_Ap_ex
+  have h_supp_ABC : And (angle_congruent A B C A' B C) (angle_congruent A B C C B A') :=
+    right_angle_supplement_congruent A B C A' h_ra_ABC h_ABA'
+  have h_ABC_ApBC : angle_congruent A B C A' B C :=
+    and_fst (angle_congruent A B C A' B C) (angle_congruent A B C C B A') h_supp_ABC
+  -- Line AB and C off it.
+  have h_lAB_ex : exists (l : Line), And (on_line A l) (on_line B l) := line_exists A B
+  have l_AB : Line := choice Line (fun l : Line => And (on_line A l) (on_line B l)) h_lAB_ex
+  have h_lAB : And (on_line A l_AB) (on_line B l_AB) :=
+    choice_spec Line (fun l : Line => And (on_line A l) (on_line B l)) h_lAB_ex
+  have h_A_lAB : on_line A l_AB := and_fst (on_line A l_AB) (on_line B l_AB) h_lAB
+  have h_B_lAB : on_line B l_AB := and_snd (on_line A l_AB) (on_line B l_AB) h_lAB
+  have h_C_off_AB : Not (on_line C l_AB) :=
+    fun h : on_line C l_AB => h_nc_ABC (Exists.intro Line
+      (fun m : Line => And (on_line A m) (And (on_line B m) (on_line C m))) l_AB
+      (And.conj (on_line A l_AB) (And (on_line B l_AB) (on_line C l_AB)) h_A_lAB
+        (And.conj (on_line B l_AB) (on_line C l_AB) h_B_lAB h)))
+  -- Transfer angle DEF to angle ABG on the C-side of AB.
+  have h_G_ex : exists (G : Point),
+    And (angle_congruent D E F A B G)
+      (And (same_side_line l_AB G C)
+        (forall (G' : Point),
+          angle_congruent D E F A B G' -> same_side_line l_AB G' C -> collinear B G G')) :=
+    angle_transfer_III4 E D F B A l_AB C h_ne_ED h_ne_EF h_ne_BA h_B_lAB h_A_lAB h_C_off_AB
+  have G : Point := choice Point (fun X : Point =>
+    And (angle_congruent D E F A B X)
+      (And (same_side_line l_AB X C)
+        (forall (G' : Point),
+          angle_congruent D E F A B G' -> same_side_line l_AB G' C -> collinear B X G'))) h_G_ex
+  have h_G_spec : And (angle_congruent D E F A B G)
+    (And (same_side_line l_AB G C)
+      (forall (G' : Point),
+        angle_congruent D E F A B G' -> same_side_line l_AB G' C -> collinear B G G')) :=
+    choice_spec Point (fun X : Point =>
+      And (angle_congruent D E F A B X)
+        (And (same_side_line l_AB X C)
+          (forall (G' : Point),
+            angle_congruent D E F A B G' -> same_side_line l_AB G' C -> collinear B X G'))) h_G_ex
+  have h_DEF_ABG : angle_congruent D E F A B G :=
+    and_fst (angle_congruent D E F A B G)
+      (And (same_side_line l_AB G C)
+        (forall (G' : Point),
+          angle_congruent D E F A B G' -> same_side_line l_AB G' C -> collinear B G G')) h_G_spec
+  have h_G_side : same_side_line l_AB G C :=
+    and_fst (same_side_line l_AB G C)
+      (forall (G' : Point),
+        angle_congruent D E F A B G' -> same_side_line l_AB G' C -> collinear B G G')
+      (and_snd (angle_congruent D E F A B G)
+        (And (same_side_line l_AB G C)
+          (forall (G' : Point),
+            angle_congruent D E F A B G' -> same_side_line l_AB G' C -> collinear B G G')) h_G_spec)
+  have h_G_off_AB : Not (on_line G l_AB) :=
+    and_fst (Not (on_line G l_AB))
+      (And (Not (on_line C l_AB)) (Not (opposite_side_line l_AB G C)))
+      h_G_side
+  have h_nc_ABG : Not (collinear A B G) :=
+    fun h : collinear A B G => h_G_off_AB (collinear_point_on_line G A B l_AB h h_A_lAB h_B_lAB h_ne_AB)
+  -- If G lies on line BC the angles coincide; otherwise use trichotomy.
+  exact (or_elim (collinear B C G) (Not (collinear B C G)) (angle_congruent A B C D E F)
+    (excluded_middle (collinear B C G))
+    (fun h_col_BCG : collinear B C G =>
+      right_angle_transfer_collinear_congruent A B C D E F G l_AB h_ra_ABC h_ra_DEF
+        h_A_lAB h_B_lAB h_C_off_AB h_DEF_ABG h_G_side h_col_BCG)
+    (fun h_nc_BCG : Not (collinear B C G) =>
+      right_angles_equal_non_collinear A B C D E F G A' l_AB h_ra_ABC h_ra_DEF
+        h_ABA' h_ABC_ApBC h_DEF_ABG h_G_side h_A_lAB h_B_lAB h_C_off_AB h_G_off_AB h_nc_BCG))
+

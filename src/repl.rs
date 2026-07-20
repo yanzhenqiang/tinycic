@@ -255,8 +255,10 @@ impl Repl {
             let contents = fs::read_to_string(filepath)
                 .map_err(|e| format!("Cannot read file '{}': {}", filepath, e))?;
             let mut parser = ReplParser::new_with_state(&contents, self.infix_ops.clone(), self.notations.clone());
+            self.write_profile("_file_", &format!("parse start {}", filepath));
             let decls = parser.parse_file()
                 .map_err(|e| format!("Parse error in '{}': {}", filepath, e))?;
+            self.write_profile("_file_", &format!("parse done {} decls", decls.len()));
 
             let count = decls.len();
             for decl in decls {
@@ -265,6 +267,15 @@ impl Repl {
             if !self.quiet {
                 println!("  Loaded {} declarations from {}", count, filepath);
             }
+        }
+        if !self.quiet {
+            println!("[checker stats] infer: {} calls, {} hits; whnf: {} calls, {} hits; defeq: {} calls, {} hits",
+                self.tc_state.infer_calls,
+                self.tc_state.infer_hits,
+                self.tc_state.whnf_calls,
+                self.tc_state.whnf_hits,
+                self.tc_state.defeq_calls,
+                self.tc_state.defeq_hits);
         }
         Ok(())
     }
@@ -472,6 +483,22 @@ impl Repl {
         result
     }
 
+    fn write_profile(&self, name: &str, stage: &str) {
+        use std::io::Write;
+        let path = std::path::PathBuf::from(
+            "/data/data/com.termux/files/home/tinycic/tmp/profile_theorem.log"
+        );
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            let _ = f.write_all(format!("[checker] {}: {}\n", name, stage).as_bytes());
+            let _ = f.flush();
+            let _ = f.sync_data();
+        }
+    }
+
     fn process_decl(&mut self, decl: ParsedDecl) -> Result<(), String> {
         match decl {
             ParsedDecl::Axiom { name, ty } => {
@@ -499,6 +526,7 @@ impl Repl {
             }
             ParsedDecl::Theorem { name, params, ret_ty, value } => {
                 eprintln!("PROCESSING THEOREM: {}", name);
+                self.write_profile(&name, "process_decl theorem start");
                 self.process_def_or_theorem(name, params, Some(ret_ty), value, true, false)
             }
             ParsedDecl::Solve { name, params, ret_ty, value } => {
@@ -899,6 +927,22 @@ impl Repl {
         is_theorem: bool,
         trace: bool,
     ) -> Result<(), String> {
+        let profile_path = std::path::PathBuf::from(
+            "/data/data/com.termux/files/home/tinycic/tmp/profile_theorem.log"
+        );
+        let write_profile = |line: &str| {
+            use std::io::Write;
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&profile_path)
+            {
+                let _ = f.write_all(line.as_bytes());
+                let _ = f.flush();
+                let _ = f.sync_data();
+            }
+        };
+        write_profile(&format!("[checker] {}: entering process_def_or_theorem\n", name));
         // Prepend file-scoped variables to params
         let mut all_params = self.file_variables.clone();
         all_params.extend(params);
@@ -977,14 +1021,71 @@ impl Repl {
 
         if is_theorem {
             // Type-check in relaxed mode (allows unassigned metavariables during solving)
-            let mut tc = TypeChecker::with_allow_unassigned_mvar(&mut self.tc_state, super::local_ctx::LocalCtx::new());
-            if trace || self.trace_enabled {
-                tc.set_trace(true);
-                tc.set_trace_format(self.trace_format);
-                tc.set_trace_file(&self.trace_path);
+            let stats_before = (
+                self.tc_state.infer_calls,
+                self.tc_state.infer_hits,
+                self.tc_state.whnf_calls,
+                self.tc_state.whnf_hits,
+                self.tc_state.defeq_calls,
+                self.tc_state.defeq_hits,
+            );
+            // Persist profiling to a file so it survives SIGTERM/SIGKILL.
+            let profile_path = std::path::PathBuf::from(
+                "/data/data/com.termux/files/home/tinycic/tmp/profile_theorem.log"
+            );
+            let write_profile = |line: &str| {
+                use std::io::Write;
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&profile_path)
+                {
+                    let _ = f.write_all(line.as_bytes());
+                    let _ = f.flush();
+                    let _ = f.sync_data();
+                }
+            };
+            write_profile(&format!("[checker] {}: started\n", name));
+            {
+                let mut tc = TypeChecker::with_allow_unassigned_mvar(
+                    &mut self.tc_state, super::local_ctx::LocalCtx::new());
+                if trace || self.trace_enabled {
+                    tc.set_trace(true);
+                    tc.set_trace_format(self.trace_format);
+                    tc.set_trace_file(&self.trace_path);
+                }
+                tc.check(&final_value, &final_ty)
+                    .map_err(|e| format!("Proof does not match theorem type: {}", e))?;
             }
-            tc.check(&final_value, &final_ty)
-                .map_err(|e| format!("Proof does not match theorem type: {}", e))?;
+            let stats_after = (
+                self.tc_state.infer_calls,
+                self.tc_state.infer_hits,
+                self.tc_state.whnf_calls,
+                self.tc_state.whnf_hits,
+                self.tc_state.defeq_calls,
+                self.tc_state.defeq_hits,
+            );
+            let (ic, ih, wc, wh, dc, dh) = (
+                stats_after.0 - stats_before.0,
+                stats_after.1 - stats_before.1,
+                stats_after.2 - stats_before.2,
+                stats_after.3 - stats_before.3,
+                stats_after.4 - stats_before.4,
+                stats_after.5 - stats_before.5,
+            );
+            if !self.quiet {
+                let mut err = std::io::stderr().lock();
+                let _ = writeln!(
+                    err,
+                    "  [checker] {}: infer {} ({} hits), whnf {} ({} hits), defeq {} ({} hits)",
+                    name, ic, ih, wc, wh, dc, dh
+                );
+                let _ = err.flush();
+            }
+            write_profile(&format!(
+                "[checker] {}: infer {} ({} hits), whnf {} ({} hits), defeq {} ({} hits)\n",
+                name, ic, ih, wc, wh, dc, dh
+            ));
 
             // Collect solve-variable info: gather all MVars from value and type
             let mut mvar_names = Vec::new();

@@ -1024,3 +1024,27 @@ theorem opposite_opposite_to_same : forall (l : Line) (A B C : Point),
         h_opp3
   exact (And.conj (Not (on_line B l)) (And (Not (on_line C l)) (Not (opposite_side_line l B C))) h_B_off
     (And.conj (Not (on_line C l)) (Not (opposite_side_line l B C)) h_C_off h_nopp))
+
+-- Plane dichotomy, negative form: two off-line points that are not on the
+-- same side are on opposite sides.
+theorem not_same_side_to_opposite : forall (l : Line) (A B : Point),
+  Not (on_line A l) -> Not (on_line B l) ->
+  Not (same_side_line l A B) -> opposite_side_line l A B := by
+  intro l
+  intro A
+  intro B
+  intro h_A_off
+  intro h_B_off
+  intro h_not_same
+  have h_em : Or (opposite_side_line l A B) (Not (opposite_side_line l A B)) :=
+    excluded_middle (opposite_side_line l A B)
+  exact (or_elim (opposite_side_line l A B) (Not (opposite_side_line l A B))
+    (opposite_side_line l A B) h_em
+    (fun h_opp : opposite_side_line l A B => h_opp)
+    (fun h_nopp : Not (opposite_side_line l A B) =>
+      False_elim (opposite_side_line l A B) (h_not_same
+        (And.conj (Not (on_line A l))
+          (And (Not (on_line B l)) (Not (opposite_side_line l A B)))
+          h_A_off
+          (And.conj (Not (on_line B l)) (Not (opposite_side_line l A B))
+            h_B_off h_nopp)))))
